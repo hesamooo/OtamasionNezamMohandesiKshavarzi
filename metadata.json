@@ -1,0 +1,6 @@
+{
+  "name": "سامانه اتوماسیون کشاورزی و مهندسی مرکز ۶۳۶ خفر",
+  "description": "سامانه جامع اتوماسیون اداری، پرونده‌های ۳ گروه تخصصی کشاورزی، بانک قوانین NotebookLM، ابزار تخصصی کروکی چندلایه UTM، صدور استعلام‌ها و چاپ سربرگ رسمی مرکز خدمات کشاورزی ۶۳۶ خفر",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

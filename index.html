@@ -1,0 +1,2137 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>سامانه اتوماسیون کشاورزی و مهندسی مرکز ۶۳۶ خفر</title>
+  <meta name="description" content="سامانه جامع اتوماسیون اداری، پرونده‌های ۳ گروه تخصصی کشاورزی، ابزار تخصصی کروکی چندلایه UTM با نقشه گوگل‌ارث، صدور استعلام‌ها و چاپ سربرگ رسمی A4 و A5 مرکز خدمات کشاورزی ۶۳۶ خفر" />
+  <meta property="og:title" content="سامانه اتوماسیون کشاورزی و مهندسی مرکز ۶۳۶ خفر" />
+  <meta property="og:description" content="سامانه جامع اتوماسیون اداری، پرونده‌های ۳ گروه تخصصی کشاورزی، ابزار تخصصی کروکی چندلایه UTM با نقشه گوگل‌ارث، صدور استعلام‌ها و چاپ سربرگ رسمی A4 و A5 مرکز خدمات کشاورزی ۶۳۶ خفر" />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary_large_image" />
+
+  <!-- استایل کامل و ۱۰۰٪ خودکفای آفلاین ویندوز (بدون نیاز به اینترنت یا سرور) -->
+  <style>
+    @font-face {
+      font-family: 'Vazirmatn';
+      src: url('./public/fonts/Vazirmatn-Regular.ttf') format('truetype'),
+           url('/fonts/Vazirmatn-Regular.ttf') format('truetype');
+      font-weight: 400;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'Vazirmatn';
+      src: url('./public/fonts/Vazirmatn-Bold.ttf') format('truetype'),
+           url('/fonts/Vazirmatn-Bold.ttf') format('truetype');
+      font-weight: 700;
+      font-display: swap;
+    }
+
+    :root {
+      --primary: #14532d;
+      --primary-mid: #15803d;
+      --gold: #c59b27;
+      --bg-soft: #f1f5f2;
+    }
+
+    * {
+      box-sizing: border-box;
+      font-family: 'Vazirmatn', 'Tahoma', 'Segoe UI', sans-serif;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      direction: rtl;
+      text-align: right;
+      background-color: var(--bg-soft);
+      color: #0f172a;
+      font-size: 13.5px;
+      line-height: 1.65;
+    }
+
+    /* کلاس‌های پایه آفلاین (در صورت عدم دسترسی به CDN بوت‌استرپ در ویندوز آفلاین) */
+    .d-none { display: none !important; }
+    .d-block { display: block !important; }
+    .d-flex { display: flex !important; }
+    .flex-wrap { flex-wrap: wrap !important; }
+    .flex-column { flex-direction: column !important; }
+    .justify-content-between { justify-content: space-between !important; }
+    .justify-content-center { justify-content: center !important; }
+    .justify-content-end { justify-content: flex-end !important; }
+    .align-items-center { align-items: center !important; }
+    .align-items-start { align-items: flex-start !important; }
+    .align-items-end { align-items: flex-end !important; }
+    .gap-1 { gap: 0.28rem !important; }
+    .gap-2 { gap: 0.55rem !important; }
+    .gap-3 { gap: 1rem !important; }
+    .w-100 { width: 100% !important; }
+    .h-100 { height: 100% !important; }
+    .m-0 { margin: 0 !important; }
+    .mb-1 { margin-bottom: 0.25rem !important; }
+    .mb-2 { margin-bottom: 0.5rem !important; }
+    .mb-3 { margin-bottom: 1rem !important; }
+    .mt-1 { margin-top: 0.25rem !important; }
+    .mt-2 { margin-top: 0.5rem !important; }
+    .mt-3 { margin-top: 1rem !important; }
+    .me-1 { margin-left: 0.3rem !important; }
+    .me-2 { margin-left: 0.6rem !important; }
+    .p-2 { padding: 0.5rem !important; }
+    .p-3 { padding: 1rem !important; }
+    .p-4 { padding: 1.5rem !important; }
+    .px-1 { padding-left: 0.3rem !important; padding-right: 0.3rem !important; }
+    .px-2 { padding-left: 0.55rem !important; padding-right: 0.55rem !important; }
+    .px-3 { padding-left: 1rem !important; padding-right: 1rem !important; }
+    .py-0 { padding-top: 0.1rem !important; padding-bottom: 0.1rem !important; }
+    .py-1 { padding-top: 0.28rem !important; padding-bottom: 0.28rem !important; }
+    .py-2 { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; }
+    .py-3 { padding-top: 0.9rem !important; padding-bottom: 0.9rem !important; }
+    .py-4 { padding-top: 1.4rem !important; padding-bottom: 1.4rem !important; }
+    .pt-2 { padding-top: 0.5rem !important; }
+    .pb-2 { padding-bottom: 0.5rem !important; }
+    .text-center { text-align: center !important; }
+    .text-start { text-align: right !important; }
+    .text-end { text-align: left !important; }
+    .fw-bold { font-weight: 700 !important; }
+    .small { font-size: 0.82rem !important; }
+    .fs-6 { font-size: 0.92rem !important; }
+    .text-muted { color: #64748b !important; }
+    .text-secondary { color: #475569 !important; }
+    .text-success { color: #15803d !important; }
+    .text-danger { color: #b91c1c !important; }
+    .text-primary { color: #1d4ed8 !important; }
+    .text-warning { color: #d97706 !important; }
+    .text-white { color: #ffffff !important; }
+    .text-dark { color: #0f172a !important; }
+    .bg-white { background-color: #ffffff !important; }
+    .bg-light { background-color: #f8fafc !important; }
+    .bg-success { background-color: #15803d !important; color: #fff; }
+    .bg-primary { background-color: #1d4ed8 !important; color: #fff; }
+    .bg-danger { background-color: #dc2626 !important; color: #fff; }
+    .bg-warning { background-color: #f59e0b !important; }
+    .bg-secondary { background-color: #475569 !important; color: #fff; }
+    .bg-dark { background-color: #0f172a !important; color: #fff; }
+    .bg-success-subtle { background-color: #dcfce7 !important; }
+    .bg-danger-subtle { background-color: #fee2e2 !important; }
+    .border { border: 1px solid #cbd5e1 !important; }
+    .border-top { border-top: 1px solid #cbd5e1 !important; }
+    .border-bottom { border-bottom: 1px solid #cbd5e1 !important; }
+    .border-success { border-color: #16a34a !important; }
+    .border-danger { border-color: #dc2626 !important; }
+    .rounded { border-radius: 0.45rem !important; }
+    .rounded-3 { border-radius: 0.65rem !important; }
+    .list-unstyled { list-style: none; padding: 0; margin: 0; }
+
+    /* سیستم گرید واکنش‌گرا آفلاین */
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      margin-right: -0.5rem;
+      margin-left: -0.5rem;
+    }
+    .row > * {
+      padding-right: 0.5rem;
+      padding-left: 0.5rem;
+      width: 100%;
+    }
+    .g-2 > * { margin-bottom: 0.5rem; }
+    .g-3 > * { margin-bottom: 0.75rem; }
+    @media (min-width: 768px) {
+      .col-md-2 { width: 16.6667%; }
+      .col-md-3 { width: 25%; }
+      .col-md-4 { width: 33.3333%; }
+      .col-md-5 { width: 41.6667%; }
+      .col-md-6 { width: 50%; }
+      .col-md-7 { width: 58.3333%; }
+      .col-md-8 { width: 66.6667%; }
+      .col-md-9 { width: 75%; }
+      .col-md-12, .col-12 { width: 100%; }
+      .col-lg-4 { width: 33.3333%; }
+      .col-lg-5 { width: 41.6667%; }
+      .col-lg-6 { width: 50%; }
+      .col-lg-7 { width: 58.3333%; }
+      .col-lg-8 { width: 66.6667%; }
+    }
+
+    /* فرم‌ها و دکمه‌ها */
+    .form-control, .form-select {
+      display: block;
+      width: 100%;
+      padding: 0.4rem 0.65rem;
+      font-size: 0.87rem;
+      color: #0f172a;
+      background-color: #fff;
+      border: 1px solid #cbd5e1;
+      border-radius: 0.42rem;
+    }
+    .form-control:focus, .form-select:focus {
+      border-color: #15803d;
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.15);
+    }
+    .form-control-sm, .form-select-sm {
+      padding: 0.26rem 0.5rem;
+      font-size: 0.81rem;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.3rem;
+      font-weight: 700;
+      padding: 0.42rem 0.82rem;
+      font-size: 0.84rem;
+      border-radius: 0.42rem;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      text-decoration: none;
+    }
+    .btn:hover { opacity: 0.93; }
+    .btn-sm { padding: 0.24rem 0.55rem; font-size: 0.77rem; border-radius: 0.35rem; }
+    .btn-success { background-color: #15803d; color: #fff; }
+    .btn-primary { background-color: #1d4ed8; color: #fff; }
+    .btn-danger { background-color: #dc2626; color: #fff; }
+    .btn-warning { background-color: #f59e0b; color: #0f172a; }
+    .btn-dark { background-color: #0f172a; color: #fff; }
+    .btn-light { background-color: #f8fafc; color: #0f172a; border-color: #cbd5e1; }
+    .btn-outline-success { border-color: #15803d; color: #15803d; background: transparent; }
+    .btn-outline-success:hover { background: #15803d; color: #fff; }
+    .btn-outline-primary { border-color: #1d4ed8; color: #1d4ed8; background: transparent; }
+    .btn-outline-primary:hover { background: #1d4ed8; color: #fff; }
+    .btn-outline-danger { border-color: #dc2626; color: #dc2626; background: transparent; }
+    .btn-outline-danger:hover { background: #dc2626; color: #fff; }
+    .btn-outline-dark { border-color: #1e293b; color: #1e293b; background: transparent; }
+    .btn-outline-secondary { border-color: #64748b; color: #475569; background: transparent; }
+
+    .badge {
+      display: inline-block;
+      padding: 0.25em 0.55em;
+      font-size: 0.75rem;
+      font-weight: 700;
+      border-radius: 0.35rem;
+    }
+
+    .alert {
+      padding: 0.65rem 0.95rem;
+      border-radius: 0.48rem;
+      border: 1px solid transparent;
+      margin-bottom: 0.75rem;
+    }
+    .alert-success { background-color: #dcfce7; border-color: #86efac; color: #14532d; }
+    .alert-warning { background-color: #fef3c7; border-color: #fde68a; color: #78350f; }
+    .alert-danger { background-color: #fee2e2; border-color: #fca5a5; color: #7f1d1d; }
+
+    /* جداول */
+    .table-responsive { overflow-x: auto; width: 100%; }
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.83rem;
+    }
+    .table th, .table td {
+      padding: 0.5rem 0.6rem;
+      border-bottom: 1px solid #e2e8f0;
+      vertical-align: middle;
+      text-align: center;
+    }
+    .table thead th {
+      background-color: #f1f5f9;
+      color: #0f172a;
+      font-weight: 700;
+      border-bottom: 2px solid #cbd5e1;
+    }
+    .table-success { background-color: #dcfce7 !important; }
+    .table-active { background-color: #f0fdf4 !important; }
+
+    /* هدر و نوار منو */
+    .top-hero-bar {
+      background: linear-gradient(135deg, #062819 0%, #14532d 65%, #166534 100%);
+      color: #fff;
+      padding: 0.65rem 1.25rem;
+      border-bottom: 3px solid var(--gold);
+    }
+
+    .app-navbar {
+      background: #ffffff;
+      border-bottom: 2px solid #cbd5e1;
+      padding: 0.45rem 1rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.38rem;
+      position: sticky;
+      top: 0;
+      z-index: 980;
+      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.05);
+    }
+
+    .app-navbar .nav-link {
+      background: #f8fafc;
+      color: #1e293b;
+      border: 1px solid #cbd5e1;
+      padding: 0.42rem 0.85rem;
+      border-radius: 0.45rem;
+      font-weight: 700;
+      font-size: 0.83rem;
+      cursor: pointer;
+    }
+    .app-navbar .nav-link:hover {
+      background: #ecfdf5;
+      border-color: #15803d;
+      color: #14532d;
+    }
+    .app-navbar .nav-link.active {
+      background: #14532d;
+      color: #ffffff;
+      border-color: #14532d;
+      box-shadow: 0 3px 8px rgba(20, 83, 45, 0.25);
+    }
+
+    /* نوار دائمی متقاضی فعال در بالای صفحه */
+    .active-applicant-ContextBar {
+      background: #ffffff;
+      border-bottom: 2px solid #86efac;
+      padding: 0.5rem 1.2rem;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.03);
+    }
+
+    /* تب‌ها و زیرتب‌ها */
+    .sec-pane { display: none; }
+    .sec-pane.active { display: block; }
+    .case-subpane { display: none; }
+    .case-subpane.active { display: block; }
+
+    .case-subtab-btn {
+      background: #f1f5f9;
+      color: #334155;
+      border: 1px solid #cbd5e1;
+      padding: 0.42rem 0.9rem;
+      border-radius: 0.42rem;
+      font-weight: 700;
+      font-size: 0.83rem;
+      cursor: pointer;
+    }
+    .case-subtab-btn.active {
+      background: #15803d;
+      color: #fff;
+      border-color: #15803d;
+    }
+
+    .card-clean {
+      background: #ffffff;
+      border: 1px solid #dbe3dd;
+      border-radius: 0.65rem;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+    }
+
+    /* استایل دقیق سربرگ رسمی A4 مرکز ۶۳۶ خفر */
+    .a4-stage-bg {
+      background: #334155;
+      padding: 1.5rem;
+      border-radius: 0.65rem;
+      overflow-x: auto;
+      display: flex;
+      justify-content: center;
+    }
+
+    .a4-page {
+      width: 210mm;
+      height: 296mm;
+      max-height: 296mm;
+      background: #ffffff;
+      color: #000000;
+      box-sizing: border-box;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      overflow: hidden;
+      margin: 0 auto 24px auto;
+      page-break-after: always;
+      break-after: page;
+      transition: width 0.2s ease, height 0.2s ease;
+    }
+
+    /* استایل استاندارد کاغذ A5 (۱۴۸ در ۲۱۰ میلی‌متر) */
+    .a4-page.paper-a5 {
+      width: 148mm !important;
+      height: 209mm !important;
+      max-height: 209mm !important;
+      page-break-after: always;
+      break-after: page;
+    }
+    .a4-page.paper-a5 .lh-top {
+      padding: 3.5mm 6mm;
+    }
+    .a4-page.paper-a5 .lh-sub { font-size: 7.5pt; }
+    .a4-page.paper-a5 .lh-main { font-size: 9.2pt; }
+    .a4-page.paper-a5 .lh-c { font-size: 10.5pt; }
+    .a4-page.paper-a5 .lh-l { font-size: 8pt; padding: 1.8mm 2.8mm; }
+    .a4-page.paper-a5 .lh-body { padding: 4.5mm 7mm; }
+    .a4-page.paper-a5 .l-rec { font-size: 9.8pt; }
+    .a4-page.paper-a5 .l-txt { font-size: 9pt; line-height: 1.7; }
+    .a4-page.paper-a5 .utm-table-print { width: 98%; font-size: 7.8pt; margin: 2mm auto; }
+    .a4-page.paper-a5 .sign-box { font-size: 8.8pt; min-width: 48mm; }
+    .a4-page.paper-a5 .lh-foot { padding: 2.5mm 6mm; font-size: 7.2pt; }
+
+    .lh-top {
+      color: #ffffff;
+      padding: 5mm 10mm;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 3px solid #f3e06b;
+      flex-shrink: 0;
+    }
+    .lh-r { width: 42%; text-align: right; }
+    .lh-sub { font-size: 8.8pt; font-weight: 700; opacity: 0.95; }
+    .lh-main { font-size: 11pt; font-weight: 900; color: #f3e06b; margin-top: 1mm; }
+    .lh-c { width: 20%; text-align: center; font-size: 12.5pt; font-weight: 900; }
+    .lh-l { width: 34%; font-size: 9.2pt; background: rgba(0,0,0,0.18); padding: 2.5mm 3.5mm; border-radius: 6px; }
+    .m-row { display: flex; justify-content: space-between; margin-bottom: 0.8mm; }
+
+    .lh-body {
+      padding: 7mm 12mm;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow: hidden;
+      min-height: 0;
+    }
+    .lh-content-wrap {
+      flex: 1;
+      overflow: hidden;
+    }
+    .l-rec { font-size: 11.5pt; font-weight: 900; margin-bottom: 2mm; }
+    .l-txt { font-size: 10.5pt; line-height: 1.95; text-align: justify; white-space: pre-line; word-break: break-word; }
+
+    .utm-table-print {
+      width: 94%;
+      margin: 3mm auto;
+      border-collapse: collapse;
+      font-size: 8.8pt;
+    }
+    .utm-table-print th, .utm-table-print td {
+      border: 1.2px solid #000;
+      padding: 1.2mm 2.2mm;
+      text-align: center;
+    }
+    .utm-table-print th { background: #e2e8f0; font-weight: 900; }
+
+    .sign-area {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 4mm;
+      padding-left: 8mm;
+      flex-shrink: 0;
+    }
+    .sign-box {
+      text-align: center;
+      font-weight: 800;
+      font-size: 10pt;
+      line-height: 1.7;
+      min-width: 60mm;
+    }
+
+    .lh-foot {
+      color: #ffffff;
+      padding: 3.5mm 10mm;
+      border-top: 2.5px solid #f3e06b;
+      font-size: 8.2pt;
+      flex-shrink: 0;
+    }
+    .f-warn {
+      text-align: center;
+      font-weight: 800;
+      color: #f3e06b;
+      margin-bottom: 1.2mm;
+    }
+    .f-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* ابزارهای ویرایشگر متنی همانند مایکروسافت ورد */
+    .word-toolbar-box {
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 6px 10px;
+    }
+    .rich-editor-paper {
+      background: #ffffff;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 14px 18px;
+      min-height: 230px;
+      max-height: 380px;
+      overflow-y: auto;
+      font-size: 11pt;
+      line-height: 2;
+      text-align: justify;
+      outline: none;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.03);
+    }
+    .rich-editor-paper:focus {
+      border-color: #15803d;
+      box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.15);
+    }
+
+    /* کارت‌های بخش راهنمای اتوماسیون */
+    .guide-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 1.25rem;
+      margin-bottom: 1.2rem;
+      border-right: 5px solid #15803d;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.04);
+    }
+    .guide-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.85rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px dashed #cbd5e1;
+    }
+
+    /* اعلان Toast */
+    .toast-msg {
+      position: fixed;
+      bottom: 24px;
+      left: 24px;
+      background: #14532d;
+      color: #ffffff;
+      padding: 0.75rem 1.25rem;
+      border-radius: 0.5rem;
+      border-right: 5px solid #facc15;
+      font-weight: 700;
+      z-index: 99999;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.35);
+    }
+
+    /* مودال اجباری انتخاب متقاضی */
+    .guard-modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.75);
+      z-index: 9999;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .guard-modal-card {
+      background: #ffffff;
+      border-radius: 0.75rem;
+      max-width: 780px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      border-top: 6px solid #dc2626;
+      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.45);
+      padding: 1.25rem;
+    }
+
+    #smart-mouse-tooltip {
+      position: fixed;
+      display: none;
+      background: #0f172a;
+      color: #fff;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      z-index: 99999;
+      pointer-events: none;
+      border-right: 3px solid #facc15;
+    }
+
+    /* قوانین سراسری ابعاد کاغذ برای چاپ و خروجی PDF (A4 و A5) */
+    @page {
+      size: A4 portrait;
+      size: 210mm 297mm;
+      margin: 0;
+    }
+
+    @media print {
+      * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        color-adjust: exact !important;
+      }
+
+      html, body {
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #ffffff !important;
+        color: #000000 !important;
+        overflow: visible !important;
+      }
+
+      /* مخفی‌سازی کامل و بی‌اثر کردن تمام المان‌های محیط کاربری سامانه بدون باقی‌ماندن فضای خالی در برگه */
+      header, nav, footer,
+      .no-print,
+      .case-hero-sticky,
+      .top-hero-bar,
+      .app-main-nav,
+      .toast-container,
+      .modal,
+      .modal-backdrop,
+      #quick-status-toast,
+      #pane-dashboard,
+      #pane-cases,
+      #pane-croquis,
+      #pane-letters,
+      #pane-forms,
+      #pane-cartable,
+      #pane-chat,
+      #pane-guide,
+      .sec-pane:not(#pane-print),
+      .main-tab-pane:not(#pane-print) {
+        display: none !important;
+      }
+
+      /* قرار دادن بخش چاپ و پیش‌نمایش در جریان عادی سند چاپی بدون position:absolute تا شکست صفحات به درستی انجام شود */
+      #pane-print {
+        display: block !important;
+        position: static !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        background: transparent !important;
+      }
+
+      .a4-stage-bg {
+        display: block !important;
+        position: static !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        border: none !important;
+      }
+
+      #a4-preview-stage {
+        display: block !important;
+        position: static !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        background: transparent !important;
+      }
+
+      /* ابعاد دقیق میلی‌متری کاغذ A4 با کسر خطای گردکردن پیکسل مرورگر و جلوگیری از تولید برگه سفید اضافه */
+      .a4-page {
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: space-between !important;
+        box-shadow: none !important;
+        margin: 0 auto !important;
+        padding: 0 !important;
+        box-sizing: border-box !important;
+        width: 210mm !important;
+        height: 295mm !important;
+        min-height: 295mm !important;
+        max-height: 295mm !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+        page-break-after: always !important;
+        break-after: page !important;
+        overflow: hidden !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+
+      /* حذف شکست صفحه بعد از آخرین برگه تا هرگز صفحه سفید در انتهای پرینت چاپ نشود */
+      .a4-page:last-child,
+      .a4-page:last-of-type {
+        page-break-after: auto !important;
+        break-after: auto !important;
+      }
+
+      /* ابعاد استاندارد و دقیق کاغذ A5 در چاپ */
+      .a4-page.paper-a5 {
+        width: 148mm !important;
+        height: 208mm !important;
+        min-height: 208mm !important;
+        max-height: 208mm !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+        page-break-after: always !important;
+        break-after: page !important;
+        overflow: hidden !important;
+      }
+
+      .a4-page.paper-a5:last-child,
+      .a4-page.paper-a5:last-of-type {
+        page-break-after: auto !important;
+        break-after: auto !important;
+      }
+
+      /* تضمین چاپ کامل و شفاف نقشه ماهواره‌ای گوگل‌ارث در شیت چاپی */
+      #printed-croquis-map-holder,
+      .printed-croquis-satellite-box,
+      .printed-croquis-satellite-box * {
+        visibility: visible !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      .printed-croquis-satellite-box img {
+        visibility: visible !important;
+        display: block !important;
+        max-width: none !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ۱. نوار هدر سازمانی مرکز خدمات ۶۳۶ شهرستان خفر -->
+  <header class="top-hero-bar no-print">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <div class="d-flex align-items-center gap-3">
+        <div id="nav-logo-box" style="width:52px;height:52px;background:#fff;border-radius:50%;padding:3px;"></div>
+        <div>
+          <div class="small" style="color:#fde68a;" id="ui-hero-org">سازمان نظام مهندسی کشاورزی و منابع طبیعی استان فارس</div>
+          <h1 class="m-0 fw-bold" style="font-size:1.1rem;" id="ui-hero-office">مرکز خدمات کشاورزی غیر دولتی، شماره ۶۳۶ | مدیر مرکز: حسام‌الدین خواجه‌پور تادوانی</h1>
+        </div>
+      </div>
+
+      <div class="d-flex flex-wrap align-items-center gap-2">
+        <div class="px-3 py-1 rounded" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.2);">
+          🕒 <span id="live-clock" class="fw-bold text-warning">--:--:--</span> | <small id="live-date">۱۴۰۵/۰۲/۱۳</small>
+        </div>
+        <button type="button" class="btn btn-sm btn-warning fw-bold" onclick="downloadStandaloneWindowsHTML()" data-tip="دانلود کل اتوماسیون در یک فایل HTML مستقل برای اجرا روی هر ویندوز بدون اینترنت">
+          💻 دانلود نسخه تک‌فایلی ویندوز (.html)
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ۲. نوار دائمی انتخاب و نمایش متقاضی فعال (قانون اجباری بخش سوم) -->
+  <div class="active-applicant-ContextBar no-print">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <div class="d-flex flex-wrap align-items-center gap-2">
+        <span id="active-case-status-badge" class="badge bg-success fs-6">👤 پرونده فعال</span>
+        <div id="active-case-info-summary"></div>
+      </div>
+
+      <div class="d-flex flex-wrap align-items-center gap-2">
+        <select id="global-case-selector" class="form-select form-select-sm fw-bold" style="min-width:290px;border-color:#15803d;" onchange="selectActiveCase(this.value)" aria-label="انتخاب متقاضی فعال"></select>
+        <button type="button" class="btn btn-sm btn-success" onclick="startNewCaseWizard('GREENHOUSE_MUSHROOM')">➕ ثبت متقاضی جدید</button>
+        <button type="button" class="btn btn-sm btn-outline-danger" onclick="clearActiveApplicantSelection()" title="بستن پرونده فعال و قفل عملیات اداری">🔒 بستن پرونده فعال</button>
+      </div>
+    </div>
+    <div id="no-active-case-warning-banner" class="alert alert-danger mt-2 mb-0 py-1 px-3 small fw-bold" style="display:none;">
+      ⛔ قانون پایه سامانه: هیچ متقاضی فعالی انتخاب نشده است! آغاز هرگونه فرایند اداری (کروکی UTM، صدور نامه یا چاپ فرم) منوط به انتخاب یا ثبت متقاضی است.
+      <button type="button" class="btn btn-sm btn-danger py-0 px-2 ms-2" onclick="openMandatoryApplicantModal('انتخاب متقاضی فعال')">انتخاب متقاضی</button>
+    </div>
+  </div>
+
+  <!-- ۳. منوی اصلی ناوبری بخش‌های اتوماسیون -->
+  <nav class="app-navbar no-print" aria-label="منوی بخش‌های اتوماسیون">
+    <button type="button" id="nav-btn-dashboard" class="nav-link active" onclick="switchMainPane('pane-dashboard')">📊 ۱. پیشخوان مدیریتی</button>
+    <button type="button" id="nav-btn-cases" class="nav-link" onclick="switchMainPane('pane-cases')">📁 ۲. پرونده متقاضیان (۳ گروه تخصصی)</button>
+    <button type="button" id="nav-btn-croquis" class="nav-link" onclick="switchMainPane('pane-croquis')">🗺️ ۳. کروکی چندلایه و نقشه گوگل‌ارث</button>
+    <button type="button" id="nav-btn-letters" class="nav-link" onclick="switchMainPane('pane-letters')">✉️ ۴. صدور نامه و دبیرخانه (A4 / A5)</button>
+    <button type="button" id="nav-btn-print" class="nav-link" onclick="switchMainPane('pane-print')">🖨️ ۵. سربرگ A4 / A5 و فرم‌های نظارتی</button>
+    <button type="button" id="nav-btn-office" class="nav-link" onclick="switchMainPane('pane-office')">💼 ۶. کارتابل پیگیری و تنظیمات</button>
+    <button type="button" id="nav-btn-ai" class="nav-link" onclick="switchMainPane('pane-ai')">🤖 ۷. دستیار هوشمند و OCR</button>
+    <button type="button" id="nav-btn-guide" class="nav-link" onclick="switchMainPane('pane-guide')">📘 ۸. راهنمای جامع اتوماسیون</button>
+  </nav>
+
+  <!-- محتوای اصلی تب‌ها -->
+  <main class="p-3" style="max-width: 1620px; margin: 0 auto;">
+
+    <!-- =====================================================================
+         PANE 1: پیشخوان مدیریتی (pane-dashboard)
+         ===================================================================== -->
+    <section id="pane-dashboard" class="sec-pane active">
+      <!-- کارت‌های ۳ گروه تخصصی متقاضیان -->
+      <div class="row mb-3">
+        <div class="col-md-4 mb-2">
+          <div class="card-clean h-100" style="border-right: 5px solid #15803d; cursor:pointer;" onclick="filterDirectoryByMainGroupCard('GREENHOUSE_MUSHROOM')">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <strong class="text-success" style="font-size:1rem;">🌱 گروه اول: گلخانه و قارچ</strong>
+              <span class="badge bg-success fs-6" id="badge-count-g1">0</span>
+            </div>
+            <div class="small text-muted mb-2">احداث و بهره‌برداری گلخانه سبزی و صیفی، گل زینتی، گیاهان دارویی، پرورش قارچ خوراکی و کمپوست</div>
+            <div class="d-flex justify-content-between align-items-center">
+              <span class="small fw-bold text-primary">مشاهده پرونده‌های گروه اول ←</span>
+              <button type="button" class="btn btn-sm btn-outline-success py-0" onclick="event.stopPropagation(); startNewCaseWizard('GREENHOUSE_MUSHROOM');">+ ثبت متقاضی گلخانه/قارچ</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-4 mb-2">
+          <div class="card-clean h-100" style="border-right: 5px solid #1d4ed8; cursor:pointer;" onclick="filterDirectoryByMainGroupCard('LIVESTOCK_POULTRY_FISHERIES')">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <strong class="text-primary" style="font-size:1rem;">🐄 گروه دوم: دام، طیور و شیلات</strong>
+              <span class="badge bg-primary fs-6" id="badge-count-g2">0</span>
+            </div>
+            <div class="small text-muted mb-2">دامداری و دامپروری (گوسفند، بز، گاو، گوساله، شتر)، پرورش طیور صنعتی و بومی، پرورش ماهیان سردابی و گرمابی</div>
+            <div class="d-flex justify-content-between align-items-center">
+              <span class="small fw-bold text-primary">مشاهده پرونده‌های گروه دوم ←</span>
+              <button type="button" class="btn btn-sm btn-outline-primary py-0" onclick="event.stopPropagation(); startNewCaseWizard('LIVESTOCK_POULTRY_FISHERIES');">+ ثبت متقاضی دام/طیور/شیلات</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-4 mb-2">
+          <div class="card-clean h-100" style="border-right: 5px solid #d97706; cursor:pointer;" onclick="filterDirectoryByMainGroupCard('CLINIC_PHARMACY')">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <strong class="text-warning" style="font-size:1rem;">💊 گروه سوم: کلینیک و داروخانه گیاهپزشکی</strong>
+              <span class="badge bg-warning text-dark fs-6" id="badge-count-g3">0</span>
+            </div>
+            <div class="small text-muted mb-2">تأسیس و تمدید کلینیک گیاهپزشکی، داروخانه گیاهپزشکی، مراکز عرضه سموم و شرکت‌های دفع آفات</div>
+            <div class="d-flex justify-content-between align-items-center">
+              <span class="small fw-bold text-primary">مشاهده پرونده‌های گروه سوم ←</span>
+              <button type="button" class="btn btn-sm btn-outline-dark py-0" onclick="event.stopPropagation(); startNewCaseWizard('CLINIC_PHARMACY');">+ ثبت متقاضی کلینیک/داروخانه</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- شاخص‌های آماری پیشخوان -->
+      <div class="row mb-3">
+        <div class="col-md-3 mb-2"><div class="card-clean text-center py-2"><div class="small text-muted">کل پرونده‌ها</div><div class="fw-bold fs-6 text-success" id="kpi-total-cases">0</div></div></div>
+        <div class="col-md-3 mb-2"><div class="card-clean text-center py-2"><div class="small text-muted">نامه‌های صادره</div><div class="fw-bold fs-6 text-primary" id="kpi-out-letters">0</div></div></div>
+        <div class="col-md-3 mb-2"><div class="card-clean text-center py-2"><div class="small text-muted">نامه‌های وارده</div><div class="fw-bold fs-6 text-dark" id="kpi-in-letters">0</div></div></div>
+        <div class="col-md-3 mb-2"><div class="card-clean text-center py-2"><div class="small text-muted">پیگیری‌های باز</div><div class="fw-bold fs-6 text-warning" id="kpi-open-tasks">0</div></div></div>
+      </div>
+
+      <!-- خلاصه پرونده‌های فعال در پیشخوان -->
+      <div class="card-clean">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+          <strong class="text-success">📋 فهرست سریع پرونده‌های متقاضیان مرکز خدمات ۶۳۶ شهرستان خفر</strong>
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-sm btn-success" onclick="switchMainPane('pane-cases'); switchCaseSubTab('sub-list');">🔍 جستجو و فیلتر پیشرفته متقاضیان</button>
+            <button type="button" class="btn btn-sm btn-primary" onclick="switchMainPane('pane-croquis')">🗺️ ورود به ابزار کروکی چندلایه زمین</button>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>کلاسه پرونده</th>
+                <th>نام متقاضی / شرکت</th>
+                <th>گروه تخصصی و موضوع طرح</th>
+                <th>موقعیت اراضی</th>
+                <th>وضعیت استعلام‌ها</th>
+                <th>عملیات سریع</th>
+              </tr>
+            </thead>
+            <tbody id="dash-cases-summary-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- =====================================================================
+         PANE 2: پرونده‌های متقاضیان در ۳ گروه تخصصی (pane-cases)
+         ===================================================================== -->
+    <section id="pane-cases" class="sec-pane">
+      <!-- نوار زیرتب‌های بخش پرونده‌ها -->
+      <div class="card-clean mb-3 py-2">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+          <div class="d-flex flex-wrap gap-2">
+            <button type="button" id="btn-sub-list" class="case-subtab-btn active" onclick="switchCaseSubTab('sub-list')">🔍 ۱. فهرست جامع و جستجوی پیشرفته متقاضیان</button>
+            <button type="button" id="btn-sub-info" class="case-subtab-btn" onclick="switchCaseSubTab('sub-info')">📝 ۲. ثبت / ویرایش مشخصات پرونده متقاضی</button>
+            <button type="button" id="btn-sub-matrix" class="case-subtab-btn" onclick="switchCaseSubTab('sub-matrix')">📊 ۳. ماتریس پیگیری ۷ استعلام ادارات</button>
+            <button type="button" id="btn-sub-docs" class="case-subtab-btn" onclick="switchCaseSubTab('sub-docs')">📂 ۴. چک‌لیست قانونی و بایگانی مدارک</button>
+            <button type="button" id="btn-sub-history" class="case-subtab-btn" onclick="switchCaseSubTab('sub-history')">🕒 ۵. سابقه اقدامات پرونده (Audit Log)</button>
+          </div>
+          <button type="button" class="btn btn-sm btn-success" onclick="startNewCaseWizard('GREENHOUSE_MUSHROOM')">➕ تشکیل پرونده متقاضی جدید</button>
+        </div>
+      </div>
+
+      <!-- زیرتب ۱: فهرست جامع و جستجوی پیشرفته (sub-list) -->
+      <div id="sub-list" class="case-subpane active">
+        <div class="card-clean">
+          <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <strong class="text-success">🔍 جستجو و فیلتر پیشرفته متقاضیان (نام، کد ملی، شناسه حقوقی، شماره پرونده، تلفن، نوع فعالیت، تاریخ و وضعیت)</strong>
+            <span class="badge bg-success fs-6" id="adv-search-count-badge">0 پرونده</span>
+          </div>
+
+          <div class="row mb-3">
+            <div class="col-md-4 mb-2">
+              <label class="small fw-bold" for="adv-search-q">عبارت جستجو (نام، کدملی، شناسه، کلاسه، موبایل، روستا):</label>
+              <input type="text" id="adv-search-q" class="form-control form-control-sm" placeholder="مثال: نگین سبز، فروزند، ۲۲۹، گلخانه، داروخانه..." oninput="renderApplicantsDirectoryTable()" />
+            </div>
+            <div class="col-md-2 mb-2">
+              <label class="small fw-bold" for="adv-filter-group">فیلتر گروه تخصصی:</label>
+              <select id="adv-filter-group" class="form-select form-select-sm" onchange="renderApplicantsDirectoryTable()">
+                <option value="ALL">همه گروه‌های سه‌گانه</option>
+                <option value="GREENHOUSE_MUSHROOM">۱. گلخانه و قارچ</option>
+                <option value="LIVESTOCK_POULTRY_FISHERIES">۲. دام، طیور و شیلات</option>
+                <option value="CLINIC_PHARMACY">۳. کلینیک و داروخانه گیاهپزشکی</option>
+              </select>
+            </div>
+            <div class="col-md-2 mb-2">
+              <label class="small fw-bold" for="adv-filter-entity">نوع شخصیت متقاضی:</label>
+              <select id="adv-filter-entity" class="form-select form-select-sm" onchange="renderApplicantsDirectoryTable()">
+                <option value="ALL">همه (حقیقی / حقوقی / سازمانی)</option>
+                <option value="INDIVIDUAL">👤 شخص حقیقی</option>
+                <option value="LEGAL">🏢 شخص حقوقی (شرکت/تعاونی)</option>
+                <option value="ORG">🏛️ سازمان / نهاد دولتی</option>
+              </select>
+            </div>
+            <div class="col-md-2 mb-2">
+              <label class="small fw-bold" for="adv-filter-status">وضعیت پرونده:</label>
+              <select id="adv-filter-status" class="form-select form-select-sm" onchange="renderApplicantsDirectoryTable()">
+                <option value="ALL">همه وضعیت‌ها</option>
+                <option value="ACTIVE">فعال</option>
+                <option value="IN_PROGRESS">در جریان استعلام</option>
+                <option value="APPROVED">دارای مجوز / مصوب</option>
+                <option value="ARCHIVED">راکد / بایگانی</option>
+              </select>
+            </div>
+            <div class="col-md-2 mb-2">
+              <label class="small fw-bold" for="adv-filter-date">فیلتر تاریخ ثبت:</label>
+              <input type="text" id="adv-filter-date" class="form-control form-control-sm" placeholder="مثال: 1405/01" oninput="renderApplicantsDirectoryTable()" />
+            </div>
+          </div>
+
+          <div class="table-responsive">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>کلاسه پرونده</th>
+                  <th>مشخصات متقاضی / شرکت</th>
+                  <th>گروه اصلی</th>
+                  <th>نوع فعالیت و ظرفیت</th>
+                  <th>موقعیت و تاریخ ثبت</th>
+                  <th>وضعیت و کروکی</th>
+                  <th>عملیات</th>
+                </tr>
+              </thead>
+              <tbody id="applicants-directory-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- زیرتب ۲: فرم ثبت و ویرایش مشخصات متقاضی (sub-info) -->
+      <div id="sub-info" class="case-subpane">
+        <div class="card-clean">
+          <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 pb-2 border-bottom">
+            <strong class="text-success">📝 فرم تخصصی مشخصات متقاضی، محاسبه سرانه فنی و مختصات پایه پرونده</strong>
+            <div class="d-flex flex-wrap gap-2">
+              <button type="button" class="btn btn-sm btn-success" onclick="saveActiveCaseChanges(false)">💾 ذخیره تغییرات پرونده</button>
+              <button type="button" class="btn btn-sm btn-primary" onclick="saveActiveCaseChanges(true)">📨 ذخیره و انتقال به صدور نامه</button>
+              <button type="button" class="btn btn-sm btn-outline-dark" onclick="addNewActivitySubgroupPrompt()">➕ افزودن زیرگروه فعالیت جدید</button>
+              <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteActiveCase()">🗑️ حذف کنترل‌شده متقاضی</button>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="col-md-3 mb-2">
+              <label class="small fw-bold" for="c-entity-type">نوع شخصیت متقاضی:</label>
+              <select id="c-entity-type" class="form-select form-select-sm fw-bold" onchange="onEntityTypeChangedInForm()">
+                <option value="INDIVIDUAL">👤 شخص حقیقی</option>
+                <option value="LEGAL">🏢 شخص حقوقی (شرکت / تعاونی)</option>
+                <option value="ORG">🏛️ سازمان / اداره / نهاد</option>
+              </select>
+            </div>
+            <div class="col-md-3 mb-2">
+              <label class="small fw-bold" for="c-main-group">گروه اصلی فعالیت (ساختار سه‌گانه):</label>
+              <select id="c-main-group" class="form-select form-select-sm fw-bold" onchange="onMainGroupChangedInForm()">
+                <option value="GREENHOUSE_MUSHROOM">گروه اول: گلخانه و قارچ</option>
+                <option value="LIVESTOCK_POULTRY_FISHERIES">گروه دوم: دام، طیور و شیلات</option>
+                <option value="CLINIC_PHARMACY">گروه سوم: کلینیک و داروخانه گیاهپزشکی</option>
+              </select>
+            </div>
+            <div class="col-md-4 mb-2">
+              <label class="small fw-bold" for="c-act-type">زیرگروه / نوع فعالیت تخصصی:</label>
+              <select id="c-act-type" class="form-select form-select-sm fw-bold" onchange="recalcCaseSpecsFromHeadcount()"></select>
+            </div>
+            <div class="col-md-2 mb-2">
+              <label class="small fw-bold" for="c-case-status">وضعیت رسیدگی پرونده:</label>
+              <select id="c-case-status" class="form-select form-select-sm">
+                <option value="ACTIVE">فعال</option>
+                <option value="IN_PROGRESS">در جریان استعلام</option>
+                <option value="APPROVED">دارای مجوز / مصوب</option>
+                <option value="ARCHIVED">راکد / بایگانی</option>
+              </select>
+            </div>
+
+            <div class="col-md-2 mb-2">
+              <label class="small fw-bold" for="c-code">شماره کلاسه پرونده:</label>
+              <input type="text" id="c-code" class="form-control form-control-sm fw-bold" />
+            </div>
+            <div class="col-md-4 mb-2">
+              <label class="small fw-bold" id="lbl-c-name" for="c-name">نام و نام خانوادگی متقاضی حقیقی *</label>
+              <input type="text" id="c-name" class="form-control form-control-sm fw-bold" />
+            </div>
+            <div class="col-md-3 mb-2">
+              <label class="small fw-bold" id="lbl-c-nid" for="c-nid">کد ملی متقاضی (۱۰ رقمی) *</label>
+              <input type="text" id="c-nid" class="form-control form-control-sm" />
+            </div>
+            <div class="col-md-3 mb-2">
+              <label class="small fw-bold" for="c-mobile">شماره تلفن همراه:</label>
+              <input type="text" id="c-mobile" class="form-control form-control-sm" />
+            </div>
+          </div>
+
+          <!-- فیلدهای ویژه اشخاص حقوقی و سازمان‌ها -->
+          <div id="c-legal-extra-fields" class="row p-2 mb-2 rounded bg-light border" style="display:none;">
+            <div class="col-md-6 mb-1">
+              <label class="small fw-bold text-primary" for="c-reg-no">شماره ثبت شرکت / مجوز سازمانی:</label>
+              <input type="text" id="c-reg-no" class="form-control form-control-sm" placeholder="شماره ثبت" />
+            </div>
+            <div class="col-md-6 mb-1">
+              <label class="small fw-bold text-primary" for="c-rep-name">نام مدیرعامل / نماینده قانونی:</label>
+              <input type="text" id="c-rep-name" class="form-control form-control-sm" placeholder="نام و نام خانوادگی نماینده" />
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="col-md-2 mb-2">
+              <label class="small fw-bold" for="c-count">مقدار پایه ظرفیت (عدد):</label>
+              <input type="number" id="c-count" class="form-control form-control-sm" oninput="recalcCaseSpecsFromHeadcount()" />
+            </div>
+            <div class="col-md-4 mb-2">
+              <label class="small fw-bold" for="c-project">عنوان رسمی طرح در مکاتبات:</label>
+              <input type="text" id="c-project" class="form-control form-control-sm" />
+            </div>
+            <div class="col-md-2 mb-2">
+              <label class="small fw-bold" for="c-cap">ظرفیت با واحد:</label>
+              <input type="text" id="c-cap" class="form-control form-control-sm" />
+            </div>
+            <div class="col-md-2 mb-2">
+              <label class="small fw-bold" for="c-land">مساحت زمین (مترمربع):</label>
+              <input type="text" id="c-land" class="form-control form-control-sm" />
+            </div>
+            <div class="col-md-2 mb-2">
+              <label class="small fw-bold" for="c-water">نیاز آبی (لیتر/شبانه روز):</label>
+              <input type="text" id="c-water" class="form-control form-control-sm" />
+            </div>
+
+            <div class="col-md-4 mb-2">
+              <label class="small fw-bold" for="c-loc">موقعیت اراضی (شهرستان / بخش / روستا):</label>
+              <input type="text" id="c-loc" class="form-control form-control-sm" />
+            </div>
+            <div class="col-md-4 mb-2">
+              <label class="small fw-bold" for="c-subarea">تفکیک زیربنای مسقف و محوطه:</label>
+              <input type="text" id="c-subarea" class="form-control form-control-sm" />
+            </div>
+            <div class="col-md-2 mb-2">
+              <label class="small fw-bold" for="c-issue-date">تاریخ تشکیل پرونده:</label>
+              <input type="text" id="c-issue-date" class="form-control form-control-sm" />
+            </div>
+            <div class="col-md-2 mb-2">
+              <label class="small fw-bold" for="c-exp-date">تاریخ اعتبار استعلام‌ها:</label>
+              <input type="text" id="c-exp-date" class="form-control form-control-sm" />
+            </div>
+
+            <div class="col-md-12 mb-2">
+              <div class="p-2 rounded border bg-light">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2 pb-1 border-bottom">
+                  <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <strong class="small text-success">📍 جدول بخش‌بندی‌شده نقاط مرزی زمین متقاضی (X, Y, ارتفاع، Zone):</strong>
+                    <div class="btn-group btn-group-sm" role="group" aria-label="نوع سیستم مختصات پرونده">
+                      <button type="button" id="btn-case-coord-utm" class="btn btn-sm btn-success fw-bold py-0 px-2" onclick="setCoordInputMode('UTM')">📐 نقاط UTM (X, Y)</button>
+                      <button type="button" id="btn-case-coord-geo" class="btn btn-sm btn-outline-success fw-bold py-0 px-2" onclick="setCoordInputMode('GEO')">🌐 طول و عرض جغرافیایی (Lat / Lng)</button>
+                    </div>
+                  </div>
+                  <span class="badge bg-success" id="utm-geometry-badge">آماده محاسبه مساحت</span>
+                </div>
+
+                <!-- ردیف بخش‌بندی‌شده افزودن نقطه در فرم پرونده -->
+                <div class="row g-1 align-items-end mb-2">
+                  <div class="col-md-2">
+                    <label class="small fw-bold" for="case-pt-label">کد نقطه:</label>
+                    <input type="text" id="case-pt-label" class="form-control form-control-sm text-center" placeholder="P1" />
+                  </div>
+                  <div class="col-md-2">
+                    <label class="small fw-bold" id="lbl-case-pt-x" for="case-pt-x">X (شرقی - متر):</label>
+                    <input type="number" step="any" id="case-pt-x" class="form-control form-control-sm text-center font-monospace" placeholder="702150" />
+                  </div>
+                  <div class="col-md-2">
+                    <label class="small fw-bold" id="lbl-case-pt-y" for="case-pt-y">Y (شمالی - متر):</label>
+                    <input type="number" step="any" id="case-pt-y" class="form-control form-control-sm text-center font-monospace" placeholder="3208450" />
+                  </div>
+                  <div class="col-md-2">
+                    <label class="small fw-bold" for="case-pt-elev">ارتفاع از سطح دریا (متر):</label>
+                    <input type="number" step="any" id="case-pt-elev" class="form-control form-control-sm text-center font-monospace" placeholder="1285" value="1285" />
+                  </div>
+                  <div class="col-md-2">
+                    <label class="small fw-bold" for="case-pt-zone">زون (Zone):</label>
+                    <select id="case-pt-zone" class="form-select form-select-sm text-center fw-bold">
+                      <option value="38R">Zone 38R</option>
+                      <option value="39R" selected>Zone 39R (خفر/فارس)</option>
+                      <option value="40R">Zone 40R</option>
+                      <option value="41R">Zone 41R</option>
+                    </select>
+                  </div>
+                  <div class="col-md-2">
+                    <button type="button" class="btn btn-sm btn-success w-100 fw-bold" onclick="addPointToCaseFormTable()">➕ افزودن نقطه</button>
+                  </div>
+                </div>
+
+                <div class="row g-2">
+                  <div class="col-md-7">
+                    <div class="table-responsive bg-white rounded border" style="max-height: 175px;">
+                      <table class="table table-sm mb-0">
+                        <thead>
+                          <tr>
+                            <th>#</th>
+                            <th>کد</th>
+                            <th id="th-case-pt-x">X (شرقی)</th>
+                            <th id="th-case-pt-y">Y (شمالی)</th>
+                            <th>ارتفاع (m)</th>
+                            <th>Zone</th>
+                            <th>حذف</th>
+                          </tr>
+                        </thead>
+                        <tbody id="case-segmented-points-tbody"></tbody>
+                      </table>
+                    </div>
+                  </div>
+                  <div class="col-md-5 d-flex flex-column justify-content-between">
+                    <div>
+                      <label class="small fw-bold" id="lbl-c-utm-bulk" for="c-utm">متن دسته‌ای نقاط (هر سطر: X,Y,ارتفاع,Zone یا Lat,Lng):</label>
+                      <textarea id="c-utm" class="form-control form-control-sm font-monospace" rows="3" placeholder="702150,3208450,1285,39R&#10;702550,3208450,1285,39R" oninput="syncCaseTextareaToPointsTable()"></textarea>
+                    </div>
+                    <div class="d-flex flex-wrap gap-1 mt-1">
+                      <button type="button" class="btn btn-sm btn-outline-success flex-fill" onclick="calcUtmAreaAndApply()">📐 محاسبه مساحت و درج در پرونده</button>
+                      <button type="button" class="btn btn-sm btn-primary flex-fill" onclick="switchMainPane('pane-croquis')">🗺️ ابزار کروکی چندلایه</button>
+                      <button type="button" class="btn btn-sm btn-outline-dark" onclick="addCustomFieldToActiveCase()">➕ فیلد سفارشی</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div id="c-custom-fields-summary" class="mt-2"></div>
+        </div>
+      </div>
+
+      <!-- زیرتب ۳: ماتریس پیگیری ۷ استعلام (sub-matrix) -->
+      <div id="sub-matrix" class="case-subpane">
+        <div class="card-clean">
+          <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <strong class="text-success">📊 ماتریس جامع پیگیری پاسخ ۷ استعلام ادارات شهرستان خفر (روی وضعیت هر اداره کلیک کنید تا تغییر کند)</strong>
+            <input type="text" id="matrix-filter-input" class="form-control form-control-sm" style="max-width:260px;" placeholder="فیلتر سریع نام یا کدملی..." oninput="renderUnifiedCasesMatrix()" />
+          </div>
+          <div class="table-responsive">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>کلاسه</th>
+                  <th>متقاضی و موقعیت</th>
+                  <th>طرح و ظرفیت</th>
+                  <th>💧 آب</th>
+                  <th>⚡ برق</th>
+                  <th>🛣️ راهداری</th>
+                  <th>🔥 گاز</th>
+                  <th>🌿 محیط زیست</th>
+                  <th>🌲 منابع طبیعی</th>
+                  <th>🩺 دامپزشکی</th>
+                  <th>پیشرفت</th>
+                  <th>انقضا</th>
+                  <th>عملیات</th>
+                </tr>
+              </thead>
+              <tbody id="unified-matrix-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- زیرتب ۴: چک‌لیست قانونی و بایگانی دیجیتال مدارک پرونده (sub-docs) -->
+      <div id="sub-docs" class="case-subpane">
+        <div class="card-clean">
+          <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <div>
+              <strong class="text-success d-block">📂 چک‌لیست مدارک الزامی و بایگانی فایل‌های متقاضی</strong>
+              <small class="text-muted" id="drive-folder-label">📁 پوشه اختصاصی متقاضی</small>
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+              <button type="button" class="btn btn-sm btn-outline-success" onclick="addCustomDocToChecklist()">➕ افزودن مدرک جدید به چک‌لیست</button>
+              <button type="button" class="btn btn-sm btn-primary" onclick="syncActiveCaseFolderToDrive()">💻 ساخت پوشه فیزیکی متقاضی در ویندوز</button>
+              <button type="button" class="btn btn-sm btn-outline-dark" onclick="downloadWindowsBatFolderCreator()">📦 دانلود اسکریپت پوشه‌ساز (.bat)</button>
+            </div>
+          </div>
+
+          <div id="case-missing-docs-banner"></div>
+
+          <div class="table-responsive">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th style="width:50px;">ردیف</th>
+                  <th>عنوان مدرک الزامی و مستند قانونی</th>
+                  <th>وضعیت تحویل مدرک</th>
+                  <th>بارگذاری / مشاهده فایل</th>
+                </tr>
+              </thead>
+              <tbody id="case-docs-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- زیرتب ۵: سابقه اقدامات انجام‌شده روی پرونده (sub-history) -->
+      <div id="sub-history" class="case-subpane">
+        <div class="card-clean">
+          <strong class="text-success d-block mb-2">🕒 ثبت و مشاهده سابقه کامل اقدامات انجام‌شده در پرونده متقاضی فعال</strong>
+          <div class="d-flex gap-2 mb-3">
+            <input type="text" id="new-history-note-input" class="form-control form-control-sm" placeholder="شرح اقدام جدید (مثلاً: انجام بازدید میدانی و تحویل نقشه UTM به امور اراضی)..." />
+            <button type="button" class="btn btn-sm btn-success px-3" onclick="addManualHistoryNoteToCase()">➕ ثبت اقدام</button>
+          </div>
+          <div class="table-responsive">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th style="width:60px;">ردیف</th>
+                  <th style="width:180px;">تاریخ و ساعت</th>
+                  <th>شرح اقدام ثبت‌شده در پرونده</th>
+                  <th style="width:180px;">ثبت‌کننده</th>
+                </tr>
+              </thead>
+              <tbody id="case-history-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =====================================================================
+         PANE 3: ابزار تخصصی کروکی زمین و مدیریت لایه‌های UTM (pane-croquis)
+         ===================================================================== -->
+    <section id="pane-croquis" class="sec-pane">
+      <!-- نوار مدیریت نقشه‌های پرونده و شاخص مساحت -->
+      <div class="card-clean mb-3">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+          <div>
+            <strong class="text-success" style="font-size:1.02rem;">🗺️ سامانه تخصصی ترسیم کروکی چندلایه زمین (UTM)، کنترل هندسی قطعه مادر و جانمایی طرح</strong>
+            <div class="small text-muted">پشتیبانی از چندین لایه مستقل (زمین اصلی، محل احداث گلخانه/دامداری، تأسیسات، راه دسترسی، چاه آب و حرایم) با محاسبه مستقل مساحت هر لایه</div>
+          </div>
+          <div class="d-flex flex-wrap gap-2 align-items-center">
+            <button type="button" class="btn btn-sm btn-warning fw-bold" onclick="loadSample10HectareGreenhouseMap()">
+              🌱 بارگذاری الگوی استاندارد (زمین ۱۰ هکتاری + گلخانه ۱ هکتاری + تأسیسات)
+            </button>
+            <div class="d-flex align-items-center gap-1 border rounded px-2 py-1 bg-light">
+              <label class="small fw-bold text-success m-0" for="crq-print-mode-select">🛰️ حالت چاپ:</label>
+              <select id="crq-print-mode-select" class="form-select form-select-sm fw-bold" style="width:175px;font-size:12px;" onchange="setCroquisPrintMapMode(this.value)">
+                <option value="GOOGLE_SAT" selected>🛰️ ماهواره گوگل‌ارث</option>
+                <option value="GOOGLE_HYBRID">🗺️ هیبرید گوگل‌ارث</option>
+                <option value="CAD">📐 بوم مهندسی CAD</option>
+              </select>
+              <label class="small fw-bold text-primary m-0 ms-1" for="crq-print-zoom-select">🔍 زوم چاپ:</label>
+              <select id="crq-print-zoom-select" class="form-select form-select-sm fw-bold" style="width:155px;font-size:12px;" onchange="setCroquisPrintZoom(this.value)">
+                <option value="AUTO" selected>🎯 خودکار بهینه (Auto)</option>
+                <option value="14">زوم ۱۴ (نمای دشت/روستا)</option>
+                <option value="15">زوم ۱۵ (نمای منطقه)</option>
+                <option value="16">زوم ۱۶ (اراضی بزرگ)</option>
+                <option value="17">زوم ۱۷ (باغات و مزارع)</option>
+                <option value="18">زوم ۱۸ (قطعات متوسط)</option>
+                <option value="19">زوم ۱۹ (نمای نزدیک ملک)</option>
+                <option value="20">زوم ۲۰ (بسیار نزدیک)</option>
+                <option value="21">زوم ۲۱ (جزئیات دقیق بنا)</option>
+              </select>
+              <button type="button" class="btn btn-sm btn-outline-primary py-0 px-2 fw-bold" title="زوم بیشتر در چاپ" onclick="stepCroquisPrintZoom(1)">➕</button>
+              <button type="button" class="btn btn-sm btn-outline-primary py-0 px-2 fw-bold" title="زوم کمتر در چاپ" onclick="stepCroquisPrintZoom(-1)">➖</button>
+            </div>
+            <button type="button" class="btn btn-sm btn-success fw-bold" id="btn-print-official-croquis" onclick="printUtmSketchSheet()">
+              ✂️ تنظیم کادر برش و چاپ شیت رسمی کروکی (A4 / A5)
+            </button>
+          </div>
+        </div>
+
+        <div class="row align-items-end pt-2 border-top">
+          <div class="col-md-4 mb-2">
+            <label class="small fw-bold" for="crq-map-select">انتخاب نقشه کروکی از داخل پرونده متقاضی فعال:</label>
+            <select id="crq-map-select" class="form-select form-select-sm fw-bold" onchange="selectCroquisMapById(this.value)"></select>
+          </div>
+          <div class="col-md-2 mb-2">
+            <label class="small fw-bold" for="crq-zone-select">زون UTM:</label>
+            <select id="crq-zone-select" class="form-select form-select-sm" onchange="editCurrentCroquisMapMeta()">
+              <option value="38R">Zone 38R</option>
+              <option value="39R" selected>Zone 39R (فارس/خفر)</option>
+              <option value="40R">Zone 40R</option>
+              <option value="41R">Zone 41R</option>
+            </select>
+          </div>
+          <div class="col-md-3 mb-2">
+            <label class="small fw-bold" for="crq-map-notes">توضیحات فنی شیت کروکی:</label>
+            <input type="text" id="crq-map-notes" class="form-control form-control-sm" placeholder="توضیحات کارشناس..." />
+          </div>
+          <div class="col-md-3 mb-2 d-flex gap-1">
+            <button type="button" class="btn btn-sm btn-outline-success w-100" onclick="createNewCroquisMapForCase()">➕ نقشه جدید</button>
+            <button type="button" class="btn btn-sm btn-outline-primary" onclick="editCurrentCroquisMapMeta()">💾 ثبت عنوان</button>
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteCurrentCroquisMap()">🗑️</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- بنر هشدار یا تأیید قرارگیری طرح داخلی در داخل محدوده زمین اصلی -->
+      <div id="crq-containment-warning-box" style="display:none;"></div>
+
+      <div class="row">
+        <!-- ستون راست: مدیریت لایه‌ها (ایجاد، نام‌گذاری، حذف، جابجایی، مخفی‌سازی، استایل) -->
+        <div class="col-md-4 mb-3">
+          <div class="card-clean mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <strong class="text-primary">📑 لایه‌های نقشه (Layers)</strong>
+              <span class="small text-muted">کلیک جهت انتخاب لایه</span>
+            </div>
+
+            <div class="row mb-2 g-2">
+              <div class="col-md-6">
+                <div class="p-2 rounded bg-light border text-center">
+                  <div class="small text-muted">مساحت محدوده اصلی زمین</div>
+                  <strong class="text-success" id="crq-kpi-main-area">0 م.م</strong>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="p-2 rounded bg-light border text-center">
+                  <div class="small text-muted">مجموع مساحت طرح و ابنیه</div>
+                  <strong class="text-primary" id="crq-kpi-proj-area">0 م.م</strong>
+                </div>
+              </div>
+            </div>
+
+            <!-- لیست لایه‌ها -->
+            <div id="crq-layers-list-holder" style="max-height: 270px; overflow-y: auto;" class="mb-3"></div>
+
+            <!-- افزودن لایه جدید -->
+            <div class="p-2 rounded bg-light border">
+              <strong class="small d-block mb-2 text-success">➕ ایجاد لایه جدید در این نقشه:</strong>
+              <div class="row">
+                <div class="col-md-6 mb-1">
+                  <label class="small" for="new-lyr-cat">طبقه لایه:</label>
+                  <select id="new-lyr-cat" class="form-select form-select-sm">
+                    <option value="MAIN_PARCEL">۱. محدوده اصلی زمین</option>
+                    <option value="PROJECT_AREA" selected>۲. محل اجرای طرح</option>
+                    <option value="GREENHOUSE">۳. محدوده گلخانه / سالن</option>
+                    <option value="FACILITY">۴. ساختمان و تأسیسات</option>
+                    <option value="ROAD">۵. راه دسترسی</option>
+                    <option value="WATER_SOURCE">۶. چاه آب / منبع آبی</option>
+                    <option value="FENCE">۷. دیوارکشی و حصار</option>
+                    <option value="SUBDIVISION">۸. قطعه تفکیکی</option>
+                    <option value="BUFFER">۹. حریم قانونی</option>
+                    <option value="CUSTOM">۱۰. عارضه سفارشی</option>
+                  </select>
+                </div>
+                <div class="col-md-6 mb-1">
+                  <label class="small" for="new-lyr-type">نوع هندسی:</label>
+                  <select id="new-lyr-type" class="form-select form-select-sm">
+                    <option value="POLYGON">چندضلعی (Polygon)</option>
+                    <option value="LINE">خط / مسیر (Line)</option>
+                    <option value="POINT">نقطه (Point)</option>
+                  </select>
+                </div>
+                <div class="col-md-8 mb-1">
+                  <input type="text" id="new-lyr-name" class="form-control form-control-sm" placeholder="نام دلخواه لایه (اختیاری)" aria-label="نام دلخواه لایه" />
+                </div>
+                <div class="col-md-4 mb-1">
+                  <input type="color" id="new-lyr-color" class="form-control form-control-sm" value="#1d4ed8" style="height:30px;padding:2px;" aria-label="رنگ لایه جدید" />
+                </div>
+              </div>
+              <button type="button" class="btn btn-sm btn-success w-100 mt-1" onclick="addNewLayerToCroquisMap()">➕ افزودن لایه به کروکی</button>
+            </div>
+          </div>
+
+          <!-- ویرایش استایل لایه انتخاب‌شده -->
+          <div class="card-clean">
+            <strong class="small d-block mb-2 text-dark">🎨 ویرایش مشخصات و استایل لایه فعال:</strong>
+            <div class="row">
+              <div class="col-md-6 mb-2">
+                <label class="small" for="edit-lyr-name">نام لایه:</label>
+                <input type="text" id="edit-lyr-name" class="form-control form-control-sm" onchange="saveActiveLayerStyleAndMeta()" />
+              </div>
+              <div class="col-md-6 mb-2">
+                <label class="small" for="edit-lyr-cat">طبقه کاربردی:</label>
+                <select id="edit-lyr-cat" class="form-select form-select-sm" onchange="saveActiveLayerStyleAndMeta()">
+                  <option value="MAIN_PARCEL">محدوده اصلی زمین</option>
+                  <option value="PROJECT_AREA">محل اجرای طرح</option>
+                  <option value="GREENHOUSE">محدوده گلخانه / سالن</option>
+                  <option value="FACILITY">ساختمان و تأسیسات</option>
+                  <option value="ROAD">راه دسترسی</option>
+                  <option value="WATER_SOURCE">چاه آب و منبع آبی</option>
+                  <option value="FENCE">دیوار یا حصار</option>
+                  <option value="SUBDIVISION">قطعه تفکیک‌شده</option>
+                  <option value="BUFFER">حریم قانونی</option>
+                  <option value="CUSTOM">سایر عوارض</option>
+                </select>
+              </div>
+              <div class="col-md-5 mb-2">
+                <label class="small" for="edit-lyr-type">هندسه:</label>
+                <select id="edit-lyr-type" class="form-select form-select-sm" onchange="saveActiveLayerStyleAndMeta()">
+                  <option value="POLYGON">چندضلعی بسته</option>
+                  <option value="LINE">خط / مسیر</option>
+                  <option value="POINT">نقطه‌ای</option>
+                </select>
+              </div>
+              <div class="col-md-3 mb-2">
+                <label class="small" for="edit-lyr-color">رنگ:</label>
+                <input type="color" id="edit-lyr-color" class="form-control form-control-sm" style="height:30px;padding:2px;" onchange="saveActiveLayerStyleAndMeta()" />
+              </div>
+              <div class="col-md-4 mb-2">
+                <label class="small" for="edit-lyr-width">ضخامت خط:</label>
+                <input type="number" id="edit-lyr-width" class="form-control form-control-sm" step="0.5" min="1" max="8" onchange="saveActiveLayerStyleAndMeta()" />
+              </div>
+              <div class="col-md-12 mb-2">
+                <label class="small" for="edit-lyr-desc">توضیح لایه:</label>
+                <input type="text" id="edit-lyr-desc" class="form-control form-control-sm" onchange="saveActiveLayerStyleAndMeta()" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ستون چپ: بوم ترسیم مهندسی (CAD/SVG + Leaflet) و جدول اعتبارسنجی مختصات UTM -->
+        <div class="col-md-8 mb-3">
+          <div class="card-clean mb-3">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+              <div class="d-flex gap-2">
+                <button type="button" id="btn-view-cad" class="btn btn-sm btn-success fw-bold" onclick="switchCroquisViewMode('CAD')">📐 نمای مهندسی آفلاین (CAD / SVG)</button>
+                <button type="button" id="btn-view-map" class="btn btn-sm btn-outline-success fw-bold" onclick="switchCroquisViewMode('MAP')">🌍 نمای نقشه ماهواره‌ای گوگل‌ارث (به‌روز با زوم بالا)</button>
+              </div>
+              <div class="d-flex flex-wrap gap-1">
+                <button type="button" class="btn btn-sm btn-success" onclick="downloadCaseKML()">🌍 خروجی KML گوگل‌ارث</button>
+                <label class="btn btn-sm btn-outline-primary m-0" style="cursor:pointer;">
+                  📂 ورود فایل KML
+                  <input type="file" accept=".kml" hidden onchange="importKmlFileToActiveLayer(event)" />
+                </label>
+                <button type="button" class="btn btn-sm btn-dark" onclick="downloadCaseAutoCAD()">📐 اسکریپت اتوکد (.lsp)</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="downloadCroquisCoordinatesCSV()">📊 جدول اکسل (CSV)</button>
+              </div>
+            </div>
+
+            <!-- بوم مهندسی آفلاین SVG -->
+            <div id="crq-cad-canvas-box">
+              <div id="crq-cad-svg-container" data-testid="croquis-svg-canvas" style="height: 430px;"></div>
+            </div>
+
+            <!-- بوم نقشه آنلاین گوگل‌ارث -->
+            <div id="crq-leaflet-map-box" style="display:none;">
+              <div class="d-flex flex-wrap justify-content-between align-items-center gap-1 mb-1">
+                <small class="fw-bold text-success">🌍 سرور نقشه ماهواره‌ای Google Earth (تصاویر به‌روز با قابلیت زوم تا سطح ۲۲)</small>
+                <div class="d-flex gap-1">
+                  <button type="button" class="btn btn-sm btn-success py-0" onclick="setLeafletTileMode('GOOGLE_HYBRID')">🌍 گوگل‌ارث هیبرید (ماهواره + نام عوارض)</button>
+                  <button type="button" class="btn btn-sm btn-dark py-0" onclick="setLeafletTileMode('GOOGLE_SAT')">🛰️ گوگل‌ارث ماهواره‌ای خالص</button>
+                  <button type="button" class="btn btn-sm btn-outline-dark py-0" onclick="setLeafletTileMode('GOOGLE_TERRAIN')">⛰️ گوگل‌ارث توپوگرافی و راه‌ها</button>
+                </div>
+              </div>
+              <div id="crq-leaflet-map-div" style="width:100%; height: 410px; border-radius:10px; border:1px solid #cbd5e1;"></div>
+            </div>
+
+            <!-- راهنمای لایه‌ها و مساحت‌ها در زیر نقشه -->
+            <div id="crq-legend-box" class="mt-2 pt-2 border-top"></div>
+          </div>
+
+          <!-- بخش ورود و اعتبارسنجی پیشرفته مختصات (UTM و طول/عرض جغرافیایی + ارتفاع + Zone) لایه فعال -->
+          <div class="card-clean">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2 pb-2 border-bottom">
+              <strong class="text-success">📍 جدول بخش‌بندی‌شده رئوس لایه فعال (X, Y, ارتفاع، Zone / طول و عرض جغرافیایی)</strong>
+              <div class="d-flex align-items-center gap-2">
+                <span class="small fw-bold text-muted">نوع ورود و نمایش مختصات:</span>
+                <div class="btn-group btn-group-sm" role="group" aria-label="انتخاب سیستم مختصات کروکی">
+                  <button type="button" id="btn-crq-coord-utm" class="btn btn-sm btn-success fw-bold py-0 px-2" onclick="setCoordInputMode('UTM')">📐 نقاط UTM (X, Y)</button>
+                  <button type="button" id="btn-crq-coord-geo" class="btn btn-sm btn-outline-success fw-bold py-0 px-2" onclick="setCoordInputMode('GEO')">🌐 طول و عرض جغرافیایی (Lat / Lng)</button>
+                </div>
+              </div>
+            </div>
+            <div id="crq-utm-validation-box" class="alert alert-success py-1 px-3 small fw-bold mb-2"></div>
+
+            <!-- ردیف بخش‌بندی‌شده افزودن نقطه جدید به لایه فعال -->
+            <div class="p-2 rounded bg-light border mb-2">
+              <div class="row g-2 align-items-end">
+                <div class="col-md-2">
+                  <label class="small fw-bold" for="new-pt-label">نام / کد نقطه:</label>
+                  <input type="text" id="new-pt-label" class="form-control form-control-sm text-center" placeholder="P1 / چاه" />
+                </div>
+                <div class="col-md-2">
+                  <label class="small fw-bold" id="lbl-new-pt-x" for="new-pt-x">X (شرقی - متر):</label>
+                  <input type="number" step="any" id="new-pt-x" class="form-control form-control-sm text-center font-monospace" placeholder="702150" />
+                </div>
+                <div class="col-md-2">
+                  <label class="small fw-bold" id="lbl-new-pt-y" for="new-pt-y">Y (شمالی - متر):</label>
+                  <input type="number" step="any" id="new-pt-y" class="form-control form-control-sm text-center font-monospace" placeholder="3208450" />
+                </div>
+                <div class="col-md-2">
+                  <label class="small fw-bold" for="new-pt-elev">ارتفاع (متر):</label>
+                  <input type="number" step="any" id="new-pt-elev" class="form-control form-control-sm text-center font-monospace" placeholder="1285" value="1285" />
+                </div>
+                <div class="col-md-2">
+                  <label class="small fw-bold" for="new-pt-zone">زون (Zone):</label>
+                  <select id="new-pt-zone" class="form-select form-select-sm text-center fw-bold">
+                    <option value="38R">Zone 38R</option>
+                    <option value="39R" selected>Zone 39R (خفر)</option>
+                    <option value="40R">Zone 40R</option>
+                    <option value="41R">Zone 41R</option>
+                  </select>
+                </div>
+                <div class="col-md-2">
+                  <button type="button" class="btn btn-sm btn-success w-100 fw-bold" onclick="addSingleUtmPointToLayer()">➕ افزودن نقطه</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col-md-8 mb-2">
+                <div class="table-responsive border rounded" style="max-height: 245px;">
+                  <table class="table table-sm mb-0">
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>کد نقطه</th>
+                        <th id="th-crq-pt-x">X (شرقی - متر)</th>
+                        <th id="th-crq-pt-y">Y (شمالی - متر)</th>
+                        <th>ارتفاع (متر)</th>
+                        <th>زون (Zone)</th>
+                        <th>طول ضلع</th>
+                        <th>حذف</th>
+                      </tr>
+                    </thead>
+                    <tbody id="crq-points-tbody"></tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="col-md-4 mb-2">
+                <label class="small fw-bold" id="lbl-edit-lyr-bulk-utm" for="edit-lyr-bulk-utm">ورود دسته‌ای نقاط لایه (هر خط: X,Y,ارتفاع,Zone یا Lat,Lng):</label>
+                <textarea id="edit-lyr-bulk-utm" class="form-control form-control-sm font-monospace mb-2" rows="4" placeholder="702150,3208450,1285,39R&#10;702550,3208450,1285,39R"></textarea>
+                <button type="button" class="btn btn-sm btn-primary w-100 mb-2 fw-bold" onclick="applyBulkUtmToActiveLayer()">📥 ثبت و ترسیم نقاط دسته‌ای در لایه</button>
+
+                <!-- ابزار جانبی کنترل فاصله حریم دو نقطه (پشتیبانی از UTM و طول/عرض جغرافیایی) -->
+                <div class="p-2 rounded bg-light border">
+                  <strong class="small d-block mb-1">📏 محاسبه‌گر فاصله هوایی و اختلاف ارتفاع دو نقطه:</strong>
+                  <div class="row g-1 mb-1">
+                    <div class="col-md-4"><input type="number" step="any" id="buf-x1" class="form-control form-control-sm text-center" placeholder="X1 / Lng1" aria-label="X1" /></div>
+                    <div class="col-md-4"><input type="number" step="any" id="buf-y1" class="form-control form-control-sm text-center" placeholder="Y1 / Lat1" aria-label="Y1" /></div>
+                    <div class="col-md-4"><input type="number" step="any" id="buf-z1" class="form-control form-control-sm text-center" placeholder="ارتفاع ۱" aria-label="ارتفاع ۱" /></div>
+                    <div class="col-md-4"><input type="number" step="any" id="buf-x2" class="form-control form-control-sm text-center" placeholder="X2 / Lng2" aria-label="X2" /></div>
+                    <div class="col-md-4"><input type="number" step="any" id="buf-y2" class="form-control form-control-sm text-center" placeholder="Y2 / Lat2" aria-label="Y2" /></div>
+                    <div class="col-md-4"><input type="number" step="any" id="buf-z2" class="form-control form-control-sm text-center" placeholder="ارتفاع ۲" aria-label="ارتفاع ۲" /></div>
+                  </div>
+                  <div class="d-flex justify-content-between align-items-center">
+                    <button type="button" class="btn btn-sm btn-outline-dark py-0" onclick="calcUtmBufferDistance()">محاسبه فاصله</button>
+                    <small id="buf-dist-out" class="fw-bold"></small>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =====================================================================
+         PANE 4: صدور نامه تک‌برگی در کاغذ A4 و A5 و دفتر اندیکاتور دبیرخانه (pane-letters)
+         ===================================================================== -->
+    <section id="pane-letters" class="sec-pane">
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <div class="card-clean h-100">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+              <strong class="text-success">✉️ صدور و ذخیره نامه اداری در کاغذ A4 و A5 (شامل مختصات UTM زمین اصلی و عوارض انتخاب‌شده)</strong>
+              <span class="badge bg-success">پشتیبانی از A4 و A5</span>
+            </div>
+            <div id="letter-edit-alert" style="display:none;"></div>
+
+            <div class="small fw-bold mb-1">انتخاب قالب استعلام استاندارد مرکز ۶۳۶:</div>
+            <div id="template-buttons-container" class="d-flex flex-wrap gap-1 mb-3"></div>
+
+            <div class="row">
+              <div class="col-md-2 mb-2">
+                <label class="small fw-bold" for="l-direction">نوع نامه:</label>
+                <select id="l-direction" class="form-select form-select-sm">
+                  <option value="OUT">صادره</option>
+                  <option value="IN">وارده</option>
+                </select>
+              </div>
+              <div class="col-md-3 mb-2">
+                <label class="small fw-bold text-primary" for="l-paper-size">اندازه کاغذ ذخیره و چاپ:</label>
+                <select id="l-paper-size" class="form-select form-select-sm fw-bold border-success" onchange="setPaperSize(this.value)">
+                  <option value="A4">📄 کاغذ A4 (۲۱۰×۲۹۷)</option>
+                  <option value="A5">📄 کاغذ A5 (۱۴۸×۲۱۰)</option>
+                </select>
+              </div>
+              <div class="col-md-3 mb-2">
+                <label class="small fw-bold" for="l-number">شماره نامه:</label>
+                <input type="text" id="l-number" class="form-control form-control-sm fw-bold" />
+              </div>
+              <div class="col-md-2 mb-2">
+                <label class="small fw-bold" for="l-date">تاریخ:</label>
+                <input type="text" id="l-date" class="form-control form-control-sm" />
+              </div>
+              <div class="col-md-2 mb-2">
+                <label class="small fw-bold" for="l-attach">پیوست:</label>
+                <input type="text" id="l-attach" class="form-control form-control-sm" value="ندارد" />
+              </div>
+            </div>
+
+            <div class="mb-2">
+              <label class="small fw-bold" for="l-recipient">عنوان گیرنده نامه (اداره یا سازمان مقصد):</label>
+              <input type="text" id="l-recipient" class="form-control form-control-sm fw-bold" />
+            </div>
+
+            <!-- جعبه‌ابزار ویرایشگر اداری همانند مایکروسافت ورد (Word) -->
+            <div class="mb-2">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <label class="small fw-bold text-success">📝 متن نامه اداری (ویرایشگر پیشرفته با ابزارهای کامل نوشتاری):</label>
+                <span class="badge bg-light text-dark border">ابزارهای قلم، چیدمان و درج متغیر</span>
+              </div>
+
+              <div class="word-toolbar-box mb-2 d-flex flex-wrap align-items-center gap-1">
+                <div class="btn-group btn-group-sm">
+                  <button type="button" class="btn btn-outline-secondary fw-bold" onclick="execLetterFormat('bold')" title="پررنگ (Ctrl+B)"><b>B</b></button>
+                  <button type="button" class="btn btn-outline-secondary fst-italic" onclick="execLetterFormat('italic')" title="مورب (Ctrl+I)"><i>I</i></button>
+                  <button type="button" class="btn btn-outline-secondary text-decoration-underline" onclick="execLetterFormat('underline')" title="خط زیرین (Ctrl+U)"><u>U</u></button>
+                  <button type="button" class="btn btn-outline-secondary text-decoration-line-through" onclick="execLetterFormat('strikeThrough')" title="خط‌خورده"><s>S</s></button>
+                </div>
+
+                <div class="btn-group btn-group-sm">
+                  <button type="button" class="btn btn-outline-secondary" onclick="execLetterFormat('justifyRight')" title="راست‌چین">➡️</button>
+                  <button type="button" class="btn btn-outline-secondary" onclick="execLetterFormat('justifyCenter')" title="وسط‌چین">↔️</button>
+                  <button type="button" class="btn btn-outline-secondary" onclick="execLetterFormat('justifyLeft')" title="چپ‌چین">⬅️</button>
+                  <button type="button" class="btn btn-outline-secondary" onclick="execLetterFormat('justifyFull')" title="هم‌تراز دوطرفه (Justify)">🟰</button>
+                </div>
+
+                <div class="btn-group btn-group-sm">
+                  <button type="button" class="btn btn-outline-secondary" onclick="execLetterFormat('insertUnorderedList')" title="لیست نقطه‌ای">• لیست</button>
+                  <button type="button" class="btn btn-outline-secondary" onclick="execLetterFormat('insertOrderedList')" title="لیست عددی">۱. شماره</button>
+                </div>
+
+                <select class="form-select form-select-sm" style="width:125px;font-size:11px;" onchange="applyLetterFontSize(this.value); this.selectedIndex=0;" aria-label="اندازه قلم">
+                  <option value="" disabled selected>اندازه قلم...</option>
+                  <option value="16pt">تیتر بزرگ (16pt)</option>
+                  <option value="13pt">عنوان بند (13pt)</option>
+                  <option value="11pt">متن استاندارد (11pt)</option>
+                  <option value="9.5pt">متن فشرده (9.5pt)</option>
+                </select>
+
+                <div class="btn-group btn-group-sm">
+                  <button type="button" class="btn btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" onclick="var m=this.nextElementSibling; m.style.display=m.style.display==='block'?'none':'block';">
+                    🏷️ درج متغیر...
+                  </button>
+                  <ul class="dropdown-menu dropdown-menu-end shadow" style="display:none;" onmouseleave="this.style.display='none';">
+                    <li><a class="dropdown-item small" href="javascript:void(0)" onclick="insertTagIntoLetterBody('{نام}');this.closest('ul').style.display='none';">👤 {نام متقاضی}</a></li>
+                    <li><a class="dropdown-item small" href="javascript:void(0)" onclick="insertTagIntoLetterBody('{کدملی}');this.closest('ul').style.display='none';">🆔 {کد ملی/شناسه}</a></li>
+                    <li><a class="dropdown-item small" href="javascript:void(0)" onclick="insertTagIntoLetterBody('{طرح}');this.closest('ul').style.display='none';">📋 {موضوع طرح}</a></li>
+                    <li><a class="dropdown-item small" href="javascript:void(0)" onclick="insertTagIntoLetterBody('{مساحت}');this.closest('ul').style.display='none';">📐 {مساحت زمین}</a></li>
+                    <li><a class="dropdown-item small" href="javascript:void(0)" onclick="insertTagIntoLetterBody('{ظرفیت}');this.closest('ul').style.display='none';">🔢 {ظرفیت طرح}</a></li>
+                    <li><a class="dropdown-item small" href="javascript:void(0)" onclick="insertTagIntoLetterBody('{موقعیت}');this.closest('ul').style.display='none';">📍 {موقعیت اراضی}</a></li>
+                  </ul>
+                </div>
+
+                <div class="btn-group btn-group-sm">
+                  <button type="button" class="btn btn-outline-dark dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" onclick="var m=this.nextElementSibling; m.style.display=m.style.display==='block'?'none':'block';">
+                    📜 عبارات متداول...
+                  </button>
+                  <ul class="dropdown-menu dropdown-menu-end shadow" style="display:none;" onmouseleave="this.style.display='none';">
+                    <li><a class="dropdown-item small" href="javascript:void(0)" onclick="insertPhraseIntoLetterBody('احتراماً عطف به تقاضای نامبرده و دستورالعمل‌های جاری، ');this.closest('ul').style.display='none';">احتراماً عطف به تقاضای نامبرده...</a></li>
+                    <li><a class="dropdown-item small" href="javascript:void(0)" onclick="insertPhraseIntoLetterBody('خواهشمند است دستور فرمایید نسبت به بررسی ضوابط حریم و اعلام نظر مقتضی اقدام فرمایند. ');this.closest('ul').style.display='none';">خواهشمند است دستور فرمایید...</a></li>
+                    <li><a class="dropdown-item small" href="javascript:void(0)" onclick="insertPhraseIntoLetterBody('بدیهی است صدور پروانه منوط به اخذ پاسخ استعلام مذکور خواهد بود. ');this.closest('ul').style.display='none';">بدیهی است صدور پروانه منوط به...</a></li>
+                    <li><a class="dropdown-item small" href="javascript:void(0)" onclick="insertPhraseIntoLetterBody('پیشاپیش از حسن همکاری آن مدیریت کمال تشکر را دارد. ');this.closest('ul').style.display='none';">پیشاپیش از حسن همکاری...</a></li>
+                  </ul>
+                </div>
+
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="insertLetterTable()" title="درج جدول اداری">📊 جدول</button>
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="execLetterFormat('removeFormat')" title="پاکسازی استایل">🧹</button>
+              </div>
+
+              <!-- محیط نوشتاری غنی با پشتیبانی کامل از استایل‌ها -->
+              <div id="l-body-rich" class="rich-editor-paper" contenteditable="true" oninput="syncRichEditorToTextarea()" placeholder="متن کامل نامه اداری را در این قسمت بنویسید یا ویرایش کنید..."></div>
+              <textarea id="l-body" class="form-control form-control-sm" rows="6" style="display:none;" oninput="syncTextareaToRichEditor()"></textarea>
+            </div>
+
+            <!-- گزینه انتخابی کاربر برای درج یا عدم درج جدول مختصات UTM -->
+            <div class="form-check form-switch mb-3 p-2 rounded bg-light border">
+              <input class="form-check-input ms-2" type="checkbox" id="l-include-utm" checked onchange="onToggleLetterIncludeUtm(this.checked)" style="cursor:pointer;" />
+              <label class="form-check-label fw-bold text-success" for="l-include-utm" style="cursor:pointer;">
+                📍 درج جدول مختصات UTM زمین اصلی و عوارض در انتهای این نامه
+              </label>
+              <small class="text-muted d-block mt-1">💡 به انتخاب کاربر: در صورت غیرفعال کردن، نامه بدون جدول مختصات صادر و چاپ می‌شود (مناسب نامه‌های عمومی یا گزارش‌های اداری).</small>
+            </div>
+
+            <div class="d-flex flex-wrap gap-2">
+              <button type="button" class="btn btn-success" onclick="saveLetterToSecretariat(true, 'A4')">🖨️ ذخیره و چاپ در کاغذ A4</button>
+              <button type="button" class="btn btn-primary" onclick="saveLetterToSecretariat(true, 'A5')">🖨️ ذخیره و چاپ در کاغذ A5</button>
+              <button type="button" class="btn btn-outline-success" onclick="saveLetterToSecretariat(false)">💾 ثبت در دفتر اندیکاتور</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-6 mb-3">
+          <div class="card-clean h-100">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+              <strong class="text-primary">📚 دفتر اندیکاتور مکاتبات صادره و وارده مرکز ۶۳۶ (ذخیره‌شده در کاغذ A4 و A5)</strong>
+              <div class="d-flex gap-1">
+                <input type="text" id="sec-search-q" class="form-control form-control-sm" placeholder="جستجو در نامه‌ها..." oninput="renderSecretariatTable()" />
+                <select id="sec-filter-dir" class="form-select form-select-sm" style="width:120px;" onchange="renderSecretariatTable()">
+                  <option value="ALL">همه نامه‌ها</option>
+                  <option value="OUT">صادره</option>
+                  <option value="IN">وارده</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="table-responsive" style="max-height: 460px;">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>شماره و تاریخ</th>
+                    <th>نوع و کاغذ</th>
+                    <th>گیرنده و متقاضی مرتبط</th>
+                    <th>عملیات (چاپ A4 / A5)</th>
+                  </tr>
+                </thead>
+                <tbody id="secretariat-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =====================================================================
+         PANE 5: پیش‌نمایش و ذخیره سربرگ رسمی A4 و A5 و فرم‌های نظارتی مرکز ۶۳۶ (pane-print)
+         ===================================================================== -->
+    <section id="pane-print" class="sec-pane">
+      <div class="card-clean mb-3 no-print">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2 pb-2 border-bottom">
+          <div class="d-flex flex-wrap align-items-center gap-2">
+            <span id="active-paper-size-badge" class="badge bg-dark fs-6">📄 قالب فعال: کاغذ A4 (۲۱۰×۲۹۷ میلی‌متر)</span>
+            <div class="d-flex gap-1">
+              <button type="button" id="btn-paper-a4" class="btn btn-sm btn-success fw-bold" onclick="setPaperSize('A4')">📄 کاغذ A4</button>
+              <button type="button" id="btn-paper-a5" class="btn btn-sm btn-outline-success fw-bold" onclick="setPaperSize('A5')">📄 کاغذ A5</button>
+            </div>
+            <select id="print-paper-size-select" class="form-select form-select-sm fw-bold" style="width:145px;" onchange="setPaperSize(this.value)" aria-label="انتخاب سایز کاغذ">
+              <option value="A4">کاغذ A4</option>
+              <option value="A5">کاغذ A5</option>
+            </select>
+
+            <!-- کنترل اندازه فونت و تنظیم خودکار برای جلوگیری از سرریز -->
+            <div class="d-flex align-items-center gap-1 border rounded px-2 py-1 bg-light">
+              <small class="fw-bold text-muted">اندازه قلم برگه:</small>
+              <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 fw-bold" onclick="adjustPaperFontSize(-1)" title="کوچک‌تر کردن قلم (A-)">A-</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 fw-bold" onclick="adjustPaperFontSize(1)" title="بزرگ‌تر کردن قلم (A+)">A+</button>
+              <button type="button" class="btn btn-sm btn-outline-success py-0 px-2 fw-bold" onclick="autoFitCurrentPaper()" title="تنظیم خودکار فونت و فاصله‌ها تا متن نامه دقیقاً در یک برگه جا شود">✨ تنظیم خودکار تک‌برگی</button>
+            </div>
+
+            <button type="button" id="btn-toggle-print-utm" class="btn btn-sm btn-outline-success fw-bold" onclick="toggleUtmInPreviewSheet()" title="فعال یا غیرفعال کردن نمایش جدول UTM در این نامه">
+              📍 جدول UTM در نامه: دارد
+            </button>
+          </div>
+
+          <div class="d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-sm btn-warning fw-bold" onclick="savePaperEditsToSecretariat()">💾 ذخیره متن و تغییرات در این کاغذ (A4/A5)</button>
+            <button type="button" class="btn btn-sm btn-outline-primary fw-bold" onclick="downloadPaperSheetFile()">📥 دانلود فایل مستقل این کاغذ</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleQrVerificationOnSheets()">🔳 درج QR اصالت</button>
+            <button type="button" class="btn btn-sm btn-primary" onclick="exportStageToWordDoc()">📝 خروجی Word (.doc)</button>
+            <button type="button" class="btn btn-sm btn-success fw-bold" onclick="doPrintPaperSheet()">🖨️ چاپ مستقیم کاغذ (A4 / A5) / PDF</button>
+          </div>
+        </div>
+
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+          <div class="d-flex flex-wrap gap-1">
+            <button type="button" class="btn btn-sm btn-outline-success" onclick="renderSinglePreviewSheet()">📄 نامه فعلی دبیرخانه</button>
+            <button type="button" class="btn btn-sm btn-outline-primary" onclick="printUtmSketchSheet()">🗺️ شیت کروکی چندلایه UTM (۲ شیت مجزا: نقشه + جداول)</button>
+            <button type="button" class="btn btn-sm btn-outline-dark" onclick="printOfficialForm('FOLDER_COVER')">📋 روکش تکمیل پرونده</button>
+            <button type="button" class="btn btn-sm btn-outline-dark" onclick="printOfficialForm('GREENHOUSE_CHECKLIST')">🌱 فرم پایش فنی گلخانه/قارچ</button>
+            <button type="button" class="btn btn-sm btn-outline-dark" onclick="printOfficialForm('PHARMACY_INSPECTION')">💊 فرم ۱۸ بندی داروخانه گیاهپزشکی</button>
+            <button type="button" class="btn btn-sm btn-outline-dark" onclick="printOfficialForm('PLEDGE_CONTRACT')">✍️ تعهدنامه بهره‌بردار</button>
+            <button type="button" class="btn btn-sm btn-outline-dark" onclick="printOfficialForm('BINDER_LABEL')">🏷️ لیبل عطف زونکن</button>
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="issueDeficiencyLetterForActiveCase()">⚠️ اخطاریه نقص مدارک</button>
+          </div>
+          <small class="text-muted fw-bold">✏️ می‌توانید مستقیماً روی متن‌های داخل برگه کلیک و ویرایش کرده یا با دکمه «تنظیم خودکار تک‌برگی» ابعاد را تراز کنید.</small>
+        </div>
+      </div>
+
+      <div class="a4-stage-bg">
+        <div id="a4-preview-stage"></div>
+      </div>
+    </section>
+
+    <!-- =====================================================================
+         PANE 6: کارتابل پیگیری، تنظیمات سربرگ و پشتیبان ویندوز (pane-office)
+         ===================================================================== -->
+    <section id="pane-office" class="sec-pane">
+      <div class="row">
+        <!-- ستون راست: کارتابل وظایف و پشتیبان‌گیری ویندوز -->
+        <div class="col-md-6 mb-3">
+          <div class="card-clean mb-3">
+            <strong class="text-primary d-block mb-2">📅 کارتابل وظایف، پیگیری استعلام‌ها و نوبت بازدید</strong>
+            <div class="row g-2 mb-2">
+              <div class="col-md-5">
+                <input type="text" id="tsk-title" class="form-control form-control-sm" placeholder="عنوان پیگیری یا بازدید..." aria-label="عنوان پیگیری" />
+              </div>
+              <div class="col-md-4">
+                <select id="tsk-cat" class="form-select form-select-sm" aria-label="دسته پیگیری">
+                  <option value="پیگیری استعلام ادارات">پیگیری استعلام ادارات</option>
+                  <option value="بازدید میدانی و برداشت UTM">بازدید میدانی و برداشت UTM</option>
+                  <option value="کمیسیون صدور پروانه">کمیسیون صدور پروانه</option>
+                </select>
+              </div>
+              <div class="col-md-2">
+                <input type="text" id="tsk-due" class="form-control form-control-sm" placeholder="۱۴۰۵/۰۲/۲۰" aria-label="سررسید" />
+              </div>
+              <div class="col-md-1">
+                <button type="button" class="btn btn-sm btn-primary w-100" onclick="addOfficeTask()">➕</button>
+              </div>
+            </div>
+            <div id="tasks-list-holder" class="row g-2"></div>
+          </div>
+
+          <div class="card-clean">
+            <strong class="text-dark d-block mb-2">💻 پشتیبان‌گیری و اجرای آفلاین روی ویندوز</strong>
+            <div class="d-flex flex-wrap gap-2">
+              <button type="button" class="btn btn-sm btn-warning fw-bold" onclick="downloadStandaloneWindowsHTML()">📦 دانلود نسخه تک‌فایلی مستقل ویندوز (.html)</button>
+              <button type="button" class="btn btn-sm btn-dark" onclick="exportFullSystemBackup()">💾 دانلود فایل پشتیبان کل اطلاعات (.json)</button>
+              <label class="btn btn-sm btn-outline-primary m-0" style="cursor:pointer;">
+                📂 بازیابی فایل پشتیبان
+                <input type="file" accept=".json" hidden onchange="importFullSystemBackup(event)" />
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- ستون چپ: تنظیمات سربرگ و قالب نامه‌ها -->
+        <div class="col-md-6 mb-3">
+          <div class="card-clean mb-3">
+            <strong class="text-success d-block mb-2">⚙️ تنظیمات سربرگ رسمی مرکز ۶۳۶ (محل مهر و امضا به صورت پیش‌فرض خالی است)</strong>
+            <div class="row">
+              <div class="col-md-6 mb-2">
+                <label class="small fw-bold" for="cfg-org">عنوان سازمان بالادستی:</label>
+                <input type="text" id="cfg-org" class="form-control form-control-sm" />
+              </div>
+              <div class="col-md-6 mb-2">
+                <label class="small fw-bold" for="cfg-office">نام رسمی مرکز:</label>
+                <input type="text" id="cfg-office" class="form-control form-control-sm" />
+              </div>
+              <div class="col-md-6 mb-2">
+                <label class="small fw-bold" for="cfg-mgr-role">سمت مدیر مرکز:</label>
+                <input type="text" id="cfg-mgr-role" class="form-control form-control-sm" />
+              </div>
+              <div class="col-md-6 mb-2">
+                <label class="small fw-bold" for="cfg-mgr-name">نام و نام خانوادگی مدیر مرکز:</label>
+                <input type="text" id="cfg-mgr-name" class="form-control form-control-sm" />
+              </div>
+              <div class="col-md-8 mb-2">
+                <label class="small fw-bold" for="cfg-addr">آدرس پاورقی سربرگ:</label>
+                <input type="text" id="cfg-addr" class="form-control form-control-sm" />
+              </div>
+              <div class="col-md-4 mb-2">
+                <label class="small fw-bold" for="cfg-postal">کد پستی:</label>
+                <input type="text" id="cfg-postal" class="form-control form-control-sm" />
+              </div>
+              <div class="col-md-6 mb-2">
+                <label class="small fw-bold" for="cfg-phone">تلفن تماس:</label>
+                <input type="text" id="cfg-phone" class="form-control form-control-sm" />
+              </div>
+              <div class="col-md-6 mb-2">
+                <label class="small fw-bold" for="cfg-color">رنگ نوار سربرگ:</label>
+                <input type="color" id="cfg-color" class="form-control form-control-sm" style="height:31px;" />
+              </div>
+            </div>
+            <div class="d-flex flex-wrap gap-2 mt-1">
+              <button type="button" class="btn btn-sm btn-success" onclick="saveOfficeBrandingFromUI()">💾 ذخیره مشخصات سربرگ</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" onclick="resetOfficeBranding()">بازنشانی پیش‌فرض</button>
+              <label class="btn btn-sm btn-outline-primary m-0" style="cursor:pointer;">
+                🖼️ تغییر لوگو
+                <input type="file" accept="image/*" hidden onchange="uploadBrandImage(event, 'customLogoData')" />
+              </label>
+            </div>
+          </div>
+
+          <div class="card-clean">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <strong class="text-primary">📝 ویرایشگر قالب‌های استعلام دبیرخانه</strong>
+              <button type="button" class="btn btn-sm btn-outline-success py-0" onclick="addNewInquiryTemplatePrompt()">➕ افزودن قالب جدید</button>
+            </div>
+            <div class="mb-2">
+              <select id="cfg-tpl-key" class="form-select form-select-sm fw-bold" onchange="loadTemplateForEdit()" aria-label="انتخاب قالب جهت ویرایش"></select>
+            </div>
+            <div class="row">
+              <div class="col-md-5 mb-2">
+                <input type="text" id="cfg-tpl-title" class="form-control form-control-sm" placeholder="عنوان دکمه" aria-label="عنوان دکمه قالب" />
+              </div>
+              <div class="col-md-7 mb-2">
+                <input type="text" id="cfg-tpl-rec" class="form-control form-control-sm" placeholder="گیرنده نامه" aria-label="گیرنده قالب" />
+              </div>
+            </div>
+            <textarea id="cfg-tpl-body" class="form-control form-control-sm mb-2" rows="3" aria-label="متن قالب"></textarea>
+            <button type="button" class="btn btn-sm btn-primary" onclick="saveEditedTemplate()">💾 ذخیره تغییرات قالب</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =====================================================================
+         PANE 7: دستیار هوشمند و OCR اسناد و کروکی (pane-ai)
+         ===================================================================== -->
+    <section id="pane-ai" class="sec-pane">
+      <!-- نوار اتصال مستقیم به Google Gemini API با امکان تنظیم و تست کلید اختصاصی کاربر -->
+      <div class="card-clean mb-3 p-3" style="background: linear-gradient(to left, #f0fdf4, #ffffff); border: 2px solid #86efac; box-shadow: 0 3px 10px rgba(22, 101, 52, 0.08);">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2 pb-2 border-bottom">
+          <div class="d-flex align-items-center gap-2">
+            <span style="font-size: 1.5rem;">🔑</span>
+            <div>
+              <strong class="text-success" style="font-size: 1.05rem;">اتصال به کلید اختصاصی Google Gemini API (هوش مصنوعی آنلاین مرکز ۶۳۶)</strong>
+              <div class="small text-muted">اتصال مستقیم به مدل هوشمند Gemini 2.5 Flash جهت پاسخگویی به ضوابط جهاد کشاورزی و خوانش خودکار اسناد (OCR)</div>
+            </div>
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <span id="gemini-key-status-pill" class="badge bg-secondary p-2">در حال بررسی کلید...</span>
+          </div>
+        </div>
+
+        <div class="row g-2 align-items-center">
+          <div class="col-md-7">
+            <div class="input-group input-group-sm">
+              <span class="input-group-text bg-white fw-bold text-success">کلید Gemini API:</span>
+              <input type="password" id="gemini-custom-api-key" class="form-control font-monospace fw-bold" placeholder="AIzaSy... (کلید اختصاصی گوگل خود را اینجا وارد نمایید)" />
+              <button type="button" class="btn btn-outline-secondary" onclick="toggleGeminiKeyVisibility()" title="نمایش / مخفی‌سازی کلید">👁️</button>
+            </div>
+          </div>
+          <div class="col-md-5 d-flex gap-1 flex-wrap">
+            <button type="button" class="btn btn-sm btn-success fw-bold flex-grow-1" onclick="saveCustomGeminiKey()">💾 ذخیره و برقراری اتصال</button>
+            <button type="button" class="btn btn-sm btn-primary fw-bold" onclick="testCustomGeminiKey()">🧪 تست اتصال زنده</button>
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="clearCustomGeminiKey()" title="حذف کلید ذخیره‌شده">🗑️</button>
+          </div>
+        </div>
+
+        <div id="gemini-key-feedback" class="small mt-2" style="display:none;"></div>
+
+        <div class="small text-muted mt-2 pt-2 border-top d-flex justify-content-between flex-wrap gap-1">
+          <span>💡 <b>راهنمای دریافت کلید:</b> می‌توانید کلید رایگان خود را از کنسول رسمی <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" class="text-primary fw-bold text-decoration-underline">Google AI Studio (aistudio.google.com/apikey)</a> دریافت کرده و در این کادر ذخیره فرمایید.</span>
+          <span class="text-secondary fw-bold">✓ سازگار با سرور آنلاین و نسخه ویندوز مستقل</span>
+        </div>
+      </div>
+
+      <div class="row">
+        <!-- ستون سمت راست: استخراج اطلاعات سند و OCR و خلبان خودکار -->
+        <div class="col-md-7 mb-3">
+          <div class="card-clean h-100">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+              <strong class="text-primary">🤖 استخراج هوشمند اطلاعات سند، قولنامه و نقشه UTM (OCR آنلاین و آفلاین)</strong>
+              <span id="ai-connection-badge" class="badge bg-success px-3 py-2 shadow-sm">🌐 در حال بررسی وضعیت هوش مصنوعی...</span>
+            </div>
+
+            <div id="ai-online-status-desc" class="alert alert-success small mb-3 border-success">
+              ✨ <b>هوش مصنوعی پیشرفته آنلاین فعال:</b> مجهز به مدل پرقدرت <code>Gemini 3.8 Flash</code> به همراه استناد و جستجوی زنده قوانین (Google Search Grounding) بدون نیاز به تنظیمات دستی. در صورت قطعی شبکه، سیستم خودکار به موتور آفلاین تغییر وضعیت می‌دهد.
+            </div>
+
+            <div class="p-3 bg-light rounded border mb-3">
+              <div class="fw-bold small mb-2 text-dark">🖼️ خوانش و تحلیل هوشمند تصویر سند، قولنامه، پروانه یا نقشه UTM:</div>
+              <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+                <input type="file" id="ai-ocr-file-input" class="form-control form-control-sm" style="max-width:320px;" accept="image/*" onchange="aiHandleImageSelect(this)" />
+                <button type="button" class="btn btn-sm btn-primary" onclick="aiReadDocumentImagePro()">🔍 تحلیل و خوانش تصویر با Gemini 3.8 Flash</button>
+              </div>
+              <div id="ai-ocr-preview-box" class="mt-2 text-center" style="display:none; max-height:220px; overflow:hidden; border-radius:6px; border:1px dashed #0d6efd; background:#fff; padding:6px;">
+                <img id="ai-ocr-preview-img" src="" alt="پیش‌نمایش تصویر سند" style="max-height:200px; max-width:100%; object-fit:contain;" />
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label class="small fw-bold mb-1" for="ai-raw-text-input">📋 مشخصات استخراج‌شده سند / متن خام / ردیف‌های مختصات X,Y:</label>
+              <textarea id="ai-raw-text-input" class="form-control form-control-sm font-monospace" rows="6" placeholder="متن سند، قولنامه، پیامک، یا ردیف‌های مختصات X و Y را اینجا قرار دهید یا از تصویر بالا با هوش مصنوعی استخراج کنید..."></textarea>
+            </div>
+
+            <div class="d-flex flex-wrap gap-2">
+              <button type="button" class="btn btn-success" onclick="aiExtractFromRawText()">⚡ استخراج مشخصات و انتقال به فرم پرونده</button>
+              <button type="button" class="btn btn-outline-primary" onclick="aiRunFullAutopilotPipeline()">🚀 خلبان خودکار (استخراج و ثبت مستقیم پرونده)</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ستون سمت چپ: چت‌بات مشاور فنی ضوابط و مقررات مرکز ۶۳۶ با Search Grounding -->
+        <div class="col-md-5 mb-3">
+          <div class="card-clean h-100 d-flex flex-column">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <strong class="text-success">💬 مشاور فنی ضوابط، فواصل و استعلام‌های کشاورزی</strong>
+              <span id="ai-chat-mode-tag" class="badge bg-success">آنلاین (Gemini 3.8 Flash)</span>
+            </div>
+            <p class="small text-muted mb-2">
+              پاسخگوی هوشمند به قوانین حریم چاه، ظرفیت گلخانه و قارچ، فواصل بهداشتی دام و طیور، و مستندات به‌روز:
+            </p>
+
+            <div id="ai-chat-history" class="p-2 mb-2 bg-light rounded border flex-grow-1" style="min-height:280px; max-height:420px; overflow-y:auto; font-size:12px;">
+              <div class="p-2 mb-2 rounded bg-white border text-dark shadow-sm">
+                <b>🤖 مشاور فنی مرکز ۶۳۶:</b> سلام و درود. سامانه هوش مصنوعی آنلاین مرکز ۶۳۶ خفر با مدل <code>Gemini 3.8 Flash</code> و جستجوی زنده در مقررات وزارت جهاد کشاورزی آماده خدمت‌رسانی است. هر سوالی در رابطه با حداقل متراژ زمین، سهمیه آب، فواصل مرغداری و دامداری، حریم چاه یا ضوابط کلینیک گیاهپزشکی دارید بفرمایید.
+              </div>
+            </div>
+
+            <div class="input-group input-group-sm">
+              <input type="text" id="ai-chat-input" class="form-control" placeholder="سوال خود را بپرسید (مثال: حداقل زمین گلخانه، حریم مرغداری با کانون روستایی)..." onkeydown="if(event.key==='Enter') aiSendChatMessage()" />
+              <button type="button" class="btn btn-success" onclick="aiSendChatMessage()">ارسال ↵</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =====================================================================
+         PANE 8: راهنمای جامع اتوماسیون اداری و فنی مرکز ۶۳۶ (pane-guide)
+         ===================================================================== -->
+    <section id="pane-guide" class="sec-pane">
+      <div class="card-clean mb-3">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 border-bottom pb-2">
+          <div>
+            <h4 class="m-0 fw-bold text-primary">📘 راهنمای جامع سامانه اتوماسیون اداری و فنی مرکز خدمات کشاورزی ۶۳۶ خفر</h4>
+            <small class="text-muted">مستندات گام‌به‌گام کاربری سیستم، تشکیل پرونده، نقشه‌برداری، صدور مکاتبات و چاپ تک‌برگی بدون پرش</small>
+          </div>
+          <span class="badge bg-success p-2">ویرایش ۲۲.۰ - ویژه کاربرد آفلاین و تحت شبکه</span>
+        </div>
+
+        <div class="row g-3">
+          <!-- کارت ۱: تشکیل پرونده و گروه‌های تخصصی -->
+          <div class="col-md-6">
+            <div class="guide-card p-3 rounded border bg-light h-100">
+              <h6 class="fw-bold text-success mb-2">۱. تشکیل پرونده و گروه‌های تخصصی سه‌گانه</h6>
+              <ul class="small pe-3 mb-0" style="line-height:1.9;">
+                <li><b>گروه ۱ (گلخانه و قارچ):</b> شامل سبزی و صیفی، گل و گیاه زینتی، پرورش قارچ دکمه‌ای و صدفی. حداقل عرصه ۳۰۰۰ متر مربع.</li>
+                <li><b>گروه ۲ (دام، طیور و شیلات):</b> شامل گوسفند داشتی و پرواری، گاو شیری و پرواری، مرغداری گوشتی و تخم‌گذار، آبزی‌پروری سردابی و گرمابی.</li>
+                <li><b>گروه ۳ (کلینیک و داروخانه گیاهپزشکی):</b> الزام به کارشناس واجد شرایط نظام مهندسی و بازرسی فرم ۱۸ بندی.</li>
+                <li><b>انتخاب متقاضی فعال:</b> تمام عملیات نقشه، حریم و نامه منوط به انتخاب متقاضی است تا داده‌ها اشتباه ثبت نگردد.</li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- کارت ۲: مختصات UTM و کروکی دوبرگی -->
+          <div class="col-md-6">
+            <div class="guide-card p-3 rounded border bg-light h-100">
+              <h6 class="fw-bold text-primary mb-2">۲. کروکی زمین و تفکیک خودکار دوبرگی</h6>
+              <ul class="small pe-3 mb-0" style="line-height:1.9;">
+                <li><b>ورود نقاط UTM:</b> مختصات نقاط گوشه زمین اصلی را به صورت ردیف‌های <code>X,Y</code> در کادر وارد نمایید (زون ۳۹R خفر فارس).</li>
+                <li><b>عوارض جانبی و همسایگان:</b> چاه آب، راه عبوری، کانال، مرغداری یا دامداری‌های مجاور را به عنوان لایه جداگانه ثبت کنید.</li>
+                <li><b>چاپ ۲ برگه کروکی:</b> طبق دستورالعمل، کروکی تفکیک شده است:
+                  <ul class="pe-2 mt-1">
+                    <li><b>برگه اول:</b> نقشه بزرگ گرافیکی با مقیاس، بردار شمال، راهنما، مشخصات متقاضی و مهر رسمی.</li>
+                    <li><b>برگه دوم:</b> جدول تفکیک مساحت عوارض (جدول الف)، جدول کامل مختصات X,Y کلیه نقاط (جدول ب) و یادداشت فنی کارشناس.</li>
+                  </ul>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- کارت ۳: استعلام و حریم قانونی -->
+          <div class="col-md-6">
+            <div class="guide-card p-3 rounded border bg-light h-100">
+              <h6 class="fw-bold text-warning text-dark mb-2">۳. بررسی حریم قانونی و بافر هوشمند</h6>
+              <ul class="small pe-3 mb-0" style="line-height:1.9;">
+                <li><b>حریم راه و راه‌آهن:</b> بر اساس رتبه جاده روستایی، فرعی، اصلی یا شریانی فاصله قانونی خودکار محاسبه می‌شود.</li>
+                <li><b>حریم منابع آبی و چاه:</b> رعایت فواصل چاه شرب، کشاورزی، رودخانه و مسیل سیلابی.</li>
+                <li><b>حریم واحدهای دامی و مرغداری:</b> بررسی تداخل شعاع بهداشتی با مرغداری‌ها و مراکز مسکونی جهت صدور مجوز بلامانع.</li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- کارت ۴: صدور نامه با ابزارهای شبیه ورد و چاپ تک‌برگی -->
+          <div class="col-md-6">
+            <div class="guide-card p-3 rounded border bg-light h-100">
+              <h6 class="fw-bold text-danger mb-2">۴. نگارش نامه‌ها با ابزارهای شبیه Word و چاپ تک‌برگی بدون پرش</h6>
+              <ul class="small pe-3 mb-0" style="line-height:1.9;">
+                <li><b>ویرایشگر پیشرفته:</b> قلم پررنگ، مورب، زیرخط‌دار، چیدمان راست/وسط/چپ/هم‌تراز، درج لیست و جدول اداری.</li>
+                <li><b>درج متغیرهای متقاضی:</b> با کلیک روی برچسب‌های <code>{نام}</code>، <code>{کدملی}</code>، <code>{طرح}</code> و <code>{مساحت}</code> مشخصات متقاضی خودکار جایگزین می‌گردد.</li>
+                <li><b>گزینه انتخابی جدول UTM:</b> با کلید سوییچ می‌توانید درج جدول مختصات را در انتهای نامه فعال یا غیرفعال فرمایید.</li>
+                <li><b>پیشگیری قطعی از سرریز صفحه:</b> سیستم ارتفاع کاغذ را روی ۲۹۶ میلی‌متر دقیق قفل کرده و با کلیک روی <code>✨ تنظیم خودکار تک‌برگی</code> یا کلیدهای <code>A-</code> و <code>A+</code> فواصل و فونت را مقیاس‌بندی می‌کند تا هرگز متن به برگه دوم نرود.</li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- کارت ۵: هوش مصنوعی و OCR -->
+          <div class="col-md-6">
+            <div class="guide-card p-3 rounded border bg-light h-100">
+              <h6 class="fw-bold text-info text-dark mb-2">۵. دستیار هوشمند و خوانش اسناد (OCR)</h6>
+              <ul class="small pe-3 mb-0" style="line-height:1.9;">
+                <li><b>استخراج از تصویر:</b> عکس سند مالکیت، قولنامه، پروانه یا نقشه دستی را آپلود نموده تا متن و مختصات استخراج شوند.</li>
+                <li><b>استخراج آفلاین:</b> متن کپی‌شده را در کادر قرار داده و روی استخراج کلیک کنید؛ نام متقاضی، کدملی، متراژ، طرح و مختصات X,Y بدون اینترنت شناسایی می‌شوند.</li>
+                <li><b>خلبان خودکار:</b> با یک کلیک پرونده متقاضی جدید تشکیل شده و آماده صدور نامه می‌گردد.</li>
+                <li><b>مشاور فنی:</b> سوالات مرتبط با ضوابط نظام مهندسی را در پنجره چت مطرح فرمایید.</li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- کارت ۶: امنیت داده‌ها، نسخه آفلاین و پشتیبان‌گیری -->
+          <div class="col-md-6">
+            <div class="guide-card p-3 rounded border bg-light h-100">
+              <h6 class="fw-bold text-secondary mb-2">۶. کارکرد ۱۰۰٪ آفلاین، دفتر اندیکاتور و پشتیبان‌گیری</h6>
+              <ul class="small pe-3 mb-0" style="line-height:1.9;">
+                <li><b>اجرای بدون اینترنت:</b> تمامی کدها، استایل‌ها، فونت‌ها و اسکریپت‌ها محلی ذخیره شده‌اند و روی هر کامپیوتری بدون اینترنت کار می‌کنند.</li>
+                <li><b>دفتر اندیکاتور:</b> هر نامه پس از صدور با شماره و تاریخ در حافظه سیستم ثبت و قابل بازیابی است.</li>
+                <li><b>پشتیبان‌گیری JSON:</b> جهت حفظ پرونده‌ها و انتقال به کامپیوتر دیگر، از دکمه پشتیبان‌گیری در نوار بالا استفاده نمایید.</li>
+                <li><b>دانلود نسخه تک‌فایلی ویندوز:</b> با کلیک روی دریافت بسته ویندوز، فایل یکپارچه را دریافت و مستقیماً با دوبار کلیک باز نمایید.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- =====================================================================
+       مودال اجباری انتخاب یا ثبت متقاضی (قانون بخش سوم)
+       ===================================================================== -->
+  <div id="mandatory-applicant-modal" class="guard-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="guard-modal-title">
+    <div class="guard-modal-card">
+      <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-2">
+        <h5 class="m-0 fw-bold text-danger" id="guard-modal-title">⛔ الزام قانونی: انتخاب یا ثبت متقاضی پیش از شروع فرایند</h5>
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="closeMandatoryApplicantModal()">✖ بستن</button>
+      </div>
+      <div id="guard-modal-reason" class="alert alert-warning small fw-bold mb-3"></div>
+
+      <div class="row g-2 mb-2">
+        <div class="col-md-7">
+          <input type="text" id="guard-modal-search" class="form-control form-control-sm" placeholder="جستجوی نام، کد ملی، شناسه، شماره پرونده یا روستا..." oninput="renderGuardModalApplicantList()" aria-label="جستجوی متقاضی در مودال" />
+        </div>
+        <div class="col-md-5">
+          <select id="guard-modal-group" class="form-select form-select-sm" onchange="renderGuardModalApplicantList()" aria-label="فیلتر گروه در مودال">
+            <option value="ALL">همه گروه‌های سه‌گانه</option>
+            <option value="GREENHOUSE_MUSHROOM">۱. گلخانه و قارچ</option>
+            <option value="LIVESTOCK_POULTRY_FISHERIES">۲. دام، طیور و شیلات</option>
+            <option value="CLINIC_PHARMACY">۳. کلینیک و داروخانه گیاهپزشکی</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="table-responsive mb-3" style="max-height: 260px;">
+        <table class="table table-sm">
+          <thead>
+            <tr>
+              <th>کلاسه</th>
+              <th>مشخصات متقاضی</th>
+              <th>گروه و طرح</th>
+              <th>انتخاب</th>
+            </tr>
+          </thead>
+          <tbody id="guard-modal-tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 pt-2 border-top">
+        <div class="d-flex gap-1">
+          <button type="button" class="btn btn-sm btn-success" onclick="startNewCaseWizard('GREENHOUSE_MUSHROOM')">➕ ثبت متقاضی جدید (گلخانه/قارچ)</button>
+          <button type="button" class="btn btn-sm btn-primary" onclick="startNewCaseWizard('LIVESTOCK_POULTRY_FISHERIES')">➕ ثبت متقاضی (دام/طیور/شیلات)</button>
+          <button type="button" class="btn btn-sm btn-warning text-dark" onclick="startNewCaseWizard('CLINIC_PHARMACY')">➕ ثبت متقاضی (کلینیک/داروخانه)</button>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="closeMandatoryApplicantModal()">انصراف</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- راهنمای شناور موس -->
+  <div id="smart-mouse-tooltip"></div>
+
+  <!-- ماژول‌های اصلی اتوماسیون مرکز خدمات ۶۳۶ خفر (۱۰۰٪ آفلاین و سازگار با اجرای مستقیم ویندوز و مرورگر) -->
+  <script src="./nezam-core.js"></script>
+  <script src="./nezam-customizer.js"></script>
+  <script src="./nezam-ai-assistant.js"></script>
+</body>
+</html>
