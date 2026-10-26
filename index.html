@@ -2133,5 +2133,209 @@
   <script src="./nezam-core.js"></script>
   <script src="./nezam-customizer.js"></script>
   <script src="./nezam-ai-assistant.js"></script>
+<!-- ماژول اتصال خودکار سامانه ۶۳۶ خفر به گوگل درایو -->
+  <script>
+  (function() {
+    const DRIVE_API_URL = 'https://script.google.com/macros/s/AKfycbyd7lrIZfKVUm09OzBQewj8_XRWJfMpd8vCm6DV-tAUXEkA33LgqL10UKe8Yz17TwM2/exec';
+    let syncTimer = null;
+    let isRestoring = false;
+
+    // ۱. افزودن نشانگر وضعیت و دکمه ذخیره ابری در نوار بالای سایت
+    function createCloudStatusUI() {
+      const headerRight = document.querySelector('.top-hero-bar .d-flex.flex-wrap.align-items-center.gap-2');
+      if (!headerRight || document.getElementById('gdrive-status-btn')) return;
+
+      const btn = document.createElement('button');
+      btn.id = 'gdrive-status-btn';
+      btn.type = 'button';
+      btn.className = 'btn btn-sm btn-success fw-bold';
+      btn.style.border = '1px solid #86efac';
+      btn.innerHTML = '☁️ گوگل درایو: آماده';
+      btn.title = 'کلیک برای ذخیره و همگام‌سازی فوری اطلاعات با گوگل درایو';
+      btn.onclick = function() {
+        saveApplicantFolderToDrive(true);
+        syncAllDataToDrive(true);
+      };
+      headerRight.prepend(btn);
+    }
+
+    function setCloudStatus(text, bg) {
+      const btn = document.getElementById('gdrive-status-btn');
+      if (btn) {
+        btn.innerHTML = text;
+        if (bg) btn.style.backgroundColor = bg;
+      }
+    }
+
+    // ۲. جمع‌آوری تمام اطلاعات سامانه برای ذخیره در دیتابیس مرکزی گوگل درایو (db.json)
+    function collectStorageSnapshot() {
+      const data = {};
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && !k.startsWith('__gdrive_')) {
+          data[k] = localStorage.getItem(k);
+        }
+      }
+      return data;
+    }
+
+    // ۳. ارسال کل دیتابیس به گوگل درایو
+    async function syncAllDataToDrive(showAlert) {
+      if (isRestoring) return;
+      try {
+        setCloudStatus('⏳ در حال ذخیره در درایو...', '#d97706');
+        const ts = Date.now();
+        localStorage.setItem('__gdrive_sync_ts', String(ts));
+
+        const payload = {
+          action: 'sync',
+          db: [{
+            _type: 'FULL_STORAGE_SYNC',
+            updatedAt: ts,
+            updatedAtFa: new Date().toLocaleString('fa-IR'),
+            storage: collectStorageSnapshot()
+          }]
+        };
+
+        await fetch(DRIVE_API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(payload),
+          redirect: 'follow'
+        });
+
+        setCloudStatus('✅ ذخیره در درایو انجام شد', '#15803d');
+        if (showAlert) alert('تمامی اطلاعات سامانه با موفقیت در گوگل درایو ذخیره شد.');
+      } catch (err) {
+        console.error('Google Drive Sync Error:', err);
+        setCloudStatus('⚠️ خطا در ارتباط با درایو', '#dc2626');
+      }
+    }
+
+    // ۴. ساخت پوشه اختصاصی برای متقاضی فعال در گوگل درایو
+    async function saveApplicantFolderToDrive(manualTrigger) {
+      const val = id => (document.getElementById(id) ? document.getElementById(id).value.trim() : '');
+      const selText = id => {
+        const el = document.getElementById(id);
+        return el && el.options && el.selectedIndex >= 0 ? el.options[el.selectedIndex].text : '';
+      };
+
+      const fullName = val('c-name');
+      const nationalCode = val('c-nid') || val('c-code');
+      if (!fullName && !manualTrigger) return;
+
+      const folderKey = (fullName || 'متقاضی') + '_' + (nationalCode || '');
+      const createdFolders = JSON.parse(localStorage.getItem('__gdrive_folders') || '{}');
+      if (!manualTrigger && createdFolders[folderKey]) return;
+
+      const applicantPayload = {
+        fullName: fullName || 'متقاضی',
+        nationalCode: nationalCode || String(Date.now()),
+        caseCode: val('c-code'),
+        phone: val('c-mobile'),
+        entityType: selText('c-entity-type'),
+        mainGroup: selText('c-main-group'),
+        activityType: selText('c-act-type'),
+        status: selText('c-case-status'),
+        projectTitle: val('c-project'),
+        capacity: val('c-cap'),
+        landArea: val('c-land'),
+        waterNeed: val('c-water'),
+        location: val('c-loc'),
+        subArea: val('c-subarea'),
+        issueDate: val('c-issue-date'),
+        expireDate: val('c-exp-date'),
+        utmCoordinates: val('c-utm')
+      };
+
+      try {
+        setCloudStatus('⏳ ساخت پوشه متقاضی در درایو...', '#1d4ed8');
+        await fetch(DRIVE_API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(applicantPayload),
+          redirect: 'follow'
+        });
+        createdFolders[folderKey] = Date.now();
+        localStorage.setItem('__gdrive_folders', JSON.stringify(createdFolders));
+        setCloudStatus('✅ پوشه در درایو ساخته شد', '#15803d');
+      } catch (err) {
+        console.error('Folder Creation Error:', err);
+      }
+    }
+
+    // ۵. بارگذاری خودکار اطلاعات از گوگل درایو هنگام باز شدن سایت
+    async function loadFromDriveOnStartup() {
+      try {
+        setCloudStatus('🔄 دریافت اطلاعات از درایو...', '#0284c7');
+        const res = await fetch(DRIVE_API_URL, { method: 'GET', redirect: 'follow' });
+        const data = await res.json();
+
+        if (Array.isArray(data) && data.length > 0) {
+          const syncRecord = data.find(item => item && item._type === 'FULL_STORAGE_SYNC' && item.storage);
+          if (syncRecord) {
+            const localTs = Number(localStorage.getItem('__gdrive_sync_ts') || 0);
+            const cloudTs = Number(syncRecord.updatedAt || 0);
+
+            if (cloudTs > localTs) {
+              isRestoring = true;
+              const entries = Object.entries(syncRecord.storage);
+              for (const [k, v] of entries) {
+                localStorage.setItem(k, v);
+              }
+              localStorage.setItem('__gdrive_sync_ts', String(cloudTs));
+              isRestoring = false;
+
+              if (!sessionStorage.getItem('__gdrive_reloaded')) {
+                sessionStorage.setItem('__gdrive_reloaded', '1');
+                location.reload();
+                return;
+              }
+            }
+          }
+        }
+        sessionStorage.removeItem('__gdrive_reloaded');
+        setCloudStatus('☁️ گوگل درایو: متصل', '#15803d');
+      } catch (err) {
+        console.warn('Could not load from Google Drive:', err);
+        setCloudStatus('☁️ حالت آفلاین', '#475569');
+      }
+    }
+
+    // ۶. اتصال خودکار به تغییرات حافظه و دکمه‌های ذخیره سامانه
+    const origSetItem = Storage.prototype.setItem;
+    Storage.prototype.setItem = function(key, value) {
+      origSetItem.apply(this, arguments);
+      if (!isRestoring && key && !key.startsWith('__gdrive_')) {
+        clearTimeout(syncTimer);
+        syncTimer = setTimeout(() => syncAllDataToDrive(false), 1500);
+      }
+    };
+
+    window.addEventListener('load', function() {
+      createCloudStatusUI();
+      loadFromDriveOnStartup();
+
+      // اتصال به دکمه ذخیره پرونده متقاضی
+      if (typeof window.saveActiveCaseChanges === 'function') {
+        const origSaveCase = window.saveActiveCaseChanges;
+        window.saveActiveCaseChanges = function() {
+          const result = origSaveCase.apply(this, arguments);
+          saveApplicantFolderToDrive(false).then(() => syncAllDataToDrive(false));
+          return result;
+        };
+      }
+
+      // اتصال به دکمه ساخت پوشه متقاضی در تب مدارک
+      if (typeof window.syncActiveCaseFolderToDrive === 'function') {
+        const origSyncFolder = window.syncActiveCaseFolderToDrive;
+        window.syncActiveCaseFolderToDrive = function() {
+          saveApplicantFolderToDrive(true).then(() => syncAllDataToDrive(true));
+          return origSyncFolder.apply(this, arguments);
+        };
+      }
+    });
+  })();
+  </script>
 </body>
 </html>
