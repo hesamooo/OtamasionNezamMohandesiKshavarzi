@@ -3504,236 +3504,201 @@
   });
 })();
 </script>
-  <!-- =========================================================================
-     ماژول یکپارچه رابط کاربری: منوی اصلی در سایدبار راست + تب زیرمجموعه‌ها در بالا
-     + تعمیر خودکار نمایش تایل‌های ماهواره‌ای Google Earth در تمام سطوح زوم
+<!-- =========================================================================
+     ماژول اصلاح‌شده چیدمان: هدر تمام‌عرض + منوی راست جمع‌وجور + تب زیرمجموعه بالا
+     (بدون جمع‌شدگی صفحات از سمت راست + تعمیر قطعی نقشه ماهواره‌ای Google Earth/Esri)
      ========================================================================= -->
-<style id="nezam-sidebar-topsub-styles">
-  /* ساختار اصلی دو ستونه: سایدبار در سمت راست + محیط کاری در سمت چپ */
-  .nezam-app-shell {
-    display: flex;
-    align-items: stretch;
-    min-height: calc(100vh - 122px);
-    position: relative;
-    width: 100%;
-  }
-
-  /* ۱. سایدبار عمودی سمت راست (منوی اصلی) */
-  .nezam-right-sidebar {
-    width: 255px;
-    min-width: 255px;
-    background: linear-gradient(180deg, #163024 0%, #1b4332 60%, #203a2d 100%);
-    border-left: 3px solid #d4a373;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    transition: width 0.22s ease, min-width 0.22s ease;
-    z-index: 950;
-    box-shadow: -4px 0 15px rgba(22, 48, 36, 0.15);
-    position: sticky;
-    top: 0;
-    height: calc(100vh - 68px);
-    overflow-y: auto;
+<style id="nezam-layout-and-map-fix-styles">
+  /* ۱. تضمین تمام‌عرض بودن کامل هدر و نوار متقاضی بدون هیچ‌گونه جمع‌شدگی از راست */
+  html, body {
+    padding-right: 0 !important;
+    margin-right: 0 !important;
     overflow-x: hidden;
   }
 
-  /* حالت جمع‌شده (Mini-Sidebar) */
-  .nezam-right-sidebar.collapsed {
-    width: 68px;
-    min-width: 68px;
-  }
-  .nezam-right-sidebar.collapsed .sb-item-text,
-  .nezam-right-sidebar.collapsed .sb-header-title,
-  .nezam-right-sidebar.collapsed .sb-footer-box,
-  .nezam-right-sidebar.collapsed .sb-badge-pill {
-    display: none !important;
-  }
-  .nezam-right-sidebar.collapsed .app-navbar .nav-link {
-    justify-content: center !important;
-    padding: 0.65rem 0.3rem !important;
-  }
-  .nezam-right-sidebar.collapsed .sb-icon-box {
-    margin-left: 0 !important;
-    font-size: 1.25rem !important;
+  .top-hero-bar,
+  .active-applicant-ContextBar {
+    width: 100% !important;
+    margin-right: 0 !important;
+    padding-right: 1.25rem !important;
   }
 
-  .sb-top-header {
-    padding: 0.7rem 0.85rem;
-    border-bottom: 1px solid rgba(233, 196, 106, 0.25);
+  /* ۲. چیدمان دسکتاپ: منوی راست و محتوا در کنار هم در زیر هدر */
+  @media (min-width: 992px) {
+    .nezam-body-grid {
+      display: flex !important;
+      flex-direction: row !important;
+      align-items: flex-start !important;
+      width: 100% !important;
+      min-height: calc(100vh - 115px);
+    }
+
+    /* منوی اصلی در ستون سمت راست (زیر هدر) */
+    nav.app-navbar {
+      position: sticky !important;
+      top: 0 !important;
+      right: 0 !important;
+      width: 215px !important;
+      min-width: 215px !important;
+      height: calc(100vh - 10px) !important;
+      background: linear-gradient(180deg, #163024 0%, #1b4332 65%, #203a2d 100%) !important;
+      border-left: 3px solid #d4a373 !important;
+      border-bottom: none !important;
+      display: flex !important;
+      flex-direction: column !important;
+      flex-wrap: nowrap !important;
+      padding: 0.55rem 0.45rem !important;
+      gap: 0.38rem !important;
+      z-index: 950 !important;
+      overflow-y: auto !important;
+      overflow-x: hidden !important;
+      box-shadow: -3px 0 12px rgba(22, 48, 36, 0.14) !important;
+      transition: width 0.2s ease, min-width 0.2s ease !important;
+      flex-shrink: 0 !important;
+    }
+
+    /* حالت جمع‌شده (فقط آیکون) برای باز شدن حداکثری صفحه */
+    body.nezam-sb-collapsed nav.app-navbar {
+      width: 58px !important;
+      min-width: 58px !important;
+      padding: 0.55rem 0.25rem !important;
+    }
+
+    nav.app-navbar .nav-link {
+      width: 100% !important;
+      text-align: right !important;
+      justify-content: flex-start !important;
+      background: rgba(255, 255, 255, 0.07) !important;
+      color: #e2e8f0 !important;
+      border: 1px solid rgba(255, 255, 255, 0.13) !important;
+      border-radius: 0.5rem !important;
+      padding: 0.52rem 0.6rem !important;
+      font-size: 0.8rem !important;
+      font-weight: 700 !important;
+      white-space: nowrap !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+      flex-shrink: 0 !important;
+    }
+
+    body.nezam-sb-collapsed nav.app-navbar .nav-link {
+      font-size: 0 !important;
+      justify-content: center !important;
+      padding: 0.6rem 0.15rem !important;
+    }
+    body.nezam-sb-collapsed nav.app-navbar .nav-link::first-letter {
+      font-size: 1.15rem !important;
+    }
+
+    nav.app-navbar .nav-link:hover {
+      background: rgba(233, 196, 106, 0.18) !important;
+      color: #ffffff !important;
+      border-color: #e9c46a !important;
+    }
+
+    nav.app-navbar .nav-link.active {
+      background: linear-gradient(90deg, #e9c46a 0%, #f4d58d 100%) !important;
+      color: #163024 !important;
+      border-color: #ffffff !important;
+      font-weight: 900 !important;
+      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.22) !important;
+    }
+
+    /* ستون محتوای اصلی در سمت چپ منو (پر کردن ۱۰۰٪ فضای باقی‌مانده بدون فشردگی) */
+    .nezam-content-column {
+      flex: 1 1 auto !important;
+      min-width: 0 !important;
+      width: calc(100% - 215px) !important;
+      display: flex !important;
+      flex-direction: column !important;
+    }
+    body.nezam-sb-collapsed .nezam-content-column {
+      width: calc(100% - 58px) !important;
+    }
+
+    .nezam-content-column > main {
+      width: 100% !important;
+      max-width: 100% !important;
+      margin: 0 !important;
+      padding: 0.85rem 1rem !important;
+    }
+  }
+
+  /* سرستون منوی سمت راست + دکمه جمع‌کردن */
+  .nezam-sb-top-brand {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    padding: 0.35rem 0.4rem 0.55rem 0.4rem;
+    margin-bottom: 0.2rem;
+    border-bottom: 1px solid rgba(233, 196, 106, 0.3);
     color: #e9c46a;
-    background: rgba(0, 0, 0, 0.18);
+    font-weight: 700;
+    font-size: 0.78rem;
   }
-  .sb-toggle-btn {
-    background: rgba(255, 255, 255, 0.1);
-    color: #ffffff;
-    border: 1px solid rgba(233, 196, 106, 0.4);
+  body.nezam-sb-collapsed .nezam-sb-top-brand span {
+    display: none !important;
+  }
+  .nezam-sb-collapse-trigger {
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    border: 1px solid rgba(233, 196, 106, 0.45);
     border-radius: 6px;
-    width: 32px;
-    height: 32px;
+    width: 28px;
+    height: 28px;
+    cursor: pointer;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    cursor: pointer;
-    transition: all 0.15s ease;
+    margin: 0 auto;
   }
-  .sb-toggle-btn:hover {
+  .nezam-sb-collapse-trigger:hover {
     background: #e9c46a;
     color: #163024;
   }
 
-  .nezam-right-sidebar .app-navbar {
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-    position: static !important;
-    display: flex !important;
-    flex-direction: column !important;
-    padding: 0.65rem 0.55rem !important;
-    gap: 0.42rem !important;
-    width: 100% !important;
-  }
-
-  .nezam-right-sidebar .app-navbar .nav-link {
-    width: 100% !important;
-    text-align: right !important;
-    justify-content: flex-start !important;
-    background: rgba(255, 255, 255, 0.06) !important;
-    color: #e2e8f0 !important;
-    border: 1px solid rgba(255, 255, 255, 0.12) !important;
-    border-radius: 0.55rem !important;
-    padding: 0.58rem 0.75rem !important;
-    font-size: 0.84rem !important;
-    font-weight: 700 !important;
-    transition: all 0.18s ease !important;
-    position: relative;
-  }
-
-  .nezam-right-sidebar .app-navbar .nav-link:hover {
-    background: rgba(233, 196, 106, 0.16) !important;
-    color: #ffffff !important;
-    border-color: #e9c46a !important;
-    transform: translateX(-3px) !important;
-  }
-
-  .nezam-right-sidebar .app-navbar .nav-link.active {
-    background: linear-gradient(90deg, #e9c46a 0%, #f4d58d 100%) !important;
-    color: #163024 !important;
-    border-color: #ffffff !important;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25) !important;
-    font-weight: 900 !important;
-  }
-
-  .sb-icon-box {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    border-radius: 6px;
-    background: rgba(0, 0, 0, 0.2);
-    margin-left: 0.5rem;
-    font-size: 1.05rem;
-    flex-shrink: 0;
-  }
-  .nezam-right-sidebar .app-navbar .nav-link.active .sb-icon-box {
-    background: rgba(22, 48, 36, 0.15);
-  }
-
-  .sb-badge-pill {
-    margin-right: auto;
-    background: rgba(233, 196, 106, 0.25);
-    color: #fde68a;
-    border: 1px solid rgba(233, 196, 106, 0.4);
-    font-size: 0.72rem;
-    padding: 0.1rem 0.45rem;
-    border-radius: 1rem;
-  }
-  .nezam-right-sidebar .app-navbar .nav-link.active .sb-badge-pill {
-    background: #1b4332;
-    color: #ffffff;
-    border-color: #1b4332;
-  }
-
-  .sb-footer-box {
-    padding: 0.7rem 0.85rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.12);
-    font-size: 0.74rem;
-    color: #cbd5e1;
-    background: rgba(0, 0, 0, 0.22);
-    text-align: center;
-  }
-
-  /* ۲. ستون سمت چپ: نوار تب زیرمجموعه‌ها در بالا + محتوای اصلی */
-  .nezam-workspace-col {
-    flex: 1 1 auto;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    background: transparent;
-  }
-
+  /* ۳. نوار تب زیرمجموعه‌ها در بالای بخش محتوا */
   .nezam-top-subbar {
     background: #ffffff;
     border-bottom: 2px solid #b8c4ce;
-    padding: 0.55rem 1.15rem;
+    padding: 0.45rem 1rem;
     position: sticky;
     top: 0;
     z-index: 940;
-    box-shadow: 0 4px 12px rgba(38, 56, 73, 0.06);
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.65rem;
-  }
-
-  .subbar-breadcrumb {
-    display: flex;
-    align-items: center;
-    gap: 0.45rem;
-    font-weight: 700;
-    font-size: 0.88rem;
-    color: #1b4332;
-    padding-left: 0.75rem;
-    border-left: 2px solid #e2e8f0;
-  }
-
-  .subbar-tabs-list {
+    box-shadow: 0 2px 8px rgba(38, 56, 73, 0.05);
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 0.4rem;
-    flex: 1 1 auto;
+    width: 100%;
   }
-
+  .subbar-breadcrumb {
+    font-weight: 700;
+    font-size: 0.83rem;
+    color: #1b4332;
+    padding-left: 0.6rem;
+    border-left: 2px solid #cbd5e1;
+    margin-left: 0.25rem;
+  }
   .subbar-tab-item {
     background: #f4f3ec;
     color: #263849;
     border: 1.5px solid #b8c4ce;
-    border-radius: 0.5rem;
-    padding: 0.38rem 0.82rem;
-    font-size: 0.81rem;
+    border-radius: 0.45rem;
+    padding: 0.3rem 0.72rem;
+    font-size: 0.79rem;
     font-weight: 700;
     cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
     transition: all 0.15s ease;
   }
   .subbar-tab-item:hover {
     background: #e6efe9;
     border-color: #2d6a4f;
-    color: #1b4332;
-    transform: translateY(-1px);
   }
   .subbar-tab-item.active {
-    background: linear-gradient(135deg, #2d6a4f 0%, #1b4332 100%);
+    background: #2d6a4f;
     color: #ffffff;
-    border-color: #163024;
-    box-shadow: 0 3px 8px rgba(45, 106, 79, 0.25);
+    border-color: #1b4332;
   }
 
   /* مخفی‌سازی نوار زیرتب تکراری قدیمی در داخل pane-cases */
@@ -3741,465 +3706,389 @@
     display: none !important;
   }
 
-  /* تضمین نمایش صحیح تایل‌های نقشه Leaflet در حالت RTL */
-  #crq-leaflet-map-div .leaflet-tile-pane img,
-  #crq-leaflet-map-div .leaflet-tile {
+  /* ۴. تضمین نمایش ۱۰۰٪ تایل‌های نقشه Leaflet */
+  #crq-leaflet-map-div {
+    background-color: #1e293b !important;
+  }
+  #crq-leaflet-map-div img.leaflet-tile {
     max-width: none !important;
     max-height: none !important;
+    width: 256px !important;
+    height: 256px !important;
     visibility: visible !important;
     opacity: 1 !important;
+    display: block !important;
   }
 
   @media (max-width: 991px) {
-    .nezam-app-shell {
-      flex-direction: column;
-    }
-    .nezam-right-sidebar {
-      width: 100% !important;
-      min-width: 100% !important;
-      height: auto !important;
-      position: static !important;
-      border-left: none;
-      border-bottom: 3px solid #d4a373;
-    }
-    .nezam-right-sidebar .app-navbar {
-      flex-direction: row !important;
-      flex-wrap: wrap !important;
-    }
-    .nezam-right-sidebar .app-navbar .nav-link {
-      width: auto !important;
-      flex: 1 1 auto;
-    }
-    .sb-top-header, .sb-footer-box {
-      display: none !important;
-    }
+    .nezam-sb-top-brand { display: none !important; }
   }
 
   @media print {
-    .nezam-app-shell,
-    .nezam-workspace-col {
+    .nezam-body-grid, .nezam-content-column {
       display: block !important;
       width: 100% !important;
       margin: 0 !important;
       padding: 0 !important;
     }
-    .nezam-right-sidebar,
-    .nezam-top-subbar {
+    nav.app-navbar, .nezam-top-subbar {
       display: none !important;
     }
   }
 </style>
 
-<script id="nezam-sidebar-topsub-engine">
+<script id="nezam-layout-and-map-fix-engine">
 (function () {
-  var currentActivePaneId = 'pane-dashboard';
+  var currentPane = 'pane-dashboard';
 
-  // ۱. یافتن شیء نقشه Leaflet در حافظه سامانه
-  function getCroquisLeafletMapInstance() {
-    var mapEl = document.getElementById('crq-leaflet-map-div');
-    if (!mapEl) return null;
+  /* ========================================================================
+     بخش اول: تعمیر قطعی نقشه ماهواره‌ای (حل مشکل زوم بالای ۱۸ و تحریم تایل‌ها)
+     ======================================================================== */
+  function attachTileFallbackToLayer(layer) {
+    if (!layer || layer.__nezamFallbackAttached) return;
+    layer.__nezamFallbackAttached = true;
 
-    var commonNames = ['croquisMap', 'crqMap', 'leafletMap', 'map', 'crqLeafletMap', 'croquisLeafletMap'];
-    for (var i = 0; i < commonNames.length; i++) {
-      var m = window[commonNames[i]];
-      if (m && typeof m === 'object' && typeof m.invalidateSize === 'function') {
-        return m;
+    if (layer.options) {
+      layer.options.maxZoom = 22;
+      if (!layer.options.maxNativeZoom || layer.options.maxNativeZoom > 18) {
+        layer.options.maxNativeZoom = 18;
       }
     }
 
-    for (var k in window) {
-      try {
-        var obj = window[k];
-        if (obj && typeof obj === 'object' && typeof obj.invalidateSize === 'function' && obj._container === mapEl) {
-          return obj;
+    if (typeof layer.on === 'function') {
+      layer.on('tileerror', function (errEvent) {
+        var tileImg = errEvent && errEvent.tile;
+        var coords = errEvent && errEvent.coords;
+        if (!tileImg || !coords) return;
+
+        var z = coords.z > 18 ? 18 : coords.z;
+        var x = coords.x;
+        var y = coords.y;
+
+        if (!tileImg.__retryStep) {
+          tileImg.__retryStep = 1;
+          tileImg.referrerPolicy = 'no-referrer';
+          tileImg.src = 'https://mt0.google.com/vt/lyrs=y&x=' + x + '&y=' + y + '&z=' + z;
+        } else if (tileImg.__retryStep === 1) {
+          tileImg.__retryStep = 2;
+          tileImg.src = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/' + z + '/' + y + '/' + x;
         }
-      } catch (e) {}
+      });
     }
-    return null;
   }
 
-  // ۲. تعمیر خودکار تایل‌های ماهواره‌ای Google Earth (حل مشکل صفحه خاکستری در زوم‌های بالا و تغییر ابعاد)
-  window.forceRefreshCroquisMap = function () {
-    var map = getCroquisLeafletMapInstance();
+  function fixAndRefreshMapInstance(map) {
     if (!map) return;
+    window.__nezamCapturedMap = map;
 
-    // الف) تنظیم maxNativeZoom روی ۱۸/۱۹ تا در زوم‌های ۲۰ تا ۲۲ در مناطق روستایی صفحه خاکستری نشود
-    var hasVisibleTileLayer = false;
-    map.eachLayer(function (layer) {
-      if (layer && layer._url) {
-        hasVisibleTileLayer = true;
-        if (!layer.options.maxNativeZoom || layer.options.maxNativeZoom > 19) {
-          layer.options.maxNativeZoom = 19;
+    if (typeof map.eachLayer === 'function') {
+      map.eachLayer(function (lyr) {
+        if (lyr && lyr._url) {
+          attachTileFallbackToLayer(lyr);
+          if (typeof lyr.redraw === 'function') {
+            lyr.redraw();
+          }
         }
-        layer.options.maxZoom = 22;
-        if (typeof layer.redraw === 'function') {
-          layer.redraw();
-        }
+      });
+    }
+
+    if (typeof map.invalidateSize === 'function') {
+      map.invalidateSize({ animate: false, pan: false });
+    }
+
+    if (typeof map.getZoom === 'function' && map.getZoom() > 18 && !map.__nezamZoomChecked) {
+      map.__nezamZoomChecked = true;
+      map.setZoom(18);
+    }
+  }
+
+  function hookLeafletPrototype() {
+    if (typeof window.L === 'undefined' || !window.L.Map) return;
+    if (window.__nezamLeafletHooked) return;
+    window.__nezamLeafletHooked = true;
+
+    var origTileLayer = window.L.tileLayer;
+    if (typeof origTileLayer === 'function') {
+      window.L.tileLayer = function (url, opts) {
+        opts = opts || {};
+        opts.maxZoom = 22;
+        opts.maxNativeZoom = 18;
+        var lyr = origTileLayer.call(this, url, opts);
+        attachTileFallbackToLayer(lyr);
+        return lyr;
+      };
+    }
+
+    ['setView', 'fitBounds', 'addLayer', '_onResize'].forEach(function (methodName) {
+      var origMethod = window.L.Map.prototype[methodName];
+      if (typeof origMethod === 'function') {
+        window.L.Map.prototype[methodName] = function () {
+          var result = origMethod.apply(this, arguments);
+          if (this && this._container && this._container.id === 'crq-leaflet-map-div') {
+            fixAndRefreshMapInstance(this);
+          }
+          return result;
+        };
       }
     });
 
-    // ب) اگر هیچ لایه تایلی روی نقشه نبود، لایه ماهواره‌ای گوگل ارث را اضافه کن
-    if (!hasVisibleTileLayer && typeof L !== 'undefined' && L.tileLayer) {
-      L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
-        maxZoom: 22,
-        maxNativeZoom: 19,
-        attribution: 'Google Earth Hybrid'
-      }).addTo(map);
-    }
+    window.dispatchEvent(new Event('resize'));
+  }
 
-    // ج) به‌روزرسانی ابعاد کانتینر و تنظیم سطح زوم استاندارد
+  window.switchToEsriSatellite = function () {
+    hookLeafletPrototype();
+    window.dispatchEvent(new Event('resize'));
+    var map = window.__nezamCapturedMap;
+    if (!map && typeof window.switchCroquisViewMode === 'function') {
+      window.switchCroquisViewMode('MAP');
+      window.dispatchEvent(new Event('resize'));
+      map = window.__nezamCapturedMap;
+    }
+    if (!map) return;
+
+    map.eachLayer(function (lyr) {
+      if (lyr && lyr._url) {
+        lyr.setUrl('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}');
+        lyr.options.maxNativeZoom = 18;
+        lyr.options.maxZoom = 22;
+        lyr.redraw();
+      }
+    });
     map.invalidateSize(true);
-    if (typeof map.getZoom === 'function' && map.getZoom() > 19) {
-      map.setZoom(18);
+  };
+
+  window.forceRefreshCroquisMap = function () {
+    hookLeafletPrototype();
+    window.dispatchEvent(new Event('resize'));
+    if (window.__nezamCapturedMap) {
+      fixAndRefreshMapInstance(window.__nezamCapturedMap);
     }
   };
 
-  // ناظر خودکار تغییر ابعاد کانتینر نقشه
-  function attachMapResizeObserver() {
-    var mapEl = document.getElementById('crq-leaflet-map-div');
-    if (!mapEl || window.__nezamMapObserverAttached) return;
-
-    if (typeof ResizeObserver !== 'undefined') {
-      var ro = new ResizeObserver(function () {
-        if (mapEl.offsetWidth > 0 && mapEl.offsetHeight > 0) {
-          window.forceRefreshCroquisMap();
-        }
-      });
-      ro.observe(mapEl);
-      window.__nezamMapObserverAttached = true;
+  function addEsriButtonToMapToolbar() {
+    var mapBox = document.getElementById('crq-leaflet-map-box');
+    if (!mapBox || document.getElementById('btn-esri-sat-fallback')) return;
+    var btnGroup = mapBox.querySelector('.d-flex.gap-1');
+    if (btnGroup) {
+      var esriBtn = document.createElement('button');
+      esriBtn.id = 'btn-esri-sat-fallback';
+      esriBtn.type = 'button';
+      esriBtn.className = 'btn btn-sm btn-warning py-0 fw-bold';
+      esriBtn.innerHTML = '🛰️ ماهواره Esri (بدون تحریم)';
+      esriBtn.onclick = function () {
+        window.switchToEsriSatellite();
+      };
+      btnGroup.appendChild(esriBtn);
     }
   }
 
-  // پیکربندی منوی اصلی سمت راست و زیرمجموعه‌ها در تب بالای صفحه
-  var PANE_NAVIGATION_CONFIG = {
+  /* ========================================================================
+     بخش دوم: چیدمان استاندارد Flexbox (زیر هدر) و نوار تب زیرمجموعه‌ها در بالا
+     ======================================================================== */
+  var SUB_TABS_MAP = {
     'pane-dashboard': {
       title: '📊 پیشخوان فرماندهی',
-      subTabs: [
-        { id: 'dash-all', label: '🏠 نمای کلی داشبورد', action: function () { window.scrollTo({ top: 0, behavior: 'smooth' }); } },
-        { id: 'dash-g1', label: '🌱 گروه اول: گلخانه و قارچ', action: function () { if (typeof filterDirectoryByMainGroupCard === 'function') filterDirectoryByMainGroupCard('GREENHOUSE_MUSHROOM'); } },
-        { id: 'dash-g2', label: '🐄 گروه دوم: دام و طیور', action: function () { if (typeof filterDirectoryByMainGroupCard === 'function') filterDirectoryByMainGroupCard('LIVESTOCK_POULTRY_FISHERIES'); } },
-        { id: 'dash-g3', label: '💊 گروه سوم: کلینیک و داروخانه', action: function () { if (typeof filterDirectoryByMainGroupCard === 'function') filterDirectoryByMainGroupCard('CLINIC_PHARMACY'); } },
-        { id: 'dash-new', label: '➕ تشکیل سریع پرونده', action: function () { if (typeof startNewCaseWizard === 'function') startNewCaseWizard('GREENHOUSE_MUSHROOM'); } }
+      items: [
+        { label: '🏠 نمای کلی داشبورد', fn: function () { window.scrollTo({ top: 0, behavior: 'smooth' }); } },
+        { label: '🌱 گروه ۱: گلخانه و قارچ', fn: function () { if (window.filterDirectoryByMainGroupCard) filterDirectoryByMainGroupCard('GREENHOUSE_MUSHROOM'); } },
+        { label: '🐄 گروه ۲: دام و طیور', fn: function () { if (window.filterDirectoryByMainGroupCard) filterDirectoryByMainGroupCard('LIVESTOCK_POULTRY_FISHERIES'); } },
+        { label: '💊 گروه ۳: کلینیک و داروخانه', fn: function () { if (window.filterDirectoryByMainGroupCard) filterDirectoryByMainGroupCard('CLINIC_PHARMACY'); } },
+        { label: '➕ متقاضی جدید', fn: function () { if (window.startNewCaseWizard) startNewCaseWizard('GREENHOUSE_MUSHROOM'); } }
       ]
     },
     'pane-cases': {
       title: '📁 پرونده متقاضیان',
-      subTabs: [
-        { id: 'sub-list', label: '🔍 ۱. فهرست و جستجو', action: function () { if (typeof switchCaseSubTab === 'function') switchCaseSubTab('sub-list'); } },
-        { id: 'sub-info', label: '📝 ۲. مشخصات و نقاط UTM', action: function () { if (typeof switchCaseSubTab === 'function') switchCaseSubTab('sub-info'); } },
-        { id: 'sub-matrix', label: '📊 ۳. ماتریس ۷ استعلام', action: function () { if (typeof switchCaseSubTab === 'function') switchCaseSubTab('sub-matrix'); } },
-        { id: 'sub-docs', label: '📂 ۴. چک‌لیست مدارک', action: function () { if (typeof switchCaseSubTab === 'function') switchCaseSubTab('sub-docs'); } },
-        { id: 'sub-history', label: '🕒 ۵. سابقه اقدامات', action: function () { if (typeof switchCaseSubTab === 'function') switchCaseSubTab('sub-history'); } },
-        { id: 'case-add-new', label: '➕ متقاضی جدید', action: function () { if (typeof startNewCaseWizard === 'function') startNewCaseWizard('GREENHOUSE_MUSHROOM'); } }
+      items: [
+        { id: 'sub-list', label: '🔍 ۱. فهرست و جستجو', fn: function () { if (window.switchCaseSubTab) switchCaseSubTab('sub-list'); } },
+        { id: 'sub-info', label: '📝 ۲. مشخصات و نقاط UTM', fn: function () { if (window.switchCaseSubTab) switchCaseSubTab('sub-info'); } },
+        { id: 'sub-matrix', label: '📊 ۳. ماتریس ۷ استعلام', fn: function () { if (window.switchCaseSubTab) switchCaseSubTab('sub-matrix'); } },
+        { id: 'sub-docs', label: '📂 ۴. چک‌لیست مدارک', fn: function () { if (window.switchCaseSubTab) switchCaseSubTab('sub-docs'); } },
+        { id: 'sub-history', label: '🕒 ۵. سابقه اقدامات', fn: function () { if (window.switchCaseSubTab) switchCaseSubTab('sub-history'); } },
+        { label: '➕ تشکیل پرونده جدید', fn: function () { if (window.startNewCaseWizard) startNewCaseWizard('GREENHOUSE_MUSHROOM'); } }
       ]
     },
     'pane-croquis': {
-      title: '🗺️ استودیو نقشه‌کشی UTM',
-      subTabs: [
-        { id: 'crq-cad', label: '📐 نمای مهندسی آفلاین (CAD)', action: function () { if (typeof switchCroquisViewMode === 'function') switchCroquisViewMode('CAD'); } },
+      title: '🗺️ استودیو کروکی UTM',
+      items: [
+        { label: '📐 نمای مهندسی (CAD)', fn: function () { if (window.switchCroquisViewMode) switchCroquisViewMode('CAD'); } },
         {
-          id: 'crq-map',
-          label: '🌍 نمای ماهواره‌ای Google Earth',
-          action: function () {
-            if (typeof switchCroquisViewMode === 'function') switchCroquisViewMode('MAP');
-            setTimeout(window.forceRefreshCroquisMap, 80);
-            setTimeout(window.forceRefreshCroquisMap, 300);
+          label: '🌍 نمای ماهواره‌ای گوگل‌ارث',
+          fn: function () {
+            if (window.switchCroquisViewMode) switchCroquisViewMode('MAP');
+            setTimeout(window.forceRefreshCroquisMap, 100);
+            setTimeout(window.forceRefreshCroquisMap, 400);
           }
         },
-        { id: 'crq-refresh', label: '🔄 بازخوانی نقشه ماهواره‌ای', action: function () { window.forceRefreshCroquisMap(); } },
-        { id: 'crq-sample', label: '🌱 الگوی آماده ۱۰ هکتاری', action: function () { if (typeof loadSample10HectareGreenhouseMap === 'function') loadSample10HectareGreenhouseMap(); } },
-        { id: 'crq-kml', label: '🌍 خروجی KML', action: function () { if (typeof downloadCaseKML === 'function') downloadCaseKML(); } },
-        { id: 'crq-print', label: '✂️ چاپ شیت دوبرگی کروکی', action: function () { if (typeof printUtmSketchSheet === 'function') printUtmSketchSheet(); } }
+        { label: '🛰️ ماهواره Esri (بدون تحریم)', fn: function () { if (window.switchCroquisViewMode) switchCroquisViewMode('MAP'); setTimeout(window.switchToEsriSatellite, 120); } },
+        { label: '🌱 الگوی آماده ۱۰ هکتاری', fn: function () { if (window.loadSample10HectareGreenhouseMap) loadSample10HectareGreenhouseMap(); } },
+        { label: '🌍 خروجی KML', fn: function () { if (window.downloadCaseKML) downloadCaseKML(); } },
+        { label: '✂️ چاپ شیت دوبرگی کروکی', fn: function () { if (window.printUtmSketchSheet) printUtmSketchSheet(); } }
       ]
     },
     'pane-letters': {
       title: '✉️ مکاتبات و دبیرخانه',
-      subTabs: [
-        { id: 'let-all', label: '✉️ ویرایشگر + اندیکاتور', action: function () { toggleLettersSubView('ALL'); } },
-        { id: 'let-editor', label: '📝 فقط ویرایشگر نامه', action: function () { toggleLettersSubView('EDITOR'); } },
-        { id: 'let-sec', label: '📚 فقط دفتر اندیکاتور', action: function () { toggleLettersSubView('SECRETARIAT'); } },
-        { id: 'let-a4', label: '🖨️ چاپ A4', action: function () { if (typeof saveLetterToSecretariat === 'function') saveLetterToSecretariat(true, 'A4'); } },
-        { id: 'let-a5', label: '🖨️ چاپ A5', action: function () { if (typeof saveLetterToSecretariat === 'function') saveLetterToSecretariat(true, 'A5'); } }
+      items: [
+        { label: '🖨️ ذخیره و چاپ در کاغذ A4', fn: function () { if (window.saveLetterToSecretariat) saveLetterToSecretariat(true, 'A4'); } },
+        { label: '🖨️ ذخیره و چاپ در کاغذ A5', fn: function () { if (window.saveLetterToSecretariat) saveLetterToSecretariat(true, 'A5'); } },
+        { label: '💾 ثبت در دفتر اندیکاتور', fn: function () { if (window.saveLetterToSecretariat) saveLetterToSecretariat(false); } }
       ]
     },
     'pane-print': {
       title: '🖨️ سربرگ و فرم‌های نظارتی',
-      subTabs: [
-        { id: 'prt-letter', label: '📄 نامه فعلی دبیرخانه', action: function () { if (typeof renderSinglePreviewSheet === 'function') renderSinglePreviewSheet(); } },
-        { id: 'prt-croquis', label: '🗺️ شیت دوبرگی کروکی UTM', action: function () { if (typeof printUtmSketchSheet === 'function') printUtmSketchSheet(); } },
-        { id: 'prt-cover', label: '📋 روکش تکمیل پرونده', action: function () { if (typeof printOfficialForm === 'function') printOfficialForm('FOLDER_COVER'); } },
-        { id: 'prt-gh', label: '🌱 فرم پایش گلخانه/قارچ', action: function () { if (typeof printOfficialForm === 'function') printOfficialForm('GREENHOUSE_CHECKLIST'); } },
-        { id: 'prt-pharm', label: '💊 فرم ۱۸ بندی داروخانه', action: function () { if (typeof printOfficialForm === 'function') printOfficialForm('PHARMACY_INSPECTION'); } },
-        { id: 'prt-pledge', label: '✍️ تعهدنامه بهره‌بردار', action: function () { if (typeof printOfficialForm === 'function') printOfficialForm('PLEDGE_CONTRACT'); } },
-        { id: 'prt-def', label: '⚠️ اخطاریه نقص مدارک', action: function () { if (typeof issueDeficiencyLetterForActiveCase === 'function') issueDeficiencyLetterForActiveCase(); } }
+      items: [
+        { label: '📄 نامه فعلی دبیرخانه', fn: function () { if (window.renderSinglePreviewSheet) renderSinglePreviewSheet(); } },
+        { label: '🗺️ شیت دوبرگی کروکی UTM', fn: function () { if (window.printUtmSketchSheet) printUtmSketchSheet(); } },
+        { label: '📋 روکش پرونده', fn: function () { if (window.printOfficialForm) printOfficialForm('FOLDER_COVER'); } },
+        { label: '🌱 فرم پایش گلخانه/قارچ', fn: function () { if (window.printOfficialForm) printOfficialForm('GREENHOUSE_CHECKLIST'); } },
+        { label: '💊 فرم ۱۸ بندی داروخانه', fn: function () { if (window.printOfficialForm) printOfficialForm('PHARMACY_INSPECTION'); } },
+        { label: '⚠️ اخطاریه نقص مدارک', fn: function () { if (window.issueDeficiencyLetterForActiveCase) issueDeficiencyLetterForActiveCase(); } }
       ]
     },
     'pane-office': {
       title: '💼 کارتابل و تنظیمات',
-      subTabs: [
-        { id: 'off-all', label: '🎛️ نمایش همه بخش‌ها', action: function () { toggleOfficeSubView('ALL'); } },
-        { id: 'off-tasks', label: '📅 ۱. کارتابل وظایف', action: function () { toggleOfficeSubView('TASKS'); } },
-        { id: 'off-brand', label: '⚙️ ۲. تنظیمات سربرگ مرکز', action: function () { toggleOfficeSubView('BRANDING'); } },
-        { id: 'off-backup', label: '📦 ۳. پشتیبان‌گیری JSON', action: function () { toggleOfficeSubView('BACKUP'); } }
+      items: [
+        { label: '📦 دانلود نسخه تک‌فایلی ویندوز (.html)', fn: function () { if (window.downloadStandaloneWindowsHTML) downloadStandaloneWindowsHTML(); } },
+        { label: '💾 دانلود فایل پشتیبان کل اطلاعات (.json)', fn: function () { if (window.exportFullSystemBackup) exportFullSystemBackup(); } }
       ]
     },
     'pane-ai': {
       title: '🤖 دستیار هوشمند و OCR',
-      subTabs: [
-        { id: 'ai-all', label: '✨ نمای کامل (OCR + مشاور)', action: function () { toggleAiSubView('ALL'); } },
-        { id: 'ai-ocr', label: '🖼️ ۱. خوانش اسناد و نقشه (OCR)', action: function () { toggleAiSubView('OCR'); } },
-        { id: 'ai-chat', label: '💬 ۲. مشاور فنی ضوابط', action: function () { toggleAiSubView('CHAT'); } },
-        { id: 'ai-key', label: '🔑 ۳. تنظیم کلید و مدل Gemini', action: function () { toggleAiSubView('KEY'); } }
+      items: [
+        { label: '🔍 تحلیل و خوانش فایل / سند با Gemini', fn: function () { if (window.aiReadDocumentImagePro) aiReadDocumentImagePro(); } },
+        { label: '⚡ استخراج مشخصات به فرم پرونده', fn: function () { if (window.aiExtractFromRawText) aiExtractFromRawText(); } },
+        { label: '🚀 خلبان خودکار (Auto-Pilot)', fn: function () { if (window.aiRunFullAutopilotPipeline) aiRunFullAutopilotPipeline(); } }
       ]
     },
     'pane-guide': {
       title: '📘 راهنمای جامع تصویری',
-      subTabs: [
-        { id: 'gd-all', label: '📚 نمایش کل راهنما', action: function () { filterGuideCards('ALL'); } },
-        { id: 'gd-1', label: '۱. قانون پایه و ۳ گروه', action: function () { filterGuideCards(0); } },
-        { id: 'gd-2', label: '۲. کروکی دوبرگی UTM', action: function () { filterGuideCards(1); } },
-        { id: 'gd-3', label: '۳. ماتریس ۷ استعلام', action: function () { filterGuideCards(2); } },
-        { id: 'gd-4', label: '۴. مکاتبات و قفل ۲۹۶ میلی‌متر', action: function () { filterGuideCards(3); } },
-        { id: 'gd-5', label: '۵. هوش مصنوعی و OCR', action: function () { filterGuideCards(4); } },
-        { id: 'gd-6', label: '۶. پایداری آفلاین و JSON', action: function () { filterGuideCards(5); } }
+      items: [
+        { label: '📚 مشاهده مستندات کامل اتوماسیون ۶۳۶ خفر', fn: function () { window.scrollTo({ top: 0, behavior: 'smooth' }); } }
       ]
     }
   };
 
-  function toggleLettersSubView(mode) {
-    var sec = document.getElementById('pane-letters');
-    if (!sec) return;
-    var cols = sec.querySelectorAll('.row > .col-md-6');
-    if (cols.length < 2) return;
-    cols[0].style.display = mode === 'SECRETARIAT' ? 'none' : 'block';
-    cols[0].style.width = mode === 'EDITOR' ? '100%' : '';
-    cols[1].style.display = mode === 'EDITOR' ? 'none' : 'block';
-    cols[1].style.width = mode === 'SECRETARIAT' ? '100%' : '';
-  }
+  function renderSubBar(paneId, activeSubId) {
+    var bar = document.getElementById('nezam-top-subbar');
+    if (!bar) return;
+    var cfg = SUB_TABS_MAP[paneId] || SUB_TABS_MAP['pane-dashboard'];
 
-  function toggleOfficeSubView(mode) {
-    var sec = document.getElementById('pane-office');
-    if (!sec) return;
-    var cols = sec.querySelectorAll('.row > .col-md-6');
-    if (cols.length < 2) return;
-    cols[0].style.display = mode === 'BRANDING' ? 'none' : 'block';
-    cols[1].style.display = (mode === 'TASKS' || mode === 'BACKUP') ? 'none' : 'block';
-  }
-
-  function toggleAiSubView(mode) {
-    var sec = document.getElementById('pane-ai');
-    if (!sec) return;
-    var ocrCol = sec.querySelector('.col-md-7');
-    var chatCol = sec.querySelector('.col-md-5');
-    if (!ocrCol || !chatCol) return;
-    ocrCol.style.display = mode === 'CHAT' ? 'none' : 'block';
-    ocrCol.style.width = mode === 'OCR' ? '100%' : '';
-    chatCol.style.display = mode === 'OCR' ? 'none' : 'block';
-    chatCol.style.width = mode === 'CHAT' ? '100%' : '';
-  }
-
-  function filterGuideCards(cardIndex) {
-    var sec = document.getElementById('pane-guide');
-    if (!sec) return;
-    var cols = sec.querySelectorAll('.row.g-3 > .col-md-6');
-    cols.forEach(function (col, idx) {
-      col.style.display = (cardIndex === 'ALL' || cardIndex === idx) ? 'block' : 'none';
-      col.style.width = cardIndex === 'ALL' ? '' : '100%';
-    });
-  }
-
-  function renderTopSubNavigationBar(paneId, activeSubId) {
-    var cfg = PANE_NAVIGATION_CONFIG[paneId] || PANE_NAVIGATION_CONFIG['pane-dashboard'];
-    var subBar = document.getElementById('nezam-dynamic-top-subbar');
-    if (!subBar) return;
-
-    var chosenSubId = activeSubId || (cfg.subTabs[0] ? cfg.subTabs[0].id : '');
-    if (paneId === 'pane-cases' && !activeSubId) {
-      var activeCasePane = document.querySelector('#pane-cases .case-subpane.active');
-      if (activeCasePane && activeCasePane.id) chosenSubId = activeCasePane.id;
-    }
-
-    subBar.innerHTML =
-      '<div class="subbar-breadcrumb">' +
-      '<span>' + cfg.title + '</span>' +
-      '<span class="text-muted">⬅️</span>' +
-      '<small class="text-secondary">زیرمجموعه‌ها:</small>' +
-      '</div>' +
-      '<div class="subbar-tabs-list" id="nezam-subbar-buttons-holder"></div>';
-
-    var holder = document.getElementById('nezam-subbar-buttons-holder');
-    cfg.subTabs.forEach(function (item) {
+    bar.innerHTML = '<div class="subbar-breadcrumb">' + cfg.title + ' ⬅️</div>';
+    cfg.items.forEach(function (item, idx) {
       var btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'subbar-tab-item' + (item.id === chosenSubId ? ' active' : '');
+      var isAct = activeSubId ? (item.id === activeSubId) : (idx === 0);
+      btn.className = 'subbar-tab-item' + (isAct ? ' active' : '');
       btn.innerHTML = item.label;
       btn.onclick = function () {
-        holder.querySelectorAll('.subbar-tab-item').forEach(function (b) { b.classList.remove('active'); });
+        bar.querySelectorAll('.subbar-tab-item').forEach(function (b) { b.classList.remove('active'); });
         btn.classList.add('active');
-        if (typeof item.action === 'function') item.action();
+        if (item.fn) item.fn();
       };
-      holder.appendChild(btn);
+      bar.appendChild(btn);
     });
   }
 
-  function formatSidebarButtons() {
-    var mapMeta = [
-      { btnId: 'nav-btn-dashboard', icon: '📊', text: '۱. پیشخوان فرماندهی', badgeId: '' },
-      { btnId: 'nav-btn-cases', icon: '📁', text: '۲. پرونده متقاضیان', badgeId: 'sb-count-cases' },
-      { btnId: 'nav-btn-croquis', icon: '🗺️', text: '۳. استودیو کروکی UTM', badgeId: '' },
-      { btnId: 'nav-btn-letters', icon: '✉️', text: '۴. مکاتبات و دبیرخانه', badgeId: 'sb-count-letters' },
-      { btnId: 'nav-btn-print', icon: '🖨️', text: '۵. سربرگ و فرم‌ها (A4/A5)', badgeId: '' },
-      { btnId: 'nav-btn-office', icon: '💼', text: '۶. کارتابل و پشتیبان', badgeId: 'sb-count-tasks' },
-      { btnId: 'nav-btn-ai', icon: '🤖', text: '۷. دستیار هوشمند و OCR', badgeId: '' },
-      { btnId: 'nav-btn-guide', icon: '📘', text: '۸. راهنمای جامع تصویری', badgeId: '' }
-    ];
+  function setupBalancedGridLayout() {
+    var nav = document.querySelector('nav.app-navbar');
+    var main = document.querySelector('main');
+    if (!nav || !main) return;
 
-    mapMeta.forEach(function (m) {
-      var btn = document.getElementById(m.btnId);
-      if (btn && !btn.getAttribute('data-sb-formatted')) {
-        btn.setAttribute('data-sb-formatted', '1');
-        btn.title = m.text;
-        btn.innerHTML =
-          '<span class="sb-icon-box">' + m.icon + '</span>' +
-          '<span class="sb-item-text">' + m.text + '</span>' +
-          (m.badgeId ? '<span id="' + m.badgeId + '" class="sb-badge-pill">0</span>' : '');
-      }
-    });
-  }
+    // ساخت ظرف Flexbox دو ستونه در زیر هدر (تا هدر و نوار متقاضی ۱۰۰٪ تمام‌عرض بمانند)
+    if (!document.getElementById('nezam-body-grid')) {
+      var grid = document.createElement('div');
+      grid.id = 'nezam-body-grid';
+      grid.className = 'nezam-body-grid';
 
-  function syncSidebarCounters() {
-    var totalCasesEl = document.getElementById('kpi-total-cases');
-    var outLettersEl = document.getElementById('kpi-out-letters');
-    var openTasksEl = document.getElementById('kpi-open-tasks');
+      var contentCol = document.createElement('div');
+      contentCol.id = 'nezam-content-column';
+      contentCol.className = 'nezam-content-column';
 
-    var sbCases = document.getElementById('sb-count-cases');
-    var sbLetters = document.getElementById('sb-count-letters');
-    var sbTasks = document.getElementById('sb-count-tasks');
+      var subBar = document.createElement('div');
+      subBar.id = 'nezam-top-subbar';
+      subBar.className = 'nezam-top-subbar no-print';
 
-    if (sbCases && totalCasesEl) sbCases.textContent = totalCasesEl.textContent || '0';
-    if (sbLetters && outLettersEl) sbLetters.textContent = outLettersEl.textContent || '0';
-    if (sbTasks && openTasksEl) sbTasks.textContent = openTasksEl.textContent || '0';
-  }
+      nav.parentNode.insertBefore(grid, nav);
+      grid.appendChild(nav);
+      contentCol.appendChild(subBar);
+      contentCol.appendChild(main);
+      grid.appendChild(contentCol);
+    }
 
-  function initSidebarAndTopSubBarLayout() {
-    if (document.getElementById('nezam-main-app-shell')) return;
+    // افزودن سرستون جمع‌شونده به بالای منوی راست
+    if (!document.getElementById('nezam-sb-brand-box')) {
+      var brand = document.createElement('div');
+      brand.id = 'nezam-sb-brand-box';
+      brand.className = 'nezam-sb-top-brand';
+      brand.innerHTML =
+        '<span>🧭 منوی اصلی ۶۳۶</span>' +
+        '<button type="button" class="nezam-sb-collapse-trigger" title="جمع کردن / باز کردن منوی سمت راست">☰</button>';
+      nav.prepend(brand);
 
-    var navEl = document.querySelector('nav.app-navbar');
-    var mainEl = document.querySelector('main');
-    if (!navEl || !mainEl) return;
-
-    var shell = document.createElement('div');
-    shell.id = 'nezam-main-app-shell';
-    shell.className = 'nezam-app-shell';
-
-    var sidebar = document.createElement('aside');
-    sidebar.id = 'nezam-right-sidebar';
-    sidebar.className = 'nezam-right-sidebar no-print';
-
-    var sbTop = document.createElement('div');
-    sbTop.className = 'sb-top-header';
-    sbTop.innerHTML =
-      '<strong class="sb-header-title small">🧭 منوی اصلی سامانه ۶۳۶</strong>' +
-      '<button type="button" class="sb-toggle-btn" id="nezam-sb-collapse-btn" title="جمع / باز کردن منو">☰</button>';
-
-    var sbNavWrapper = document.createElement('div');
-    sbNavWrapper.style.flex = '1 1 auto';
-
-    var sbFooter = document.createElement('div');
-    sbFooter.className = 'sb-footer-box';
-    sbFooter.innerHTML = '🌱 نظام مهندسی کشاورزی خفر<br><span style="color:#e9c46a;">مرکز خدمات غیر دولتی ۶۳۶</span>';
-
-    var workspaceCol = document.createElement('div');
-    workspaceCol.className = 'nezam-workspace-col';
-
-    var topSubBar = document.createElement('div');
-    topSubBar.id = 'nezam-dynamic-top-subbar';
-    topSubBar.className = 'nezam-top-subbar no-print';
-
-    mainEl.parentNode.insertBefore(shell, mainEl);
-    sbNavWrapper.appendChild(navEl);
-    sidebar.appendChild(sbTop);
-    sidebar.appendChild(sbNavWrapper);
-    sidebar.appendChild(sbFooter);
-
-    workspaceCol.appendChild(topSubBar);
-    workspaceCol.appendChild(mainEl);
-
-    shell.appendChild(sidebar);
-    shell.appendChild(workspaceCol);
-
-    var toggleBtn = document.getElementById('nezam-sb-collapse-btn');
-    if (toggleBtn) {
-      toggleBtn.onclick = function () {
-        sidebar.classList.toggle('collapsed');
-        setTimeout(window.forceRefreshCroquisMap, 260);
+      brand.querySelector('button').onclick = function () {
+        document.body.classList.toggle('nezam-sb-collapsed');
+        setTimeout(window.forceRefreshCroquisMap, 220);
       };
     }
 
-    formatSidebarButtons();
-    renderTopSubNavigationBar('pane-dashboard');
-    attachMapResizeObserver();
-    setTimeout(syncSidebarCounters, 400);
-    setInterval(syncSidebarCounters, 3000);
+    renderSubBar(currentPane);
+    addEsriButtonToMapToolbar();
+    hookLeafletPrototype();
   }
 
-  function hookNavigationFunctions() {
-    if (typeof window.switchMainPane === 'function' && !window.__nezamSwitchMainHooked) {
-      var origSwitchMain = window.switchMainPane;
+  function hookAppSwitches() {
+    if (typeof window.switchMainPane === 'function' && !window.__nezamMainHooked) {
+      var origMain = window.switchMainPane;
       window.switchMainPane = function (paneId) {
-        var res = origSwitchMain.apply(this, arguments);
-        currentActivePaneId = paneId;
-        renderTopSubNavigationBar(paneId);
-        syncSidebarCounters();
+        var r = origMain.apply(this, arguments);
+        currentPane = paneId;
+        renderSubBar(paneId);
         if (paneId === 'pane-croquis') {
-          setTimeout(window.forceRefreshCroquisMap, 80);
-          setTimeout(window.forceRefreshCroquisMap, 350);
+          setTimeout(window.forceRefreshCroquisMap, 100);
+          setTimeout(window.forceRefreshCroquisMap, 400);
         }
-        return res;
+        return r;
       };
-      window.__nezamSwitchMainHooked = true;
+      window.__nezamMainHooked = true;
     }
 
-    if (typeof window.switchCaseSubTab === 'function' && !window.__nezamSwitchSubHooked) {
-      var origSwitchSub = window.switchCaseSubTab;
+    if (typeof window.switchCaseSubTab === 'function' && !window.__nezamSubHooked) {
+      var origSub = window.switchCaseSubTab;
       window.switchCaseSubTab = function (subId) {
-        var res = origSwitchSub.apply(this, arguments);
-        if (currentActivePaneId === 'pane-cases') {
-          renderTopSubNavigationBar('pane-cases', subId);
-        }
-        return res;
+        var r = origSub.apply(this, arguments);
+        if (currentPane === 'pane-cases') renderSubBar('pane-cases', subId);
+        return r;
       };
-      window.__nezamSwitchSubHooked = true;
+      window.__nezamSubHooked = true;
     }
 
-    if (typeof window.switchCroquisViewMode === 'function' && !window.__nezamCroquisViewHooked) {
-      var origCroquisView = window.switchCroquisViewMode;
+    if (typeof window.switchCroquisViewMode === 'function' && !window.__nezamCrqHooked) {
+      var origCrq = window.switchCroquisViewMode;
       window.switchCroquisViewMode = function (mode) {
-        var res = origCroquisView.apply(this, arguments);
+        var r = origCrq.apply(this, arguments);
         if (mode === 'MAP') {
-          setTimeout(window.forceRefreshCroquisMap, 80);
-          setTimeout(window.forceRefreshCroquisMap, 300);
+          setTimeout(window.forceRefreshCroquisMap, 100);
+          setTimeout(window.forceRefreshCroquisMap, 450);
         }
-        return res;
+        return r;
       };
-      window.__nezamCroquisViewHooked = true;
+      window.__nezamCrqHooked = true;
     }
   }
+
+  setInterval(function () {
+    hookLeafletPrototype();
+    addEsriButtonToMapToolbar();
+  }, 1200);
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function () {
-      initSidebarAndTopSubBarLayout();
-      hookNavigationFunctions();
+      setupBalancedGridLayout();
+      hookAppSwitches();
     });
   } else {
-    initSidebarAndTopSubBarLayout();
-    hookNavigationFunctions();
+    setupBalancedGridLayout();
+    hookAppSwitches();
   }
-  window.addEventListener('load', function () {
-    initSidebarAndTopSubBarLayout();
-    hookNavigationFunctions();
-    setTimeout(window.forceRefreshCroquisMap, 500);
-  });
 })();
 </script>
 </body>
