@@ -8,13 +8,13 @@ if (typeof WScript !== 'undefined') {
 }
 
 /* ==========================================================================
-   NEZAM AI ASSISTANT MODULE v27.0 (DYNAMIC MODEL DISCOVERY + AQ. KEY SUPPORT)
+   NEZAM AI ASSISTANT MODULE v28.0 (MULTI-MODEL + PDF/KML/KMZ/GPX/CAD + LTR UTM)
    سامانه هوشمند و دستیار فنی مرکز خدمات کشاورزی ۶۳۶ خفر:
    ۱. استعلام زنده لیست مدل‌های فعال حساب کاربر از سرور گوگل (ModelService.ListModels)
    ۲. پشتیبانی کامل از کلیدهای نسل جدید (AQ.) و کلیدهای کلاسیک (AIza)
-   ۳. سازگاری ۱۰۰٪ با GitHub Pages، حالت آفلاین (file://) و سرور محلی
-   ۴. خوانش تصویر اسناد، قولنامه‌ها و نقشه‌های UTM (OCR آنلاین و تحلیل حقوقی)
-   ۵. استخراج خودکار فیلدهای پرونده و مختصات از متن خام (آفلاین و آنلاین)
+   ۳. خوانش هوشمند تصاویر، اسناد PDF و فایل‌های نقشه‌برداری (KML, KMZ, GPX, AutoCAD DXF/DWG)
+   ۴. استخراج استاندارد مختصات UTM با فرمت چپ‌به‌راست: X,Y,Z,Zone (پیش‌فرض زون 39)
+   ۵. خلبان خودکار تشکیل پرونده و سازگاری ۱۰۰٪ با GitHub Pages و حالت آفلاین
    ========================================================================== */
 
 // فهرست اولیه مدل‌ها (به محض اتصال کلید، با لیست واقعی سرور گوگل به‌روزرسانی می‌شود)
@@ -34,6 +34,9 @@ var aiOnlineStatus = {
 
 var aiPendingImageBase64 = null;
 var aiPendingImageMime = 'image/jpeg';
+var aiPendingFileName = '';
+var aiPendingFileExt = '';
+var aiPendingParsedGisData = null;
 var aiChatHistoryBuffer = [];
 
 // تشخیص اجرا روی GitHub Pages یا فایل محلی (بدون سرور بک‌اند Node.js)
@@ -41,6 +44,14 @@ function isStaticHostEnvironment() {
   var host = (window.location && window.location.hostname) ? window.location.hostname.toLowerCase() : '';
   var proto = (window.location && window.location.protocol) ? window.location.protocol : '';
   return proto === 'file:' || host.indexOf('github.io') !== -1 || host.indexOf('pages.dev') !== -1 || host.indexOf('netlify.app') !== -1;
+}
+
+// تبدیل ارقام فارسی و عربی به انگلیسی (برای مختصات چپ‌به‌راست)
+function toEnglishDigits(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/[۰-۹]/g, function (d) { return String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)); })
+    .replace(/[٠-٩]/g, function (d) { return String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)); });
 }
 
 // مدیریت مدل انتخابی کاربر در حافظه محلی
@@ -62,6 +73,7 @@ function setStoredGeminiModel(modelId) {
       var cleanModel = modelId.trim().replace(/^models\//, '');
       localStorage.setItem('nezam_gemini_model', cleanModel);
       aiOnlineStatus.model = cleanModel;
+      syncOcrUploadControlsUI();
     }
   } catch (e) {}
 }
@@ -82,13 +94,56 @@ window.changeGeminiModel = function (modelId) {
   var chosen = modelId || (sel ? sel.value : 'gemini-2.5-flash');
   setStoredGeminiModel(chosen);
   updateAiBadgeStatus(aiOnlineStatus.isOnline);
+  syncOcrUploadControlsUI();
   if (typeof showToastMsg === 'function') {
     showToastMsg('🤖 مدل هوش مصنوعی روی ' + chosen + ' تنظیم شد.');
   }
 };
 
+// ارتقای خودکار کادر آپلود فایل (افزودن فرمت‌های PDF, KML, KMZ, GPX, DXF, DWG) و چپ‌به‌راست کردن کادر UTM
+function syncOcrUploadControlsUI() {
+  var activeModel = aiOnlineStatus.model || getStoredGeminiModel();
+
+  // ۱. تنظیم خاصیت accept روی کادر انتخاب فایل برای پذیرش کلیه فرمت‌های مهندسی و اسناد
+  var fileInputs = document.querySelectorAll('input[type="file"]');
+  for (var i = 0; i < fileInputs.length; i++) {
+    var inp = fileInputs[i];
+    var onchangeAttr = inp.getAttribute('onchange') || '';
+    if (onchangeAttr.indexOf('aiHandleImageSelect') !== -1 || inp.id === 'ai-ocr-file-input') {
+      var acceptedFormats = 'image/*,.pdf,.kml,.kmz,.gpx,.dxf,.dwg,.csv,.txt';
+      if (inp.getAttribute('accept') !== acceptedFormats) {
+        inp.setAttribute('accept', acceptedFormats);
+      }
+    }
+  }
+
+  // ۲. به‌روزرسانی متن دکمه خوانش سند با نام مدل انتخابی فعلی
+  var buttons = document.querySelectorAll('button');
+  for (var b = 0; b < buttons.length; b++) {
+    var btn = buttons[b];
+    var onclickAttr = btn.getAttribute('onclick') || '';
+    if (onclickAttr.indexOf('aiReadDocumentImagePro') !== -1 && btn.innerHTML.indexOf('⏳') === -1) {
+      btn.innerHTML = '🔍 تحلیل و خوانش فایل / سند با ' + escapeHtml(activeModel);
+    }
+  }
+
+  // ۳. تضمین نوشتار چپ‌به‌راست (LTR) برای کادر مختصات UTM در فرم پرونده
+  var utmEl = document.getElementById('c-utm');
+  if (utmEl) {
+    utmEl.setAttribute('dir', 'ltr');
+    utmEl.style.direction = 'ltr';
+    utmEl.style.textAlign = 'left';
+    utmEl.style.unicodeBidi = 'plaintext';
+    utmEl.style.fontFamily = 'Consolas, Monaco, monospace';
+    if (!utmEl.getAttribute('placeholder') || utmEl.getAttribute('placeholder').indexOf('Zone') === -1) {
+      utmEl.setAttribute('placeholder', 'X,Y,Z,Zone (Example: 645120.50,3198450.20,1150,39)');
+    }
+  }
+}
+
 // ایجاد یا همگام‌سازی خودکار منوی انتخاب مدل در رابط کاربری
 function ensureGeminiModelSelectorUI() {
+  syncOcrUploadControlsUI();
   var existingSelect = document.getElementById('gemini-model-select');
   var currentModel = getStoredGeminiModel();
 
@@ -160,6 +215,470 @@ function populateModelSelectOptions(selectEl, modelsList, selectedId) {
   }
 }
 
+/* ==========================================================================
+   موتور تبدیل ژئودتیک WGS84 (Lat/Lon) به UTM و نرمال‌ساز چپ‌به‌راست (X,Y,Z,Zone)
+   ========================================================================== */
+
+// تبدیل دقیق مختصات جغرافیایی (عرض و طول جغرافیایی WGS84) به مختصات متریک UTM
+function wgs84LatLonToUtm(latDeg, lonDeg, elevation, forceZone) {
+  var lat = parseFloat(latDeg);
+  var lon = parseFloat(lonDeg);
+  var z = (elevation !== undefined && elevation !== null && !isNaN(parseFloat(elevation)))
+    ? Math.round(parseFloat(elevation) * 100) / 100
+    : 0;
+
+  if (isNaN(lat) || isNaN(lon)) return null;
+
+  // اگر اعداد ورودی از قبل در محدوده متریک UTM باشند، مستقیماً برگردان
+  if (Math.abs(lat) > 90 || Math.abs(lon) > 180) {
+    var uX = lat < lon ? lat : lon;
+    var uY = lat < lon ? lon : lat;
+    return {
+      x: Math.round(uX * 100) / 100,
+      y: Math.round(uY * 100) / 100,
+      z: z,
+      zone: forceZone || 39
+    };
+  }
+
+  var a = 6378137.0; // شعاع استوایی بیضوی WGS84
+  var f = 1 / 298.257223563;
+  var k0 = 0.9996;
+  var e2 = 2 * f - f * f;
+  var ep2 = e2 / (1 - e2);
+
+  var zone = forceZone || (Math.floor((lon + 180) / 6) + 1);
+  var lonOrigin = (zone - 1) * 6 - 180 + 3;
+
+  var latRad = (lat * Math.PI) / 180.0;
+  var lonRad = (lon * Math.PI) / 180.0;
+  var lonOriginRad = (lonOrigin * Math.PI) / 180.0;
+
+  var N = a / Math.sqrt(1 - e2 * Math.sin(latRad) * Math.sin(latRad));
+  var T = Math.tan(latRad) * Math.tan(latRad);
+  var C = ep2 * Math.cos(latRad) * Math.cos(latRad);
+  var A = Math.cos(latRad) * (lonRad - lonOriginRad);
+
+  var M =
+    a *
+    ((1 - e2 / 4 - (3 * e2 * e2) / 64 - (5 * e2 * e2 * e2) / 256) * latRad -
+      ((3 * e2) / 8 + (3 * e2 * e2) / 32 + (45 * e2 * e2 * e2) / 1024) * Math.sin(2 * latRad) +
+      ((15 * e2 * e2) / 256 + (45 * e2 * e2 * e2) / 1024) * Math.sin(4 * latRad) -
+      ((35 * e2 * e2 * e2) / 3072) * Math.sin(6 * latRad));
+
+  var easting =
+    k0 *
+      N *
+      (A +
+        ((1 - T + C) * A * A * A) / 6 +
+        ((5 - 18 * T + T * T + 72 * C - 58 * ep2) * Math.pow(A, 5)) / 120) +
+    500000.0;
+
+  var northing =
+    k0 *
+    (M +
+      N *
+        Math.tan(latRad) *
+        ((A * A) / 2 +
+          ((5 - T + 9 * C + 4 * C * C) * Math.pow(A, 4)) / 24 +
+          ((61 - 58 * T + T * T + 600 * C - 330 * ep2) * Math.pow(A, 6)) / 720));
+
+  if (lat < 0) {
+    northing += 10000000.0;
+  }
+
+  return {
+    x: Math.round(easting * 100) / 100,
+    y: Math.round(northing * 100) / 100,
+    z: z,
+    zone: zone
+  };
+}
+
+// محاسبه مساحت چندضلعی از روی نقاط UTM (فرمول شولیس - مترمربع)
+function calculateUtmPolygonAreaSqm(pointsList) {
+  if (!pointsList || pointsList.length < 3) return 0;
+  var area = 0;
+  var n = pointsList.length;
+  for (var i = 0; i < n; i++) {
+    var j = (i + 1) % n;
+    area += pointsList[i].x * pointsList[j].y;
+    area -= pointsList[j].x * pointsList[i].y;
+  }
+  return Math.round(Math.abs(area) / 2.0);
+}
+
+// استانداردسازی و فرمت‌بندی هرگونه متن مختصات UTM به فرمت چپ‌به‌راست: X,Y,Z,Zone
+function formatUtmCoordinatesLTR(rawInput, defaultZone) {
+  var zoneDefault = defaultZone || 39;
+  if (!rawInput) return '';
+
+  // اگر آرایه‌ای از آبجکت‌های {x,y,z,zone} باشد
+  if (Array.isArray(rawInput)) {
+    var arrLines = [];
+    var prevKey = '';
+    for (var i = 0; i < rawInput.length; i++) {
+      var pt = rawInput[i];
+      if (!pt || isNaN(pt.x) || isNaN(pt.y)) continue;
+      var xVal = Math.round(parseFloat(pt.x) * 100) / 100;
+      var yVal = Math.round(parseFloat(pt.y) * 100) / 100;
+      var zVal = (pt.z !== undefined && pt.z !== null && !isNaN(parseFloat(pt.z)))
+        ? Math.round(parseFloat(pt.z) * 100) / 100
+        : 0;
+      var znVal = pt.zone ? String(pt.zone).replace(/[^\d]/g, '') || zoneDefault : zoneDefault;
+
+      var dedupKey = xVal.toFixed(2) + '_' + yVal.toFixed(2);
+      if (dedupKey === prevKey) continue;
+      prevKey = dedupKey;
+
+      arrLines.push(xVal + ',' + yVal + ',' + zVal + ',' + znVal);
+    }
+    // حذف نقطه آخر در صورتی که دقیقاً منطبق بر نقطه شروع پلی‌گون بسته باشد
+    if (arrLines.length > 3 && arrLines[0].split(',').slice(0, 2).join(',') === arrLines[arrLines.length - 1].split(',').slice(0, 2).join(',')) {
+      arrLines.pop();
+    }
+    return arrLines.join('\n');
+  }
+
+  // اگر رشته متنی باشد
+  var cleanStr = toEnglishDigits(String(rawInput))
+    .replace(/[\u200E\u200F\u202A-\u202E]/g, '')
+    .replace(/;/g, '\n');
+
+  // تشخیص زون کلی در صورت ذکر شدن در متن (مثلاً Zone 39 یا 39R یا 40)
+  var detectedZone = zoneDefault;
+  var zoneMatch = cleanStr.match(/(?:zone|زون)\s*[:=]?\s*(38|39|40|41)/i) || cleanStr.match(/\b(38|39|40)\s*[RNrn]\b/);
+  if (zoneMatch) {
+    detectedZone = parseInt(zoneMatch[1], 10);
+  }
+
+  var rawLines = cleanStr.split(/\r?\n/);
+  var formattedLines = [];
+
+  for (var l = 0; l < rawLines.length; l++) {
+    var line = rawLines[l].trim();
+    if (!line) continue;
+
+    // حذف شماره‌گذاری ابتدای خط مثل "1:" یا "P1-"
+    line = line.replace(/^(?:p|pt|point|نقطه|ردیف)?\s*\d+\s*[-:.)]\s*/i, '');
+
+    // استخراج تمام اعداد (صحیح یا اعشاری) در خط
+    var nums = line.match(/\d+(?:\.\d+)?/g);
+    if (!nums || nums.length < 2) continue;
+
+    var x = null;
+    var y = null;
+    var z = 0;
+    var zn = detectedZone;
+
+    var n0 = parseFloat(nums[0]);
+    var n1 = parseFloat(nums[1]);
+
+    // حالت ۱: مختصات UTM استاندارد (X شش رقمی، Y هفت رقمی)
+    if (n0 >= 100000 && n0 <= 900000 && n1 >= 2000000 && n1 <= 5000000) {
+      x = n0;
+      y = n1;
+      if (nums.length >= 3) {
+        var n2 = parseFloat(nums[2]);
+        if (nums.length === 3 && (n2 === 38 || n2 === 39 || n2 === 40 || n2 === 41)) {
+          // اگر عدد سوم دقیقاً شماره زون باشد و عدد چهارمی نباشد، ارتفاع 0 و زون n2
+          z = 0;
+          zn = n2;
+        } else {
+          z = n2;
+          if (nums.length >= 4) {
+            var n3 = parseInt(nums[3], 10);
+            if (n3 >= 1 && n3 <= 60) zn = n3;
+          }
+        }
+      }
+    }
+    // حالت ۲: جای X و Y برعکس نوشته شده باشد (اول Y هفت رقمی، بعد X شش رقمی)
+    else if (n1 >= 100000 && n1 <= 900000 && n0 >= 2000000 && n0 <= 5000000) {
+      x = n1;
+      y = n0;
+      if (nums.length >= 3) {
+        var n2b = parseFloat(nums[2]);
+        if (nums.length === 3 && (n2b === 38 || n2b === 39 || n2b === 40 || n2b === 41)) {
+          z = 0;
+          zn = n2b;
+        } else {
+          z = n2b;
+          if (nums.length >= 4) {
+            var n3b = parseInt(nums[3], 10);
+            if (n3b >= 1 && n3b <= 60) zn = n3b;
+          }
+        }
+      }
+    }
+    // حالت ۳: مختصات جغرافیایی Lat/Lon در خط نوشته شده باشد (مثلاً 28.95, 53.21)
+    else if (n0 >= 20 && n0 <= 42 && n1 >= 44 && n1 <= 64) {
+      var conv1 = wgs84LatLonToUtm(n0, n1, nums[2] ? parseFloat(nums[2]) : 0);
+      if (conv1) {
+        x = conv1.x;
+        y = conv1.y;
+        z = conv1.z;
+        zn = conv1.zone;
+      }
+    } else if (n1 >= 20 && n1 <= 42 && n0 >= 44 && n0 <= 64) {
+      var conv2 = wgs84LatLonToUtm(n1, n0, nums[2] ? parseFloat(nums[2]) : 0);
+      if (conv2) {
+        x = conv2.x;
+        y = conv2.y;
+        z = conv2.z;
+        zn = conv2.zone;
+      }
+    }
+
+    if (x !== null && y !== null) {
+      formattedLines.push(x + ',' + y + ',' + z + ',' + zn);
+    }
+  }
+
+  // اگر خطوط با regex خط‌به‌خط پیدا نشدند، کل متن را برای جفت‌های (X, Y) اسکن کن
+  if (formattedLines.length === 0) {
+    var globalRegex = /([1-9]\d{5}(?:\.\d+)?)\s*[,،\s\t/-]+\s*([2-4]\d{6}(?:\.\d+)?)(?:\s*[,،\s\t/-]+\s*(\d{1,4}(?:\.\d+)?))?(?:\s*[,،\s\t/-]+\s*(38|39|40|41))?/g;
+    var m;
+    while ((m = globalRegex.exec(cleanStr)) !== null) {
+      var gx = m[1];
+      var gy = m[2];
+      var gz = m[3] !== undefined ? m[3] : '0';
+      var gzn = m[4] !== undefined ? m[4] : String(detectedZone);
+      if (m[4] === undefined && (gz === '38' || gz === '39' || gz === '40')) {
+        gzn = gz;
+        gz = '0';
+      }
+      formattedLines.push(gx + ',' + gy + ',' + gz + ',' + gzn);
+    }
+  }
+
+  return formattedLines.join('\n');
+}
+
+/* ==========================================================================
+   موتورهای خوانش مستقیم فایل‌های نقشه‌برداری: KML, KMZ, GPX, AutoCAD DXF/DWG
+   ========================================================================== */
+
+// ۱. استخراج فایل KML از داخل آرشیو فشرده KMZ (بدون نیاز به کتابخانه خارجی)
+async function extractKmlTextFromKmzBuffer(arrayBuffer) {
+  var bytes = new Uint8Array(arrayBuffer);
+  var view = new DataView(arrayBuffer);
+  var offset = 0;
+
+  while (offset + 30 < bytes.length) {
+    var sig = view.getUint32(offset, true);
+    if (sig !== 0x04034b50) break; // Local File Header signature
+
+    var compression = view.getUint16(offset + 8, true);
+    var compressedSize = view.getUint32(offset + 18, true);
+    var fileNameLen = view.getUint16(offset + 26, true);
+    var extraLen = view.getUint16(offset + 28, true);
+
+    var nameBytes = bytes.subarray(offset + 30, offset + 30 + fileNameLen);
+    var fileName = new TextDecoder('utf-8').decode(nameBytes);
+    var dataStart = offset + 30 + fileNameLen + extraLen;
+    var compressedData = bytes.subarray(dataStart, dataStart + compressedSize);
+
+    if (/\.kml$/i.test(fileName)) {
+      if (compression === 0) {
+        return new TextDecoder('utf-8').decode(compressedData);
+      } else if (compression === 8 && typeof DecompressionStream !== 'undefined') {
+        var ds = new DecompressionStream('deflate-raw');
+        var writer = ds.writable.getWriter();
+        writer.write(compressedData);
+        writer.close();
+        var decompressedResp = new Response(ds.readable);
+        return await decompressedResp.text();
+      }
+    }
+    offset = dataStart + compressedSize;
+  }
+  throw new Error('فایل KML معتبری در بسته KMZ یافت نشد.');
+}
+
+// ۲. تجزیه فایل KML (گوگل ارث) و تبدیل به نقاط X,Y,Z,Zone
+function parseKmlContentToUtm(kmlText) {
+  var parser = new DOMParser();
+  var xmlDoc = parser.parseFromString(kmlText, 'text/xml');
+  var points = [];
+  var docName = '';
+  var docDesc = '';
+
+  var nameNodes = xmlDoc.getElementsByTagName('name');
+  if (nameNodes.length > 0 && nameNodes[0].textContent) {
+    docName = nameNodes[0].textContent.trim();
+  }
+  var descNodes = xmlDoc.getElementsByTagName('description');
+  if (descNodes.length > 0 && descNodes[0].textContent) {
+    docDesc = descNodes[0].textContent.trim();
+  }
+
+  var coordNodes = xmlDoc.getElementsByTagName('coordinates');
+  for (var i = 0; i < coordNodes.length; i++) {
+    var rawCoords = (coordNodes[i].textContent || '').trim();
+    if (!rawCoords) continue;
+    var tuples = rawCoords.split(/\s+/);
+    for (var t = 0; t < tuples.length; t++) {
+      var parts = tuples[t].split(',');
+      if (parts.length >= 2) {
+        var lon = parseFloat(parts[0]);
+        var lat = parseFloat(parts[1]);
+        var elev = parts.length >= 3 ? parseFloat(parts[2]) : 0;
+        if (!isNaN(lat) && !isNaN(lon)) {
+          var utm = wgs84LatLonToUtm(lat, lon, elev);
+          if (utm) points.push(utm);
+        }
+      }
+    }
+  }
+
+  var utmString = formatUtmCoordinatesLTR(points, 39);
+  var areaSqm = calculateUtmPolygonAreaSqm(points);
+
+  return {
+    utmCoordinates: utmString,
+    pointCount: utmString ? utmString.split('\n').length : 0,
+    landArea: areaSqm > 0 ? String(areaSqm) : '',
+    planTitle: docName,
+    fullSummary: 'استخراج از فایل KML/KMZ گوگل ارث' + (docName ? ' (' + docName + ')' : '') + (docDesc ? ' - ' + docDesc : '')
+  };
+}
+
+// ۳. تجزیه فایل GPX (دستگاه‌های GPS دستی گارمین و غیره) و تبدیل به X,Y,Z,Zone
+function parseGpxContentToUtm(gpxText) {
+  var parser = new DOMParser();
+  var xmlDoc = parser.parseFromString(gpxText, 'text/xml');
+  var points = [];
+  var trackName = '';
+
+  var nameEl = xmlDoc.getElementsByTagName('name')[0];
+  if (nameEl && nameEl.textContent) trackName = nameEl.textContent.trim();
+
+  var tagTypes = ['wpt', 'rtept', 'trkpt'];
+  for (var tt = 0; tt < tagTypes.length; tt++) {
+    var nodes = xmlDoc.getElementsByTagName(tagTypes[tt]);
+    for (var i = 0; i < nodes.length; i++) {
+      var node = nodes[i];
+      var lat = parseFloat(node.getAttribute('lat'));
+      var lon = parseFloat(node.getAttribute('lon'));
+      var eleNode = node.getElementsByTagName('ele')[0];
+      var elev = eleNode && eleNode.textContent ? parseFloat(eleNode.textContent) : 0;
+
+      if (!isNaN(lat) && !isNaN(lon)) {
+        var utm = wgs84LatLonToUtm(lat, lon, elev);
+        if (utm) points.push(utm);
+      }
+    }
+  }
+
+  var utmString = formatUtmCoordinatesLTR(points, 39);
+  var areaSqm = calculateUtmPolygonAreaSqm(points);
+
+  return {
+    utmCoordinates: utmString,
+    pointCount: utmString ? utmString.split('\n').length : 0,
+    landArea: areaSqm > 0 ? String(areaSqm) : '',
+    planTitle: trackName,
+    fullSummary: 'استخراج مستقیم از فایل GPX دستگاه GPS' + (trackName ? ' (' + trackName + ')' : '')
+  };
+}
+
+// ۴. تجزیه فایل اتوکد DXF و DWG و استخراج رئوس (X,Y,Z,39)
+function parseAutoCadContentToUtm(rawTextOrBuffer, ext) {
+  var points = [];
+  var textContent = typeof rawTextOrBuffer === 'string'
+    ? rawTextOrBuffer
+    : new TextDecoder('utf-8', { fatal: false }).decode(new Uint8Array(rawTextOrBuffer));
+
+  if (ext === 'dxf' || textContent.indexOf('SECTION') !== -1 || textContent.indexOf('ENTITIES') !== -1) {
+    var lines = textContent.split(/\r?\n/);
+    var inEntities = textContent.indexOf('ENTITIES') === -1; // اگر سکشن‌بندی نداشت، کل فایل را بررسی کن
+    var curX = null;
+    var curY = null;
+    var curZ = 0;
+    var layerElevation = 0;
+
+    for (var i = 0; i + 1 < lines.length; i += 2) {
+      var code = parseInt(lines[i].trim(), 10);
+      var val = lines[i + 1].trim();
+
+      if (code === 2 && val === 'ENTITIES') {
+        inEntities = true;
+        continue;
+      }
+      if (code === 0 && val === 'ENDSEC' && inEntities) {
+        break;
+      }
+      if (!inEntities) continue;
+
+      if (code === 0) {
+        layerElevation = 0;
+      } else if (code === 38) {
+        var elv = parseFloat(val);
+        if (!isNaN(elv)) layerElevation = elv;
+      } else if (code === 10) {
+        curX = parseFloat(val);
+      } else if (code === 20 && curX !== null) {
+        curY = parseFloat(val);
+        // بررسی اینکه آیا خط بعدی کد 30 (ارتفاع Z رأس) است یا خیر
+        if (i + 3 < lines.length && parseInt(lines[i + 2].trim(), 10) === 30) {
+          curZ = parseFloat(lines[i + 3].trim()) || layerElevation || 0;
+          i += 2;
+        } else {
+          curZ = layerElevation || 0;
+        }
+
+        if (!isNaN(curX) && !isNaN(curY)) {
+          // اگر مختصات در محدوده UTM یا Lat/Lon باشد
+          var conv = wgs84LatLonToUtm(curY, curX, curZ, 39);
+          if (conv && conv.x >= 100000 && conv.x <= 900000 && conv.y >= 2000000 && conv.y <= 5000000) {
+            points.push(conv);
+          }
+        }
+        curX = null;
+        curY = null;
+      }
+    }
+  }
+
+  // اگر فایل DWG باینری بود یا در کدهای گروهی DXF نقاطی با فرمت متنی وجود داشت
+  if (points.length === 0 && rawTextOrBuffer instanceof ArrayBuffer) {
+    // اسکن باینری IEEE-754 (8-byte double) برای یافتن زوج‌های مختصات UTM زون 39 فارس/خفر
+    var dv = new DataView(rawTextOrBuffer);
+    for (var b = 0; b + 24 <= dv.byteLength; b += 1) {
+      var bx = dv.getFloat64(b, true);
+      var by = dv.getFloat64(b + 8, true);
+      // محدوده UTM استان فارس و خفر: X بین 500,000 تا 800,000 و Y بین 3,000,000 تا 3,450,000
+      if (
+        bx >= 500000 && bx <= 800000 &&
+        by >= 3000000 && by <= 3450000 &&
+        Math.abs(bx - Math.round(bx * 10000) / 10000) < 0.01
+      ) {
+        var bz = dv.getFloat64(b + 16, true);
+        var validZ = (!isNaN(bz) && bz >= 0 && bz <= 4500) ? Math.round(bz * 100) / 100 : 0;
+        points.push({
+          x: Math.round(bx * 100) / 100,
+          y: Math.round(by * 100) / 100,
+          z: validZ,
+          zone: 39
+        });
+        b += 15;
+        if (points.length >= 200) break;
+      }
+    }
+  }
+
+  var utmString = formatUtmCoordinatesLTR(points, 39);
+  var areaSqm = calculateUtmPolygonAreaSqm(points);
+
+  return {
+    utmCoordinates: utmString,
+    pointCount: utmString ? utmString.split('\n').length : 0,
+    landArea: areaSqm > 0 ? String(areaSqm) : '',
+    fullSummary: 'استخراج مهندسی از فایل نقشه اتوکد (' + ext.toUpperCase() + ')'
+  };
+}
+
 // ترجمه دقیق خطاهای سرور گوگل به راهنمای فارسی
 function translateGeminiErrorToPersian(errMsg, status) {
   var msg = String(errMsg || '');
@@ -195,7 +714,7 @@ function translateGeminiErrorToPersian(errMsg, status) {
   return 'خطای دریافتی از سرور گوگل: <div class="mt-1 small" dir="ltr"><code>' + escapeHtml(msg) + '</code></div>';
 }
 
-// ۱. استعلام زنده لیست مدل‌های فعال حساب کاربر از سرور گوگل (ModelService.ListModels)
+// استعلام زنده لیست مدل‌های فعال حساب کاربر از سرور گوگل (ModelService.ListModels)
 async function discoverAccountModelsFromGoogle(apiKey) {
   var cleanKey = (apiKey || '').trim();
   if (!cleanKey) return [];
@@ -213,7 +732,6 @@ async function discoverAccountModelsFromGoogle(apiKey) {
       });
 
       if (!resp.ok) {
-        // تلاش مجدد بدون هدر اضافی در صورت محدودیت CORS
         resp = await fetch(endpoints[e], { method: 'GET' });
       }
 
@@ -227,7 +745,6 @@ async function discoverAccountModelsFromGoogle(apiKey) {
             var rawName = m.name || '';
             var shortId = rawName.replace(/^models\//, '');
 
-            // فقط مدل‌هایی که از generateContent پشتیبانی می‌کنند و مخصوص تولید متن/تصویر هستند
             if (
               methods.indexOf('generateContent') !== -1 &&
               shortId.indexOf('embedding') === -1 &&
@@ -246,7 +763,6 @@ async function discoverAccountModelsFromGoogle(apiKey) {
           }
 
           if (discovered.length > 0) {
-            // مرتب‌سازی هوشمند: اولویت با 2.5-flash، سپس 2.5-pro، سپس 2.0-flash و بقیه
             discovered.sort(function (a, b) {
               function getScore(id) {
                 if (id === 'gemini-2.5-flash') return 100;
@@ -299,7 +815,6 @@ async function callGeminiModelEndpoint(apiKey, modelName, payload) {
       encodeURIComponent(cleanModel) +
       ':generateContent';
 
-    // در نسخه v1 برخی فیلدهای خاص v1beta مثل systemInstruction یا responseMimeType ممکن است تفاوت داشته باشند
     var requestPayload = payload;
     if (ver === 'v1' && payload && (payload.systemInstruction || (payload.generationConfig && payload.generationConfig.responseMimeType))) {
       requestPayload = JSON.parse(JSON.stringify(payload));
@@ -334,12 +849,10 @@ async function callGeminiModelEndpoint(apiKey, modelName, payload) {
       lastStatus = resp.status;
       lastErrMsg = rawMsg;
 
-      // اگر خطا 404 (یافت نشدن مدل در v1beta) بود، حلقه سراغ v1 می‌رود؛ در غیر این صورت خطا را برگردان
       if (resp.status !== 404 && !/not found/i.test(rawMsg)) {
         return { ok: false, status: resp.status, errorMessage: rawMsg };
       }
     } catch (netErr) {
-      // تلاش بدون هدر x-goog-api-key در صورت خطای شبکه/CORS
       try {
         var respSimple = await fetch(baseUrl + '?key=' + encodeURIComponent(cleanKey), {
           method: 'POST',
@@ -362,9 +875,8 @@ async function callGeminiModelEndpoint(apiKey, modelName, payload) {
   return { ok: false, status: lastStatus, errorMessage: lastErrMsg };
 }
 
-// ارسال هوشمند درخواست به گوگل: ابتدا استعلام مدل‌های واقعی حساب، سپس اجرای درخواست روی مدل انتخابی یا جایگزین‌های واقعی
+// ارسال هوشمند درخواست به گوگل با Fallback خودکار
 async function fetchDirectGeminiWithFallback(apiKey, payload, preferredModel) {
-  // گام ۱: اگر هنوز لیست مدل‌های واقعی حساب دریافت نشده، ابتدا از گوگل استعلام بگیر
   if (GEMINI_AVAILABLE_MODELS.length <= 3) {
     await discoverAccountModelsFromGoogle(apiKey);
   }
@@ -372,7 +884,6 @@ async function fetchDirectGeminiWithFallback(apiKey, payload, preferredModel) {
   var primaryModel = (preferredModel || getStoredGeminiModel() || 'gemini-2.5-flash').replace(/^models\//, '');
   var candidateModels = [primaryModel];
 
-  // افزودن مدل‌های واقعی کشف‌شده از حساب کاربر به صف پشتیبان
   for (var i = 0; i < GEMINI_AVAILABLE_MODELS.length; i++) {
     var mId = GEMINI_AVAILABLE_MODELS[i].id;
     if (candidateModels.indexOf(mId) === -1) {
@@ -394,12 +905,10 @@ async function fetchDirectGeminiWithFallback(apiKey, payload, preferredModel) {
       };
     }
 
-    // ذخیره خطای مدل اصلی انتخاب‌شده توسط کاربر تا با خطای مدل‌های آخر جایگزین نشود
     if (idx === 0) {
       primaryError = new Error(translateGeminiErrorToPersian(res.errorMessage, res.status));
     }
 
-    // اگر کلید نامعتبر است یا آی‌پی مسدود است، نیازی به تست سایر مدل‌ها نیست
     if (
       (res.status === 400 && /API_KEY_INVALID|key not valid/i.test(res.errorMessage)) ||
       (res.status === 403 && /location is not supported/i.test(res.errorMessage))
@@ -493,7 +1002,6 @@ window.testCustomGeminiKey = async function () {
   var directErrorMsg = '';
 
   try {
-    // ۱. ابتدا لیست مدل‌های واقعی حساب کاربر را از گوگل بگیر و منوی کشویی را پر کن
     var discoveredList = await discoverAccountModelsFromGoogle(key);
 
     var selEl = document.getElementById('gemini-model-select');
@@ -503,7 +1011,6 @@ window.testCustomGeminiKey = async function () {
       fb.innerHTML = '⏳ در حال تست ارسال پیام با مدل <code>' + escapeHtml(selectedModel) + '</code>...';
     }
 
-    // ۲. تست تولید محتوا روی مدل‌های واقعی حساب
     var testResult = await fetchDirectGeminiWithFallback(
       key,
       {
@@ -539,6 +1046,7 @@ window.testCustomGeminiKey = async function () {
       aiOnlineStatus.userKeyActive = true;
       aiOnlineStatus.model = activeModel;
       updateAiBadgeStatus(true);
+      syncOcrUploadControlsUI();
       return true;
     }
   } catch (directErr) {
@@ -546,7 +1054,6 @@ window.testCustomGeminiKey = async function () {
     console.warn('Direct Google API test error:', directErr);
   }
 
-  // نمایش دقیق علت خطا به کاربر
   if (fb) {
     fb.className = 'small mt-2 alert alert-danger py-2 px-3';
     fb.style.display = 'block';
@@ -566,11 +1073,12 @@ window.addEventListener('DOMContentLoaded', function () {
   checkAiServerStatus();
 });
 
-// بررسی مداوم برای اطمینان از وجود منوی انتخاب مدل در تب‌های پویا
+// بررسی مداوم برای اطمینان از وجود منوی انتخاب مدل و تنظیم فرمت‌های آپلود در تب‌های پویا
 setInterval(function () {
   if (!document.getElementById('gemini-model-select')) {
     ensureGeminiModelSelectorUI();
   }
+  syncOcrUploadControlsUI();
 }, 2000);
 
 // بررسی خودکار در دسترس بودن سرور آنلاین و کلید جمینای
@@ -595,7 +1103,6 @@ async function checkAiServerStatus() {
       pill.innerHTML = '🟢 کلید اختصاصی فعال است (' + escapeHtml(currentModel) + ')';
     }
     updateAiBadgeStatus(true);
-    // دریافت خودکار لیست مدل‌های مجاز کلید در پس‌زمینه
     discoverAccountModelsFromGoogle(userKey).then(function (models) {
       if (models && models.length > 0) {
         updateAiBadgeStatus(true);
@@ -690,11 +1197,11 @@ function updateAiBadgeStatus(online) {
         escapeHtml(getModelDisplayLabel(activeModel)) +
         '</code> ' +
         (hasCustomKey ? 'با <b>کلید اختصاصی شما</b> ' : 'از طریق سرور مرکز ۶۳۶ ') +
-        'فعال است. کلیه اسناد و سوالات آنلاین تحلیل می‌شوند.';
+        'فعال است. پشتیبانی کامل از خوانش تصویر، <b>PDF، KML/KMZ، GPX و اتوکد (DXF/DWG)</b> با استخراج چپ‌به‌راست مختصات <code>X,Y,Z,Zone</code>.';
     } else {
       statusDesc.className = 'alert alert-info small mb-3';
       statusDesc.innerHTML =
-        '💡 <b>موتور هوشمند محلی (آفلاین):</b> در صورت قطعی اینترنت یا عدم تنظیم کلید، استخراج مشخصات متقاضی، کدملی، متراژ، زون و مختصات UTM به صورت ۱۰۰٪ آفلاین انجام می‌گیرد. برای فعال‌سازی کامل آنلاین، کلید Gemini API خود را در کادر بالا وارد فرمایید.';
+        '💡 <b>موتور هوشمند محلی (آفلاین):</b> استخراج نقاط از فایل‌های KML، KMZ، GPX، DXF و متن به صورت ۱۰۰٪ آفلاین با فرمت چپ‌به‌راست <code>X,Y,Z,39</code> فعال است. برای تحلیل تصویری و PDF، کلید Gemini API را وارد نمایید.';
     }
   }
 
@@ -741,13 +1248,13 @@ var AI_KNOWLEDGE_BASE = [
   {
     keywords: ['کروکی', 'utm', 'جی پی اس', 'ابعاد', 'زون'],
     answer:
-      'ضوابط کروکی UTM مرکز ۶۳۶ خفر:\n• زون غالب شهرستان خفر: Zone 39R در نیمکره شمالی (بیضوی WGS84)\n• حداقل نقاط برای چندضلعی زمین: ۳ نقطه با خطای زیر ۵ سانتی‌متر\n• شیت چاپی کروکی به صورت خودکار در ۲ برگ تفکیک می‌شود (برگه اول نقشه بزرگ و برگه دوم جداول مساحت و مختصات).',
+      'ضوابط کروکی UTM مرکز ۶۳۶ خفر:\n• زون غالب شهرستان خفر: Zone 39R در نیمکره شمالی (بیضوی WGS84)\n• فرمت استاندارد نقاط: X,Y,Z,Zone (مثال چپ‌به‌راست: 645120,3198450,1150,39)\n• شیت چاپی کروکی به صورت خودکار در ۲ برگ تفکیک می‌شود.',
   },
 ];
 
-// موتور آفلاین استخراج اطلاعات با عبارات باقاعده
+// موتور آفلاین استخراج اطلاعات با عبارات باقاعده (همراه با فرمت X,Y,Z,Zone چپ‌به‌راست)
 function localOfflineExtractFields(rawText) {
-  var clean = typeof toEn === 'function' ? toEn(rawText) : rawText;
+  var clean = toEnglishDigits(rawText);
   var result = {
     name: '',
     nid: '',
@@ -788,49 +1295,193 @@ function localOfflineExtractFields(rawText) {
     else result.actType = 'greenhouse_veg';
   }
 
-  // استخراج ردیف‌های مختصات UTM
-  var utmLines = [];
-  var coordRegex = /(?:[Xхx]\s*[:=]?\s*)?([1-9]\d{5})(?:[\s,،\t]+)(?:[Yуy]\s*[:=]?\s*)?([2-4]\d{6})/gi;
-  var match;
-  while ((match = coordRegex.exec(clean)) !== null) {
-    utmLines.push(match[1] + ',' + match[2]);
-  }
-  if (utmLines.length > 0) {
-    result.utm = utmLines.join('\n');
+  // استخراج و نرمال‌سازی مختصات UTM با فرمت چپ‌به‌راست: X,Y,Z,Zone (پیش‌فرض 39)
+  var formattedUtm = formatUtmCoordinatesLTR(clean, 39);
+  if (formattedUtm) {
+    result.utm = formattedUtm;
   }
 
   return result;
 }
 
-// خوانش فایل تصویری آپلود شده
-function aiHandleImageSelect(input) {
+// نمایش وضعیت فایل غیرتصویری (PDF, KML, KMZ, GPX, CAD) در کادر پیش‌نمایش
+function showNonImageFilePreviewBanner(fileName, ext, extraInfo) {
+  var previewBox = document.getElementById('ai-ocr-preview-box');
+  var previewImg = document.getElementById('ai-ocr-preview-img');
+  if (!previewBox) return;
+
+  previewBox.style.display = 'block';
+  if (previewImg) {
+    previewImg.style.display = 'none';
+  }
+
+  var badgeEl = document.getElementById('ai-file-info-banner');
+  if (!badgeEl) {
+    badgeEl = document.createElement('div');
+    badgeEl.id = 'ai-file-info-banner';
+    badgeEl.className = 'alert alert-primary small mb-0 text-center py-2 px-3';
+    previewBox.appendChild(badgeEl);
+  }
+  badgeEl.style.display = 'block';
+  badgeEl.innerHTML =
+    '📂 <b>فایل بارگذاری شد:</b> <code dir="ltr">' +
+    escapeHtml(fileName) +
+    '</code> (' +
+    escapeHtml(ext.toUpperCase()) +
+    ')' +
+    (extraInfo ? '<div class="mt-1 text-success fw-bold">' + extraInfo + '</div>' : '');
+}
+
+// خوانش فایل آپلود شده (تصویر، PDF، KML، KMZ، GPX، اتوکد DXF/DWG، CSV/TXT)
+async function aiHandleImageSelect(input) {
   var file = input.files && input.files[0];
   if (!file) return;
-  aiPendingImageMime = file.type || 'image/jpeg';
+
+  aiPendingFileName = file.name || 'document';
+  var extMatch = aiPendingFileName.toLowerCase().match(/\.([a-z0-9]+)$/);
+  aiPendingFileExt = extMatch ? extMatch[1] : '';
+  aiPendingParsedGisData = null;
+
+  var previewBox = document.getElementById('ai-ocr-preview-box');
+  var previewImg = document.getElementById('ai-ocr-preview-img');
+  var bannerEl = document.getElementById('ai-file-info-banner');
+  if (bannerEl) bannerEl.style.display = 'none';
+
+  // ۱. فایل‌های نقشه‌برداری KML و GPX و متنی
+  if (aiPendingFileExt === 'kml' || aiPendingFileExt === 'gpx' || aiPendingFileExt === 'csv' || aiPendingFileExt === 'txt') {
+    var textReader = new FileReader();
+    textReader.onload = function (e) {
+      var rawContent = e.target.result || '';
+      try {
+        if (aiPendingFileExt === 'kml') {
+          aiPendingParsedGisData = parseKmlContentToUtm(rawContent);
+        } else if (aiPendingFileExt === 'gpx') {
+          aiPendingParsedGisData = parseGpxContentToUtm(rawContent);
+        } else {
+          var utmStr = formatUtmCoordinatesLTR(rawContent, 39);
+          aiPendingParsedGisData = {
+            utmCoordinates: utmStr,
+            pointCount: utmStr ? utmStr.split('\n').length : 0,
+            fullSummary: 'استخراج از فایل متنی مختصات (' + aiPendingFileName + ')'
+          };
+        }
+
+        aiPendingImageBase64 = 'GIS_PARSED_READY';
+        var countMsg = aiPendingParsedGisData.pointCount > 0
+          ? '✅ تعداد ' + aiPendingParsedGisData.pointCount + ' نقطه UTM با فرمت چپ‌به‌راست (X,Y,Z,39) آماده درج است.'
+          : 'فایل آماده تحلیل است.';
+        showNonImageFilePreviewBanner(aiPendingFileName, aiPendingFileExt, countMsg);
+
+        // درج فوری در کادرها برای راحتی کاربر
+        applyOcrDataToCase(aiPendingParsedGisData, document.getElementById('ai-raw-text-input'));
+        if (typeof showToastMsg === 'function') {
+          showToastMsg('✅ مختصات فایل ' + aiPendingFileExt.toUpperCase() + ' با فرمت (X,Y,Z,39) استخراج شد.');
+        }
+      } catch (err) {
+        console.error('GIS Parse Error:', err);
+      }
+    };
+    textReader.readAsText(file, 'UTF-8');
+    return;
+  }
+
+  // ۲. فایل‌های فشرده گوگل ارث (KMZ)
+  if (aiPendingFileExt === 'kmz') {
+    var kmzReader = new FileReader();
+    kmzReader.onload = async function (e) {
+      try {
+        var kmlText = await extractKmlTextFromKmzBuffer(e.target.result);
+        aiPendingParsedGisData = parseKmlContentToUtm(kmlText);
+        aiPendingImageBase64 = 'GIS_PARSED_READY';
+
+        var countMsg = aiPendingParsedGisData.pointCount > 0
+          ? '✅ تعداد ' + aiPendingParsedGisData.pointCount + ' نقطه UTM از بسته KMZ با فرمت (X,Y,Z,39) استخراج شد.'
+          : 'بسته KMZ بازگشایی شد.';
+        showNonImageFilePreviewBanner(aiPendingFileName, 'KMZ', countMsg);
+
+        applyOcrDataToCase(aiPendingParsedGisData, document.getElementById('ai-raw-text-input'));
+        if (typeof showToastMsg === 'function') {
+          showToastMsg('✅ فایل KMZ بازگشایی و نقاط UTM (X,Y,Z,39) استخراج شد.');
+        }
+      } catch (kmzErr) {
+        alert('خطا در بازگشایی فایل KMZ: ' + (kmzErr.message || kmzErr));
+      }
+    };
+    kmzReader.readAsArrayBuffer(file);
+    return;
+  }
+
+  // ۳. فایل‌های نقشه اتوکد (DXF / DWG)
+  if (aiPendingFileExt === 'dxf' || aiPendingFileExt === 'dwg') {
+    var cadReader = new FileReader();
+    cadReader.onload = function (e) {
+      try {
+        aiPendingParsedGisData = parseAutoCadContentToUtm(e.target.result, aiPendingFileExt);
+        aiPendingImageBase64 = 'GIS_PARSED_READY';
+
+        var cadMsg = aiPendingParsedGisData.pointCount > 0
+          ? '✅ تعداد ' + aiPendingParsedGisData.pointCount + ' رأس UTM از نقشه اتوکد با فرمت (X,Y,Z,39) استخراج شد.'
+          : (aiPendingFileExt === 'dwg'
+            ? '⚠️ فایل DWG باینری است؛ در صورت عدم استخراج همه نقاط، فایل را با فرمت DXF یا PDF ذخیره نمایید.'
+            : 'فایل نقشه اتوکد بارگذاری شد.');
+        showNonImageFilePreviewBanner(aiPendingFileName, aiPendingFileExt, cadMsg);
+
+        if (aiPendingParsedGisData.pointCount > 0) {
+          applyOcrDataToCase(aiPendingParsedGisData, document.getElementById('ai-raw-text-input'));
+          if (typeof showToastMsg === 'function') {
+            showToastMsg('✅ مختصات نقشه اتوکد با فرمت (X,Y,Z,39) استخراج شد.');
+          }
+        }
+      } catch (cadErr) {
+        console.error('CAD Parse Error:', cadErr);
+      }
+    };
+    cadReader.readAsArrayBuffer(file);
+    return;
+  }
+
+  // ۴. فایل‌های PDF و تصاویر (JPG, PNG, WEBP)
+  aiPendingImageMime = file.type || (aiPendingFileExt === 'pdf' ? 'application/pdf' : 'image/jpeg');
   var reader = new FileReader();
   reader.onload = function (e) {
     aiPendingImageBase64 = e.target.result;
-    var previewBox = document.getElementById('ai-ocr-preview-box');
-    var previewImg = document.getElementById('ai-ocr-preview-img');
-    if (previewBox && previewImg) {
+    if (aiPendingFileExt === 'pdf' || aiPendingImageMime === 'application/pdf') {
+      aiPendingImageMime = 'application/pdf';
+      showNonImageFilePreviewBanner(
+        aiPendingFileName,
+        'PDF',
+        '📄 سند PDF آماده تحلیل و استخراج نقاط UTM (X,Y,Z,39) با هوش مصنوعی Gemini است.'
+      );
+    } else if (previewBox && previewImg) {
       previewImg.src = aiPendingImageBase64;
+      previewImg.style.display = 'inline-block';
       previewBox.style.display = 'block';
     }
     if (typeof showToastMsg === 'function') {
-      showToastMsg('📸 تصویر بارگذاری شد. آماده تحلیل با هوش مصنوعی.');
+      showToastMsg('📸 فایل بارگذاری شد. آماده تحلیل با هوش مصنوعی.');
     }
   };
   reader.readAsDataURL(file);
 }
 
-// خوانش و تحلیل هوشمند سند با Gemini (مستقیم + سرور + پشتیبان آفلاین)
+// خوانش و تحلیل هوشمند سند/نقشه با Gemini (تصویر، PDF، KML/KMZ، GPX، اتوکد)
 async function aiReadDocumentImagePro() {
-  if (!aiPendingImageBase64) {
-    alert('ابتدا یک تصویر از سند، قولنامه یا نقشه UTM انتخاب نمایید.');
+  var rawTextEl = document.getElementById('ai-raw-text-input');
+
+  // اگر فایل نقشه‌برداری (KML, KMZ, GPX, DXF/DWG) قبلاً پردازش شده باشد
+  if (aiPendingImageBase64 === 'GIS_PARSED_READY' && aiPendingParsedGisData) {
+    applyOcrDataToCase(aiPendingParsedGisData, rawTextEl);
+    if (typeof showToastMsg === 'function') {
+      showToastMsg('✅ نقاط UTM با فرمت چپ‌به‌راست (X,Y,Z,39) در پرونده بارگذاری شد.');
+    }
     return;
   }
 
-  var rawTextEl = document.getElementById('ai-raw-text-input');
+  if (!aiPendingImageBase64) {
+    alert('لطفاً ابتدا یک فایل (تصویر، PDF، KML، KMZ، GPX یا نقشه اتوکد DXF) انتخاب نمایید.');
+    return;
+  }
+
   var userKey = getStoredGeminiApiKey();
   var selectedModel = getStoredGeminiModel();
   var btn = typeof event !== 'undefined' && event ? event.target : null;
@@ -838,7 +1489,7 @@ async function aiReadDocumentImagePro() {
   if (btn) btn.innerHTML = '⏳ در حال خوانش با ' + selectedModel + '...';
 
   if (typeof showToastMsg === 'function') {
-    showToastMsg('⏳ در حال خوانش تصویر سند و استخراج مختصات UTM با مدل ' + selectedModel + '...');
+    showToastMsg('⏳ در حال خوانش فایل و استخراج مختصات UTM (X,Y,Z,39) با مدل ' + selectedModel + '...');
   }
 
   if (userKey) {
@@ -847,8 +1498,18 @@ async function aiReadDocumentImagePro() {
         aiPendingImageBase64.indexOf(',') !== -1
           ? aiPendingImageBase64.split(',')[1]
           : aiPendingImageBase64;
+
       var prompt =
-        'شما کارشناس نظام مهندسی کشاورزی خفر هستید. مشخصات این تصویر سند را به صورت JSON معتبر با کلیدهای زیر استخراج کن: applicantName, nationalId, phoneNumber, planTitle, mainGroup (یکی از GREENHOUSE_MUSHROOM یا LIVESTOCK_POULTRY_FISHERIES یا CLINIC_PHARMACY), actType, landArea, capacity, location, utmCoordinates (ردیف‌های X,Y), fullSummary';
+        'شما کارشناس نظام مهندسی کشاورزی خفر هستید. مشخصات این سند یا نقشه را به صورت JSON معتبر با کلیدهای زیر استخراج کن:\n' +
+        'applicantName, nationalId, phoneNumber, planTitle, mainGroup (یکی از GREENHOUSE_MUSHROOM یا LIVESTOCK_POULTRY_FISHERIES یا CLINIC_PHARMACY), actType, landArea, capacity, location, utmCoordinates, fullSummary.\n' +
+        'قانون بسیار مهم برای utmCoordinates:\n' +
+        'نقاط مختصات UTM را حتماً با ارقام انگلیسی و از چپ به راست در قالب X,Y,Z,Zone (هر نقطه در یک خط جداگانه) برگردان که در آن:\n' +
+        '- X: طول جغرافیایی متریک ۶ رقمی (Easting)\n' +
+        '- Y: عرض جغرافیایی متریک ۷ رقمی (Northing)\n' +
+        '- Z: ارتفاع از سطح دریا (اگر در سند ارتفاع نوشته نشده بود عدد 0 بگذار)\n' +
+        '- Zone: زون UTM (اگر در سند قید نشده بود عدد 39 بگذار).\n' +
+        'مثال فرمت هر خط utmCoordinates:\n' +
+        '645120.5,3198450.2,1150,39';
 
       var directOcrResult = await fetchDirectGeminiWithFallback(
         userKey,
@@ -875,9 +1536,10 @@ async function aiReadDocumentImagePro() {
         applyOcrDataToCase(parsed, rawTextEl);
         updateAiBadgeStatus(true);
         if (typeof showToastMsg === 'function') {
-          showToastMsg('✅ مشخصات سند با مدل ' + aiOnlineStatus.model + ' استخراج شد.');
+          showToastMsg('✅ مشخصات سند و نقاط UTM (X,Y,Z,39) با مدل ' + aiOnlineStatus.model + ' استخراج شد.');
         }
         if (btn) btn.innerHTML = originalBtnText;
+        syncOcrUploadControlsUI();
         return;
       }
     } catch (dirOcrErr) {
@@ -911,9 +1573,10 @@ async function aiReadDocumentImagePro() {
           applyOcrDataToCase(result.data, rawTextEl);
           updateAiBadgeStatus(true);
           if (typeof showToastMsg === 'function') {
-            showToastMsg('✅ مشخصات سند و نقاط UTM با موفقیت استخراج و بارگذاری شد.');
+            showToastMsg('✅ مشخصات سند و نقاط UTM (X,Y,Z,39) با موفقیت استخراج شد.');
           }
           if (btn) btn.innerHTML = originalBtnText;
+          syncOcrUploadControlsUI();
           return;
         }
       }
@@ -927,21 +1590,34 @@ async function aiReadDocumentImagePro() {
   }
   aiExtractFromRawText();
   if (btn) btn.innerHTML = originalBtnText;
+  syncOcrUploadControlsUI();
 }
 
-// تابع کمکی درج مشخصات استخراج‌شده در پرونده
+// تابع کمکی درج مشخصات استخراج‌شده در پرونده (با تضمین فرمت چپ‌به‌راست X,Y,Z,39 برای نقاط UTM)
 function applyOcrDataToCase(d, rawTextEl) {
+  var normalizedUtm = formatUtmCoordinatesLTR(d.utmCoordinates || '', 39);
+
   if (rawTextEl) {
+    // افزودن کاراکتر Left-To-Right Mark (\u200E) در ابتدای هر خط UTM برای نمایش صحیح از چپ به راست در کادر فارسی
+    var ltrDisplayUtm = normalizedUtm
+      ? normalizedUtm
+          .split('\n')
+          .map(function (line) { return '\u200E' + line; })
+          .join('\n')
+      : '-';
+
     var summaryText =
-      '=== استخراج هوشمند با Gemini (' + (aiOnlineStatus.model || getStoredGeminiModel()) + ') ===\n' +
+      '=== استخراج هوشمند (' + (aiOnlineStatus.model || getStoredGeminiModel()) + ') ===\n' +
       '👤 متقاضی: ' + (d.applicantName || '-') + '\n' +
       '🆔 کدملی: ' + (d.nationalId || '-') + '\n' +
       '📱 تلفن: ' + (d.phoneNumber || '-') + '\n' +
       '📋 موضوع طرح: ' + (d.planTitle || '-') + '\n' +
       '📐 مساحت: ' + (d.landArea || '-') + ' مترمربع\n' +
       '📍 موقعیت: ' + (d.location || '-') + '\n' +
-      '🗺️ نقاط مختصات UTM:\n' + (d.utmCoordinates || '') + '\n' +
-      (d.fullSummary ? '\n📝 نکات سند:\n' + d.fullSummary : '');
+      '🗺️ نقاط مختصات UTM (فرمت چپ‌به‌راست: X,Y,Z,Zone):\n' +
+      ltrDisplayUtm +
+      '\n' +
+      (d.fullSummary ? '\n📝 توضیحات:\n' + d.fullSummary : '');
     rawTextEl.value = summaryText;
   }
 
@@ -960,8 +1636,15 @@ function applyOcrDataToCase(d, rawTextEl) {
   if (document.getElementById('c-land') && d.landArea) {
     document.getElementById('c-land').value = typeof toFa === 'function' ? toFa(d.landArea) : d.landArea;
   }
-  if (document.getElementById('c-utm') && d.utmCoordinates) {
-    document.getElementById('c-utm').value = typeof toFa === 'function' ? toFa(d.utmCoordinates) : d.utmCoordinates;
+
+  var utmField = document.getElementById('c-utm');
+  if (utmField && normalizedUtm) {
+    utmField.setAttribute('dir', 'ltr');
+    utmField.style.direction = 'ltr';
+    utmField.style.textAlign = 'left';
+    utmField.style.fontFamily = 'Consolas, Monaco, monospace';
+    // درج با اعداد انگلیسی و از چپ به راست بدون تبدیل به ارقام فارسی
+    utmField.value = normalizedUtm;
   }
 
   if (d.mainGroup && document.getElementById('c-main-group')) {
@@ -974,11 +1657,11 @@ function applyOcrDataToCase(d, rawTextEl) {
   }
 }
 
-// استخراج فیلدها و ثبت در فرم متقاضی
+// استخراج فیلدها از متن خام و ثبت در فرم متقاضی (با فرمت چپ‌به‌راست X,Y,Z,39)
 function aiExtractFromRawText() {
   var rawText = (document.getElementById('ai-raw-text-input') || {}).value || '';
   if (!rawText.trim()) {
-    alert('لطفاً ابتدا متنی را در کادر بنویسید یا تصویری را انتخاب کنید.');
+    alert('لطفاً ابتدا متنی را در کادر بنویسید یا فایلی (تصویر، PDF، KML، GPX، DXF) را انتخاب کنید.');
     return;
   }
   var data = localOfflineExtractFields(rawText);
@@ -988,7 +1671,15 @@ function aiExtractFromRawText() {
   if (document.getElementById('c-mobile') && data.mobile) document.getElementById('c-mobile').value = typeof toFa === 'function' ? toFa(data.mobile) : data.mobile;
   if (document.getElementById('c-loc') && data.loc) document.getElementById('c-loc').value = data.loc;
   if (document.getElementById('c-land') && data.land) document.getElementById('c-land').value = typeof toFa === 'function' ? toFa(data.land) : data.land;
-  if (document.getElementById('c-utm') && data.utm) document.getElementById('c-utm').value = typeof toFa === 'function' ? toFa(data.utm) : data.utm;
+
+  var utmField = document.getElementById('c-utm');
+  if (utmField && data.utm) {
+    utmField.setAttribute('dir', 'ltr');
+    utmField.style.direction = 'ltr';
+    utmField.style.textAlign = 'left';
+    utmField.style.fontFamily = 'Consolas, Monaco, monospace';
+    utmField.value = data.utm;
+  }
 
   if (document.getElementById('c-main-group')) {
     document.getElementById('c-main-group').value = data.mainGroup;
@@ -1001,7 +1692,7 @@ function aiExtractFromRawText() {
 
   if (typeof switchMainPane === 'function') switchMainPane('pane-cases');
   if (typeof switchCaseSubTab === 'function') switchCaseSubTab('sub-info');
-  if (typeof showToastMsg === 'function') showToastMsg('✅ اطلاعات استخراج و در فرم پرونده متقاضی بارگذاری شد.');
+  if (typeof showToastMsg === 'function') showToastMsg('✅ اطلاعات و نقاط UTM (با فرمت X,Y,Z,39 چپ‌به‌راست) در پرونده بارگذاری شد.');
 }
 
 function aiRunFullAutopilotPipeline() {
