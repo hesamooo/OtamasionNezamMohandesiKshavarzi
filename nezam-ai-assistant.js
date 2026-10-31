@@ -8,16 +8,16 @@ if (typeof WScript !== 'undefined') {
 }
 
 /* ==========================================================================
-   NEZAM AI ASSISTANT MODULE v25.0 (GITHUB PAGES + MULTI-MODEL GEMINI + OFFLINE)
+   NEZAM AI ASSISTANT MODULE v26.0 (AQ. & AIza KEYS + MULTI-MODEL GEMINI)
    سامانه هوشمند و دستیار فنی مرکز خدمات کشاورزی ۶۳۶ خفر:
-   ۱. هوش مصنوعی آنلاین با دریافت خودکار تمامی نسخه‌های Gemini از سرور گوگل
-   ۲. سازگاری ۱۰۰٪ با GitHub Pages، حالت آفلاین (file://) و سرور محلی
-   ۳. خوانش تصویر اسناد، قولنامه‌ها و نقشه‌های UTM (OCR آنلاین و تحلیل حقوقی)
-   ۴. استخراج خودکار فیلدهای پرونده و مختصات از متن خام (آفلاین و آنلاین)
-   ۵. خلبان خودکار تشکیل پرونده و عیب‌یاب هوشمند خطاهای کلید و تحریم
+   ۱. پشتیبانی کامل از کلیدهای نسل جدید (AQ.) و کلیدهای کلاسیک (AIza) در Google AI Studio
+   ۲. امکان انتخاب تمامی نسخه‌های Gemini (2.5 Flash, 2.5 Pro, 2.0 Flash, 1.5 Pro/Flash)
+   ۳. سازگاری ۱۰۰٪ با GitHub Pages، حالت آفلاین (file://) و سرور محلی
+   ۴. خوانش تصویر اسناد، قولنامه‌ها و نقشه‌های UTM (OCR آنلاین و تحلیل حقوقی)
+   ۵. استخراج خودکار فیلدهای پرونده و مختصات از متن خام (آفلاین و آنلاین)
    ========================================================================== */
 
-// فهرست پیش‌فرض مدل‌های رسمی و استاندارد Google Gemini
+// فهرست کامل مدل‌های قابل انتخاب Gemini
 var GEMINI_AVAILABLE_MODELS = [
   { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (پیشنهادی - سریع و دقیق)' },
   { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (تحلیل پیشرفته اسناد و قوانین)' },
@@ -52,7 +52,6 @@ function isStaticHostEnvironment() {
 function getStoredGeminiModel() {
   try {
     var saved = (localStorage.getItem('nezam_gemini_model') || '').trim();
-    // اصلاح خودکار نام مدل غیرموجود قدیمی
     if (!saved || saved === 'gemini-3.8-flash') {
       return 'gemini-2.5-flash';
     }
@@ -166,100 +165,155 @@ function populateModelSelectOptions(selectEl, modelsList, selectedId) {
   }
 }
 
-// ترجمه دقیق خطاهای سرور گوگل به راهنمای فارسی
-function translateGeminiErrorToPersian(errMsg, status, apiKey) {
+// ترجمه دقیق خطاهای سرور گوگل به راهنمای فارسی به همراه پیام فنی
+function translateGeminiErrorToPersian(errMsg, status) {
   var msg = String(errMsg || '');
-  var cleanKey = (apiKey || '').trim();
 
-  if (cleanKey && cleanKey.indexOf('AIza') !== 0) {
+  if (status === 403 || /User location is not supported|location is not supported|PERMISSION_DENIED/i.test(msg)) {
     return (
-      'کلید وارد شده (' +
-      escapeHtml(cleanKey.substring(0, 8)) +
-      '...) فرمت استاندارد Google AI Studio را ندارد. ' +
-      'کلیدهای معتبر جمینای ۳۹ کاراکتری بوده و حتماً با حروف <b><code>AIzaSy</code></b> شروع می‌شوند. ' +
-      'لطفاً وارد سایت <a href="https://aistudio.google.com/apikey" target="_blank" class="fw-bold text-danger text-decoration-underline">aistudio.google.com/apikey</a> شوید و روی دکمه <b>Create API key</b> کلیک کنید.'
+      'محدودیت جغرافیایی گوگل (آی‌پی ایران): سرور گوگل دسترسی مستقیم با آی‌پی ایران را مسدود کرده است. لطفاً سرویس <b>DNS شکن (Shecan)</b> یا ابزار تغییر آی‌پی خود را روشن کرده و مجدداً تست نمایید.' +
+      '<div class="mt-1 small text-muted" dir="ltr">Google Response: ' + escapeHtml(msg) + '</div>'
     );
   }
 
-  if (status === 400 && /API_KEY_INVALID|key not valid|invalid argument/i.test(msg)) {
-    return 'کلید API وارد شده معتبر نیست یا منقضی شده است. لطفاً کلید جدیدی (شروع‌شونده با AIzaSy) از Google AI Studio دریافت و بدون فاصله اضافی کپی نمایید.';
-  }
-
-  if (status === 403 || /User location is not supported|location is not supported|PERMISSION_DENIED/i.test(msg)) {
-    return 'محدودیت جغرافیایی گوگل (آی‌پی ایران): سرور گوگل دسترسی مستقیم با آی‌پی ایران را مسدود کرده است. لطفاً سرویس <b>DNS شکن (Shecan)</b> یا ابزار تغییر آی‌پی خود را روشن کرده و مجدداً دکمه تست را بزنید.';
+  if (status === 400 && /API_KEY_INVALID|key not valid/i.test(msg)) {
+    return (
+      'سرور گوگل کلید وارد شده را نپذیرفت. لطفاً بررسی کنید کلید بدون فاصله اضافی کپی شده باشد یا پروژه مرتبط با آن در Google AI Studio فعال باشد.' +
+      '<div class="mt-1 small text-muted" dir="ltr">Google Response: ' + escapeHtml(msg) + '</div>'
+    );
   }
 
   if (status === 429 || /RESOURCE_EXHAUSTED|quota|rate limit/i.test(msg)) {
-    return 'سهمیه لحظه‌ای (Rate Limit) این مدل در حساب رایگان گوگل پر شده است. لطفاً از منوی کشویی نسخه دیگری (مثلاً <code>Gemini 2.0 Flash</code> یا <code>Gemini 1.5 Flash</code>) را انتخاب نمایید.';
-  }
-
-  if (status === 404 || /not found|is not supported for generateContent/i.test(msg)) {
-    return 'مدل انتخاب‌شده در این نسخه از API یافت نشد. لطفاً از منوی کشویی، مدل دیگری (مانند <code>Gemini 2.5 Flash</code> یا <code>Gemini 2.0 Flash</code>) را انتخاب کنید.';
+    return (
+      'سهمیه لحظه‌ای (Quota / Rate Limit) این مدل پر شده است. لطفاً از منوی کشویی نسخه دیگری (مثلاً <code>Gemini 2.0 Flash</code> یا <code>Gemini 1.5 Flash</code>) را انتخاب نمایید.' +
+      '<div class="mt-1 small text-muted" dir="ltr">Google Response: ' + escapeHtml(msg) + '</div>'
+    );
   }
 
   if (/Failed to fetch|NetworkError|Load failed/i.test(msg)) {
-    return 'عدم برقراری ارتباط شبکه با سرور گوگل (generativelanguage.googleapis.com). لطفاً اتصال اینترنت و روشن بودن DNS شکن یا فیلترشکن خود را بررسی فرمایید.';
+    return (
+      'عدم برقراری ارتباط شبکه با سرور گوگل (<code>generativelanguage.googleapis.com</code>). لطفاً اتصال اینترنت و روشن بودن DNS شکن یا فیلترشکن خود را بررسی فرمایید.' +
+      '<div class="mt-1 small text-muted" dir="ltr">Network Error: ' + escapeHtml(msg) + '</div>'
+    );
   }
 
-  return msg || 'خطای ناشناخته در ارتباط با سرور Gemini';
+  return 'خطای دریافتی از سرور گوگل: <div class="mt-1 small" dir="ltr"><code>' + escapeHtml(msg) + '</code></div>';
 }
 
-// دریافت خودکار لیست مدل‌های مجاز حساب کاربر از سرور گوگل
-async function fetchAvailableModelsFromGoogle(apiKey) {
-  var listUrl = 'https://generativelanguage.googleapis.com/v1beta/models?key=' + encodeURIComponent(apiKey);
-  var resp = await fetch(listUrl, { method: 'GET' });
-  if (!resp.ok) {
-    var errData = await resp.json().catch(function () { return {}; });
-    var rawMsg = (errData && errData.error && errData.error.message) ? errData.error.message : ('HTTP ' + resp.status);
-    var err = new Error(translateGeminiErrorToPersian(rawMsg, resp.status, apiKey));
-    err.status = resp.status;
-    err.rawMessage = rawMsg;
-    throw err;
-  }
+// ارسال یک درخواست به Google Gemini API با پشتیبانی همزمان از کلیدهای AQ. (هدر x-goog-api-key) و کلیدهای کلاسیک
+async function callGeminiModelEndpoint(apiKey, modelName, payload) {
+  var cleanKey = (apiKey || '').trim();
+  var baseUrl =
+    'https://generativelanguage.googleapis.com/v1beta/models/' +
+    encodeURIComponent(modelName) +
+    ':generateContent';
 
-  var data = await resp.json();
-  if (data && Array.isArray(data.models)) {
-    var dynamicModels = [];
-    for (var i = 0; i < data.models.length; i++) {
-      var m = data.models[i];
-      var methods = m.supportedGenerationMethods || [];
-      var shortId = (m.name || '').replace(/^models\//, '');
-      // فیلتر کردن مدل‌های متنی و چندرسانه‌ای جمینای که از generateContent پشتیبانی می‌کنند
-      if (
-        shortId.indexOf('gemini-') === 0 &&
-        methods.indexOf('generateContent') !== -1 &&
-        shortId.indexOf('embedding') === -1 &&
-        shortId.indexOf('aqa') === -1
-      ) {
-        dynamicModels.push({
-          id: shortId,
-          label: getModelDisplayLabel(shortId) !== shortId
-            ? getModelDisplayLabel(shortId)
-            : (m.displayName ? m.displayName + ' (' + shortId + ')' : shortId)
-        });
-      }
+  // روش ۱: ارسال با هدر رسمی x-goog-api-key و پارامتر key (سازگار با کلیدهای AQ. و AIza)
+  try {
+    var resp1 = await fetch(baseUrl + '?key=' + encodeURIComponent(cleanKey), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': cleanKey,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (resp1.ok) {
+      return { ok: true, data: await resp1.json(), status: 200 };
     }
 
-    if (dynamicModels.length > 0) {
-      // اولویت دادن به مدل‌های پرکاربرد در صدر لیست
-      dynamicModels.sort(function (a, b) {
-        var priority = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
-        var idxA = priority.indexOf(a.id);
-        var idxB = priority.indexOf(b.id);
-        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-        if (idxA !== -1) return -1;
-        if (idxB !== -1) return 1;
-        return a.id.localeCompare(b.id);
+    var errData1 = await resp1.json().catch(function () { return {}; });
+    var rawMsg1 = (errData1 && errData1.error && errData1.error.message) ? errData1.error.message : ('HTTP ' + resp1.status);
+
+    // اگر کلید از نوع AQ. باشد و با ?key= تداخل داشته باشد، فقط با هدر x-goog-api-key یا Authorization تست کن
+    if (cleanKey.indexOf('AQ.') === 0 && (resp1.status === 400 || resp1.status === 401 || resp1.status === 403)) {
+      var respHeaderOnly = await fetch(baseUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': cleanKey,
+        },
+        body: JSON.stringify(payload),
       });
 
-      GEMINI_AVAILABLE_MODELS = dynamicModels;
-      var selEl = document.getElementById('gemini-model-select');
-      if (selEl) {
-        populateModelSelectOptions(selEl, GEMINI_AVAILABLE_MODELS, getStoredGeminiModel());
+      if (respHeaderOnly.ok) {
+        return { ok: true, data: await respHeaderOnly.json(), status: 200 };
       }
     }
+
+    return { ok: false, status: resp1.status, errorMessage: rawMsg1 };
+  } catch (netErr) {
+    // در صورتی که مرورگر به دلیل CORS به هدر x-goog-api-key حساسیت نشان داد، ارسال ساده بدون هدر اضافی
+    var respFallback = await fetch(baseUrl + '?key=' + encodeURIComponent(cleanKey), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (respFallback.ok) {
+      return { ok: true, data: await respFallback.json(), status: 200 };
+    }
+    var errData2 = await respFallback.json().catch(function () { return {}; });
+    var rawMsg2 = (errData2 && errData2.error && errData2.error.message) ? errData2.error.message : ('HTTP ' + respFallback.status);
+    return { ok: false, status: respFallback.status, errorMessage: rawMsg2 };
   }
-  return true;
+}
+
+// دریافت اختیاری لیست مدل‌ها در پس‌زمینه (بدون ایجاد وقفه در عملکرد کلیدهای AQ.)
+async function syncAvailableModelsNonBlocking(apiKey) {
+  try {
+    var cleanKey = (apiKey || '').trim();
+    var listUrl = 'https://generativelanguage.googleapis.com/v1beta/models?key=' + encodeURIComponent(cleanKey);
+    var resp = await fetch(listUrl, {
+      method: 'GET',
+      headers: { 'x-goog-api-key': cleanKey },
+    });
+    if (!resp.ok) return;
+
+    var data = await resp.json();
+    if (data && Array.isArray(data.models)) {
+      var dynamicModels = [];
+      for (var i = 0; i < data.models.length; i++) {
+        var m = data.models[i];
+        var methods = m.supportedGenerationMethods || [];
+        var shortId = (m.name || '').replace(/^models\//, '');
+        if (
+          shortId.indexOf('gemini-') === 0 &&
+          methods.indexOf('generateContent') !== -1 &&
+          shortId.indexOf('embedding') === -1 &&
+          shortId.indexOf('aqa') === -1
+        ) {
+          dynamicModels.push({
+            id: shortId,
+            label: getModelDisplayLabel(shortId) !== shortId
+              ? getModelDisplayLabel(shortId)
+              : (m.displayName ? m.displayName + ' (' + shortId + ')' : shortId)
+          });
+        }
+      }
+
+      if (dynamicModels.length > 0) {
+        dynamicModels.sort(function (a, b) {
+          var priority = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+          var idxA = priority.indexOf(a.id);
+          var idxB = priority.indexOf(b.id);
+          if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+          if (idxA !== -1) return -1;
+          if (idxB !== -1) return 1;
+          return a.id.localeCompare(b.id);
+        });
+
+        GEMINI_AVAILABLE_MODELS = dynamicModels;
+        var selEl = document.getElementById('gemini-model-select');
+        if (selEl) {
+          populateModelSelectOptions(selEl, GEMINI_AVAILABLE_MODELS, getStoredGeminiModel());
+        }
+      }
+    }
+  } catch (e) {
+    // نادیده گرفتن خطا در استعلام لیست؛ مدل‌های پیش‌فرض فعال می‌مانند
+  }
 }
 
 // ارسال درخواست مستقیم به Google Gemini API با قابلیت سوییچ خودکار روی مدل‌های جایگزین
@@ -273,7 +327,6 @@ async function fetchDirectGeminiWithFallback(apiKey, payload, preferredModel) {
     'gemini-1.5-pro'
   ];
 
-  // افزودن مدل‌های دریافت‌شده از حساب کاربر به صف پشتیبان
   for (var d = 0; d < GEMINI_AVAILABLE_MODELS.length; d++) {
     if (fallbackQueue.indexOf(GEMINI_AVAILABLE_MODELS[d].id) === -1) {
       fallbackQueue.push(GEMINI_AVAILABLE_MODELS[d].id);
@@ -291,50 +344,28 @@ async function fetchDirectGeminiWithFallback(apiKey, payload, preferredModel) {
 
   for (var m = 0; m < uniqueModels.length; m++) {
     var modelName = uniqueModels[m];
-    var directUrl =
-      'https://generativelanguage.googleapis.com/v1beta/models/' +
-      encodeURIComponent(modelName) +
-      ':generateContent?key=' +
-      encodeURIComponent(apiKey);
-
     try {
-      var resp = await fetch(directUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (resp.ok) {
-        var data = await resp.json();
+      var res = await callGeminiModelEndpoint(apiKey, modelName, payload);
+      if (res.ok) {
         return {
           ok: true,
-          data: data,
+          data: res.data,
           usedModel: modelName,
         };
       } else {
-        var errData = await resp.json().catch(function () {
-          return {};
-        });
-        var rawMsg =
-          errData && errData.error && errData.error.message
-            ? errData.error.message
-            : 'کد خطا ' + resp.status;
-
-        var friendlyMsg = translateGeminiErrorToPersian(rawMsg, resp.status, apiKey);
+        var friendlyMsg = translateGeminiErrorToPersian(res.errorMessage, res.status);
         lastError = new Error(friendlyMsg);
 
-        // اگر کلید نامعتبر است یا آی‌پی مسدود است، نیازی به تست سایر مدل‌ها نیست
+        // اگر خطا مربوط به آی‌پی ایران یا نامعتبر بودن کلید است، نیازی به تست سایر مدل‌ها نیست
         if (
-          resp.status === 400 && /API_KEY_INVALID|key not valid/i.test(rawMsg) ||
-          resp.status === 403 ||
-          /location is not supported/i.test(rawMsg) ||
-          apiKey.indexOf('AIza') !== 0
+          (res.status === 400 && /API_KEY_INVALID|key not valid/i.test(res.errorMessage)) ||
+          (res.status === 403 && /location is not supported/i.test(res.errorMessage))
         ) {
           break;
         }
       }
     } catch (netErr) {
-      lastError = new Error(translateGeminiErrorToPersian(netErr.message, 0, apiKey));
+      lastError = new Error(translateGeminiErrorToPersian(netErr.message, 0));
       break;
     }
   }
@@ -377,7 +408,7 @@ window.saveCustomGeminiKey = async function () {
   }
   setStoredGeminiApiKey(key);
   if (typeof showToastMsg === 'function') {
-    showToastMsg('⏳ در حال بررسی کلید و دریافت لیست مدل‌های Google Gemini...');
+    showToastMsg('⏳ در حال بررسی کلید و اتصال به Google Gemini...');
   }
   await testCustomGeminiKey();
 };
@@ -416,44 +447,21 @@ window.testCustomGeminiKey = async function () {
     if (fb) {
       fb.className = 'small mt-2 alert alert-warning py-1 px-2';
       fb.style.display = 'block';
-      fb.innerHTML = '⚠️ هنوز کلیدی وارد نشده است. لطفاً کلید دریافتی از Google AI Studio (شروع‌شونده با <code>AIzaSy</code>) را درج نمایید.';
+      fb.innerHTML = '⚠️ هنوز کلیدی وارد نشده است. لطفاً کلید دریافتی از Google AI Studio را درج نمایید.';
     }
-    return false;
-  }
-
-  // بررسی اولیه فرمت کلید پیش از ارسال
-  if (key.indexOf('AIza') !== 0) {
-    var formatErr = translateGeminiErrorToPersian('API_KEY_INVALID', 400, key);
-    if (fb) {
-      fb.className = 'small mt-2 alert alert-danger py-2 px-3';
-      fb.style.display = 'block';
-      fb.innerHTML = '❌ <b>فرمت کلید نامعتبر است:</b><br>' + formatErr;
-    }
-    if (pill) {
-      pill.className = 'badge bg-danger p-2';
-      pill.innerHTML = '🔴 کلید نامعتبر (باید با AIza شروع شود)';
-    }
-    updateAiBadgeStatus(false);
     return false;
   }
 
   if (fb) {
     fb.className = 'small mt-2 alert alert-info py-1 px-2';
     fb.style.display = 'block';
-    fb.innerHTML = '⏳ در حال استعلام مدل‌های فعال و تست اتصال به Google Gemini API...';
+    fb.innerHTML = '⏳ در حال تست اتصال مستقیم به Google Gemini API (مدل <code>' + escapeHtml(selectedModel) + '</code>)...';
   }
 
   var directErrorMsg = '';
 
-  // ۱. استعلام لیست مدل‌ها و تست مستقیم اتصال به Google Gemini API
+  // ۱. تست مستقیم تولید محتوا با کلید کاربر (سازگار با کلیدهای AQ. و AIza)
   try {
-    await fetchAvailableModelsFromGoogle(key);
-
-    // به‌روزرسانی مدل انتخابی پس از دریافت لیست مدل‌های واقعی گوگل
-    if (selEl && selEl.value) {
-      selectedModel = selEl.value;
-    }
-
     var testResult = await fetchDirectGeminiWithFallback(
       key,
       {
@@ -469,15 +477,16 @@ window.testCustomGeminiKey = async function () {
       setStoredGeminiModel(activeModel);
       if (selEl) selEl.value = activeModel;
 
+      // همگام‌سازی لیست مدل‌ها در پس‌زمینه بدون ایجاد خطا
+      syncAvailableModelsNonBlocking(key);
+
       if (fb) {
         fb.className = 'small mt-2 alert alert-success py-1 px-2 fw-bold';
         fb.style.display = 'block';
         fb.innerHTML =
           '✅ اتصال به Google Gemini API با موفقیت برقرار شد! (مدل فعال: <code>' +
           escapeHtml(activeModel) +
-          '</code> - ' +
-          GEMINI_AVAILABLE_MODELS.length +
-          ' نسخه جمینای آماده انتخاب است).';
+          '</code>).';
       }
       if (pill) {
         pill.className = 'badge bg-success p-2';
@@ -524,16 +533,14 @@ window.testCustomGeminiKey = async function () {
         updateAiBadgeStatus(true);
         return true;
       }
-    } catch (proxyErr) {
-      // نادیده گرفتن خطای پروکسی و نمایش خطای اصلی گوگل
-    }
+    } catch (proxyErr) {}
   }
 
   // نمایش دقیق علت خطا به کاربر
   if (fb) {
     fb.className = 'small mt-2 alert alert-danger py-2 px-3';
     fb.style.display = 'block';
-    fb.innerHTML = '❌ <b>خطا در اتصال به Gemini API:</b><br>' + (directErrorMsg || 'ارتباط با سرور گوگل برقرار نشد.');
+    fb.innerHTML = '❌ <b>عدم برقراری ارتباط با Gemini API:</b><br>' + (directErrorMsg || 'ارتباط با سرور گوگل برقرار نشد.');
   }
   if (pill) {
     pill.className = 'badge bg-danger p-2';
@@ -570,8 +577,8 @@ async function checkAiServerStatus() {
 
   var pill = document.getElementById('gemini-key-status-pill');
 
-  // اگر کلید استاندارد در حافظه موجود باشد، لیست مدل‌ها را در پس‌زمینه همگام کن
-  if (userKey && userKey.indexOf('AIza') === 0) {
+  // اگر کلید کاربر (چه AQ. و چه AIza) در حافظه موجود باشد
+  if (userKey) {
     aiOnlineStatus.isOnline = true;
     aiOnlineStatus.userKeyActive = true;
     if (pill) {
@@ -579,16 +586,15 @@ async function checkAiServerStatus() {
       pill.innerHTML = '🟢 کلید اختصاصی فعال است (' + escapeHtml(currentModel) + ')';
     }
     updateAiBadgeStatus(true);
-    fetchAvailableModelsFromGoogle(userKey).catch(function () {});
+    syncAvailableModelsNonBlocking(userKey);
     return;
   }
 
-  // اگر روی GitHub Pages یا file:// هستیم و کلید معتبری تنظیم نشده
   if (isStaticHostEnvironment()) {
     aiOnlineStatus.isOnline = false;
     if (pill) {
       pill.className = 'badge bg-warning text-dark p-2';
-      pill.innerHTML = userKey ? '🔴 فرمت کلید نامعتبر است' : '🟡 کلید تنظیم نشده';
+      pill.innerHTML = '🟡 کلید تنظیم نشده';
     }
     updateAiBadgeStatus(false);
     return;
@@ -670,11 +676,11 @@ function updateAiBadgeStatus(online) {
         escapeHtml(getModelDisplayLabel(activeModel)) +
         '</code> ' +
         (hasCustomKey ? 'با <b>کلید اختصاصی شما</b> ' : 'از طریق سرور مرکز ۶۳۶ ') +
-        'به همراه جستجوی زنده ضوابط وزارت جهاد کشاورزی و نظام مهندسی فعال است. کلیه اسناد و سوالات آنلاین تحلیل می‌شوند.';
+        'فعال است. کلیه اسناد و سوالات آنلاین تحلیل می‌شوند.';
     } else {
       statusDesc.className = 'alert alert-info small mb-3';
       statusDesc.innerHTML =
-        '💡 <b>موتور هوشمند محلی (آفلاین):</b> در صورت قطعی اینترنت یا عدم تنظیم کلید، استخراج مشخصات متقاضی، کدملی، متراژ، زون و مختصات UTM به صورت ۱۰۰٪ آفلاین انجام می‌گیرد. برای فعال‌سازی کامل آنلاین، کلید استاندارد Gemini API (شروع‌شونده با <code>AIzaSy</code>) را در کادر بالا وارد فرمایید.';
+        '💡 <b>موتور هوشمند محلی (آفلاین):</b> در صورت قطعی اینترنت یا عدم تنظیم کلید، استخراج مشخصات متقاضی، کدملی، متراژ، زون و مختصات UTM به صورت ۱۰۰٪ آفلاین انجام می‌گیرد. برای فعال‌سازی کامل آنلاین، کلید Gemini API خود را در کادر بالا وارد فرمایید.';
     }
   }
 
@@ -821,8 +827,8 @@ async function aiReadDocumentImagePro() {
     showToastMsg('⏳ در حال خوانش تصویر سند و استخراج مختصات UTM با مدل ' + selectedModel + '...');
   }
 
-  // ۱. فراخوانی مستقیم Google Gemini API در صورت وجود کلید کاربر
-  if (userKey && userKey.indexOf('AIza') === 0) {
+  // ۱. فراخوانی مستقیم Google Gemini API در صورت وجود کلید کاربر (AQ. یا AIza)
+  if (userKey) {
     try {
       var cleanBase64 =
         aiPendingImageBase64.indexOf(',') !== -1
@@ -996,7 +1002,7 @@ function aiRunFullAutopilotPipeline() {
   }, 200);
 }
 
-// چت‌بات آنلاین با پشتیبانی از تمامی مدل‌های Gemini و پشتیبان آفلاین
+// چت‌بات آنلاین با پشتیبانی از کلیدهای AQ. و AIza و تمامی مدل‌های Gemini
 async function aiSendChatMessage() {
   var input = document.getElementById('ai-chat-input');
   var history = document.getElementById('ai-chat-history');
@@ -1020,8 +1026,8 @@ async function aiSendChatMessage() {
   history.appendChild(botLoadingDiv);
   history.scrollTop = history.scrollHeight;
 
-  // ۱. فراخوانی مستقیم Google Gemini API (سازگار با GitHub Pages و ویندوز)
-  if (userKey && userKey.indexOf('AIza') === 0) {
+  // ۱. فراخوانی مستقیم Google Gemini API (سازگار با کلیدهای AQ. و AIza)
+  if (userKey) {
     try {
       var directContents = [];
       if (Array.isArray(aiChatHistoryBuffer)) {
@@ -1179,7 +1185,7 @@ async function aiSendChatMessage() {
 
   if (!respText) {
     respText =
-      'در مرکز خدمات کشاورزی ۶۳۶ خفر، پرونده‌ها در ۳ گروه اصلی (۱. گلخانه و قارچ، ۲. دام و طیور و شیلات، ۳. کلینیک و داروخانه گیاهپزشکی) رسیدگی می‌شوند. برای پاسخ دقیق، کلیدواژه طرح خود (مثل گوسفند، گلخانه، قارچ یا داروخانه) را قید بفرمایید یا کلید معتبر Gemini (شروع‌شونده با AIzaSy) را وارد کنید.';
+      'در مرکز خدمات کشاورزی ۶۳۶ خفر، پرونده‌ها در ۳ گروه اصلی (۱. گلخانه و قارچ، ۲. دام و طیور و شیلات، ۳. کلینیک و داروخانه گیاهپزشکی) رسیدگی می‌شوند. برای پاسخ دقیق، کلیدواژه طرح خود (مثل گوسفند، گلخانه، قارچ یا داروخانه) را قید بفرمایید یا اتصال اینترنت و کلید Gemini را بررسی کنید.';
   }
 
   botLoadingDiv.className = 'p-2 mb-2 rounded bg-white border text-dark shadow-sm';
@@ -1207,7 +1213,7 @@ function formatMarkdownToHtml(md) {
   if (!md) return '';
   var html = escapeHtml(md);
   html = html.replace(/^### (.*$)/gim, '<h6 class="fw-bold text-success mt-2 mb-1">$1</h6>');
-  html = html.replace(/^## (.*$)/gim, '<h5 class="fw-bold text-primary mt-2 mb-1">$1</h5>');
+  html = html.replace(/^## (.*$)/gim, '<h5 class="fw-bold text-primary mt-2 mb-1">$1</h6>');
   html = html.replace(/\*\*(.*?)\*\*/gim, '<b>$1</b>');
   html = html.replace(/^\s*[-*•]\s+(.*$)/gim, '<li class="me-3">$1</li>');
   html = html.replace(/\n/g, '');
