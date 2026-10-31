@@ -3504,5 +3504,346 @@
   });
 })();
 </script>
+  <script id="nezam-sidebar-topsub-engine">
+(function () {
+  var currentActivePaneId = 'pane-dashboard';
+
+  // تابع هوشمند یافتن شیء نقشه Leaflet در متغیرهای سراسری
+  function getCroquisLeafletMapInstance() {
+    var mapEl = document.getElementById('crq-leaflet-map-div');
+    if (!mapEl) return null;
+
+    // بررسی نام‌های متداول در هسته سامانه
+    var commonNames = ['croquisMap', 'crqMap', 'leafletMap', 'map', 'crqLeafletMap', 'croquisLeafletMap'];
+    for (var i = 0; i < commonNames.length; i++) {
+      var m = window[commonNames[i]];
+      if (m && typeof m === 'object' && typeof m.invalidateSize === 'function' && m._container === mapEl) {
+        return m;
+      }
+    }
+
+    // جستجوی خودکار در تمامی متغیرهای فعال پنجره
+    for (var k in window) {
+      try {
+        var obj = window[k];
+        if (obj && typeof obj === 'object' && typeof obj.invalidateSize === 'function' && obj._container === mapEl) {
+          return obj;
+        }
+      } catch (e) {}
+    }
+    return null;
+  }
+
+  // تازه‌سازی قطعی ابعاد نقشه و فراخوانی مجدد تایل‌های ماهواره‌ای
+  window.forceRefreshCroquisMap = function () {
+    var map = getCroquisLeafletMapInstance();
+    if (map) {
+      map.invalidateSize(true);
+      map.eachLayer(function (layer) {
+        if (layer && typeof layer.redraw === 'function') {
+          layer.redraw();
+        }
+      });
+    }
+  };
+
+  // فعال‌سازی ناظر خودکار ابعاد روی کانتینر نقشه
+  function attachMapResizeObserver() {
+    var mapEl = document.getElementById('crq-leaflet-map-div');
+    if (!mapEl || window.__nezamMapObserverAttached) return;
+
+    if (typeof ResizeObserver !== 'undefined') {
+      var ro = new ResizeObserver(function () {
+        window.forceRefreshCroquisMap();
+      });
+      ro.observe(mapEl);
+      window.__nezamMapObserverAttached = true;
+    }
+  }
+
+  // پیکربندی منوی اصلی سمت راست و زیرمجموعه‌ها در تب بالای صفحه
+  var PANE_NAVIGATION_CONFIG = {
+    'pane-dashboard': {
+      title: '📊 پیشخوان فرماندهی',
+      shortTitle: 'پیشخوان فرماندهی',
+      subTabs: [
+        { id: 'dash-all', label: '🏠 نمای کلی داشبورد', action: function () { window.scrollTo({ top: 0, behavior: 'smooth' }); } },
+        { id: 'dash-g1', label: '🌱 گروه اول: گلخانه و قارچ', action: function () { if (typeof filterDirectoryByMainGroupCard === 'function') filterDirectoryByMainGroupCard('GREENHOUSE_MUSHROOM'); } },
+        { id: 'dash-g2', label: '🐄 گروه دوم: دام و طیور', action: function () { if (typeof filterDirectoryByMainGroupCard === 'function') filterDirectoryByMainGroupCard('LIVESTOCK_POULTRY_FISHERIES'); } },
+        { id: 'dash-g3', label: '💊 گروه سوم: کلینیک و داروخانه', action: function () { if (typeof filterDirectoryByMainGroupCard === 'function') filterDirectoryByMainGroupCard('CLINIC_PHARMACY'); } },
+        { id: 'dash-new', label: '➕ تشکیل سریع پرونده', action: function () { if (typeof startNewCaseWizard === 'function') startNewCaseWizard('GREENHOUSE_MUSHROOM'); } }
+      ]
+    },
+    'pane-cases': {
+      title: '📁 پرونده متقاضیان',
+      shortTitle: 'پرونده متقاضیان',
+      subTabs: [
+        { id: 'sub-list', label: '🔍 ۱. فهرست و جستجو', action: function () { if (typeof switchCaseSubTab === 'function') switchCaseSubTab('sub-list'); } },
+        { id: 'sub-info', label: '📝 ۲. مشخصات و نقاط UTM', action: function () { if (typeof switchCaseSubTab === 'function') switchCaseSubTab('sub-info'); } },
+        { id: 'sub-matrix', label: '📊 ۳. ماتریس ۷ استعلام', action: function () { if (typeof switchCaseSubTab === 'function') switchCaseSubTab('sub-matrix'); } },
+        { id: 'sub-docs', label: '📂 ۴. چک‌لیست مدارک', action: function () { if (typeof switchCaseSubTab === 'function') switchCaseSubTab('sub-docs'); } },
+        { id: 'sub-history', label: '🕒 ۵. سابقه اقدامات', action: function () { if (typeof switchCaseSubTab === 'function') switchCaseSubTab('sub-history'); } }
+      ]
+    },
+    'pane-croquis': {
+      title: '🗺️ استودیو نقشه‌کشی UTM',
+      shortTitle: 'استودیو نقشه‌کشی',
+      subTabs: [
+        {
+          id: 'crq-map',
+          label: '🌍 نمای ماهواره‌ای Google Earth',
+          action: function () {
+            if (typeof switchCroquisViewMode === 'function') switchCroquisViewMode('MAP');
+            setTimeout(window.forceRefreshCroquisMap, 60);
+            setTimeout(window.forceRefreshCroquisMap, 250);
+          }
+        },
+        { id: 'crq-cad', label: '📐 نمای مهندسی (CAD)', action: function () { if (typeof switchCroquisViewMode === 'function') switchCroquisViewMode('CAD'); } },
+        { id: 'crq-refresh', label: '🔄 رفرش تایل‌های نقشه', action: function () { window.forceRefreshCroquisMap(); } },
+        { id: 'crq-sample', label: '🌱 الگوی آماده ۱۰ هکتاری', action: function () { if (typeof loadSample10HectareGreenhouseMap === 'function') loadSample10HectareGreenhouseMap(); } },
+        { id: 'crq-kml', label: '🌍 خروجی KML', action: function () { if (typeof downloadCaseKML === 'function') downloadCaseKML(); } },
+        { id: 'crq-print', label: '✂️ چاپ شیت دوبرگی', action: function () { if (typeof printUtmSketchSheet === 'function') printUtmSketchSheet(); } }
+      ]
+    },
+    'pane-letters': {
+      title: '✉️ مکاتبات و دبیرخانه',
+      shortTitle: 'مکاتبات و دبیرخانه',
+      subTabs: [
+        { id: 'let-all', label: '✉️ ویرایشگر + اندیکاتور', action: function () { toggleLettersSubView('ALL'); } },
+        { id: 'let-editor', label: '📝 فقط ویرایشگر نامه', action: function () { toggleLettersSubView('EDITOR'); } },
+        { id: 'let-sec', label: '📚 فقط دفتر اندیکاتور', action: function () { toggleLettersSubView('SECRETARIAT'); } },
+        { id: 'let-a4', label: '🖨️ چاپ A4', action: function () { if (typeof saveLetterToSecretariat === 'function') saveLetterToSecretariat(true, 'A4'); } },
+        { id: 'let-a5', label: '🖨️ چاپ A5', action: function () { if (typeof saveLetterToSecretariat === 'function') saveLetterToSecretariat(true, 'A5'); } }
+      ]
+    },
+    'pane-print': {
+      title: '🖨️ سربرگ و فرم‌های نظارتی',
+      shortTitle: 'سربرگ و فرم‌ها',
+      subTabs: [
+        { id: 'prt-letter', label: '📄 نامه فعلی', action: function () { if (typeof renderSinglePreviewSheet === 'function') renderSinglePreviewSheet(); } },
+        { id: 'prt-croquis', label: '🗺️ شیت دوبرگی کروکی', action: function () { if (typeof printUtmSketchSheet === 'function') printUtmSketchSheet(); } },
+        { id: 'prt-cover', label: '📋 روکش پرونده', action: function () { if (typeof printOfficialForm === 'function') printOfficialForm('FOLDER_COVER'); } },
+        { id: 'prt-gh', label: '🌱 فرم گلخانه/قارچ', action: function () { if (typeof printOfficialForm === 'function') printOfficialForm('GREENHOUSE_CHECKLIST'); } },
+        { id: 'prt-pharm', label: '💊 فرم ۱۸ بندی داروخانه', action: function () { if (typeof printOfficialForm === 'function') printOfficialForm('PHARMACY_INSPECTION'); } },
+        { id: 'prt-def', label: '⚠️ اخطاریه نقص مدارک', action: function () { if (typeof issueDeficiencyLetterForActiveCase === 'function') issueDeficiencyLetterForActiveCase(); } }
+      ]
+    },
+    'pane-office': {
+      title: '💼 کارتابل و تنظیمات',
+      shortTitle: 'کارتابل و تنظیمات',
+      subTabs: [
+        { id: 'off-all', label: '🎛️ نمایش همه بخش‌ها', action: function () { toggleOfficeSubView('ALL'); } },
+        { id: 'off-tasks', label: '📅 ۱. کارتابل وظایف', action: function () { toggleOfficeSubView('TASKS'); } },
+        { id: 'off-brand', label: '⚙️ ۲. مشخصات سربرگ', action: function () { toggleOfficeSubView('BRANDING'); } },
+        { id: 'off-backup', label: '📦 ۳. پشتیبان‌گیری JSON', action: function () { toggleOfficeSubView('BACKUP'); } }
+      ]
+    },
+    'pane-ai': {
+      title: '🤖 دستیار هوشمند و OCR',
+      shortTitle: 'دستیار هوشمند Gemini',
+      subTabs: [
+        { id: 'ai-all', label: '✨ نمای کامل', action: function () { toggleAiSubView('ALL'); } },
+        { id: 'ai-ocr', label: '🖼️ ۱. خوانش اسناد (OCR)', action: function () { toggleAiSubView('OCR'); } },
+        { id: 'ai-chat', label: '💬 ۲. مشاور فنی ضوابط', action: function () { toggleAiSubView('CHAT'); } },
+        { id: 'ai-key', label: '🔑 ۳. تنظیم کلید و مدل', action: function () { toggleAiSubView('KEY'); } }
+      ]
+    },
+    'pane-guide': {
+      title: '📘 راهنمای جامع تصویری',
+      shortTitle: 'راهنمای سامانه',
+      subTabs: [
+        { id: 'gd-all', label: '📚 نمایش کل راهنما', action: function () { filterGuideCards('ALL'); } },
+        { id: 'gd-1', label: '۱. قانون پایه و ۳ گروه', action: function () { filterGuideCards(0); } },
+        { id: 'gd-2', label: '۲. کروکی دوبرگی UTM', action: function () { filterGuideCards(1); } },
+        { id: 'gd-3', label: '۳. ماتریس ۷ استعلام', action: function () { filterGuideCards(2); } }
+      ]
+    }
+  };
+
+  function toggleLettersSubView(mode) {
+    var sec = document.getElementById('pane-letters');
+    if (!sec) return;
+    var cols = sec.querySelectorAll('.row > .col-md-6');
+    if (cols.length < 2) return;
+    cols[0].style.display = mode === 'SECRETARIAT' ? 'none' : 'block';
+    cols[0].style.width = mode === 'EDITOR' ? '100%' : '';
+    cols[1].style.display = mode === 'EDITOR' ? 'none' : 'block';
+    cols[1].style.width = mode === 'SECRETARIAT' ? '100%' : '';
+  }
+
+  function toggleOfficeSubView(mode) {
+    var sec = document.getElementById('pane-office');
+    if (!sec) return;
+    var cols = sec.querySelectorAll('.row > .col-md-6');
+    if (cols.length < 2) return;
+    cols[0].style.display = mode === 'BRANDING' ? 'none' : 'block';
+    cols[1].style.display = (mode === 'TASKS' || mode === 'BACKUP') ? 'none' : 'block';
+  }
+
+  function toggleAiSubView(mode) {
+    var sec = document.getElementById('pane-ai');
+    if (!sec) return;
+    var ocrCol = sec.querySelector('.col-md-7');
+    var chatCol = sec.querySelector('.col-md-5');
+    if (!ocrCol || !chatCol) return;
+    ocrCol.style.display = mode === 'CHAT' ? 'none' : 'block';
+    ocrCol.style.width = mode === 'OCR' ? '100%' : '';
+    chatCol.style.display = mode === 'OCR' ? 'none' : 'block';
+    chatCol.style.width = mode === 'CHAT' ? '100%' : '';
+  }
+
+  function filterGuideCards(cardIndex) {
+    var sec = document.getElementById('pane-guide');
+    if (!sec) return;
+    var cols = sec.querySelectorAll('.row.g-3 > .col-md-6');
+    cols.forEach(function (col, idx) {
+      col.style.display = (cardIndex === 'ALL' || cardIndex === idx) ? 'block' : 'none';
+      col.style.width = cardIndex === 'ALL' ? '' : '100%';
+    });
+  }
+
+  // رسم نوار تب زیرمجموعه‌ها در بالای صفحه
+  function renderTopSubNavigationBar(paneId, activeSubId) {
+    var cfg = PANE_NAVIGATION_CONFIG[paneId] || PANE_NAVIGATION_CONFIG['pane-dashboard'];
+    var subBar = document.getElementById('nezam-dynamic-top-subbar');
+    if (!subBar) return;
+
+    var chosenSubId = activeSubId || (cfg.subTabs[0] ? cfg.subTabs[0].id : '');
+    if (paneId === 'pane-cases' && !activeSubId) {
+      var activeCasePane = document.querySelector('#pane-cases .case-subpane.active');
+      if (activeCasePane && activeCasePane.id) chosenSubId = activeCasePane.id;
+    }
+
+    subBar.innerHTML =
+      '<div class="subbar-breadcrumb">' +
+      '<span>' + cfg.title + '</span>' +
+      '<span class="text-muted">⬅️</span>' +
+      '<small class="text-secondary">زیرمجموعه‌ها:</small>' +
+      '</div>' +
+      '<div class="subbar-tabs-list" id="nezam-subbar-buttons-holder"></div>';
+
+    var holder = document.getElementById('nezam-subbar-buttons-holder');
+    cfg.subTabs.forEach(function (item) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'subbar-tab-item' + (item.id === chosenSubId ? ' active' : '');
+      btn.innerHTML = item.label;
+      btn.onclick = function () {
+        holder.querySelectorAll('.subbar-tab-item').forEach(function (b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        if (typeof item.action === 'function') item.action();
+      };
+      holder.appendChild(btn);
+    });
+  }
+
+  // ایجاد سایدبار عمودی راست و نوار تب بالای صفحه
+  function initSidebarAndTopSubBarLayout() {
+    if (document.getElementById('nezam-main-app-shell')) return;
+
+    var navEl = document.querySelector('nav.app-navbar');
+    var mainEl = document.querySelector('main');
+    if (!navEl || !mainEl) return;
+
+    var shell = document.createElement('div');
+    shell.id = 'nezam-main-app-shell';
+    shell.className = 'nezam-app-shell';
+
+    var sidebar = document.createElement('aside');
+    sidebar.id = 'nezam-right-sidebar';
+    sidebar.className = 'nezam-right-sidebar no-print';
+
+    var sbTop = document.createElement('div');
+    sbTop.className = 'sb-top-header';
+    sbTop.innerHTML =
+      '<strong class="sb-header-title small">🧭 منوی اصلی سامانه ۶۳۶</strong>' +
+      '<button type="button" class="sb-toggle-btn" id="nezam-sb-collapse-btn" title="جمع / باز کردن منو">☰</button>';
+
+    var sbNavWrapper = document.createElement('div');
+    sbNavWrapper.style.flex = '1 1 auto';
+
+    var sbFooter = document.createElement('div');
+    sbFooter.className = 'sb-footer-box';
+    sbFooter.innerHTML = '🌱 نظام مهندسی کشاورزی خفر<br><span style="color:#e9c46a;">مرکز خدمات غیر دولتی ۶۳۶</span>';
+
+    var workspaceCol = document.createElement('div');
+    workspaceCol.className = 'nezam-workspace-col';
+
+    var topSubBar = document.createElement('div');
+    topSubBar.id = 'nezam-dynamic-top-subbar';
+    topSubBar.className = 'nezam-top-subbar no-print';
+
+    mainEl.parentNode.insertBefore(shell, mainEl);
+    sbNavWrapper.appendChild(navEl);
+    sidebar.appendChild(sbTop);
+    sidebar.appendChild(sbNavWrapper);
+    sidebar.appendChild(sbFooter);
+
+    workspaceCol.appendChild(topSubBar);
+    workspaceCol.appendChild(mainEl);
+
+    shell.appendChild(sidebar);
+    shell.appendChild(workspaceCol);
+
+    var toggleBtn = document.getElementById('nezam-sb-collapse-btn');
+    if (toggleBtn) {
+      toggleBtn.onclick = function () {
+        sidebar.classList.toggle('collapsed');
+        setTimeout(window.forceRefreshCroquisMap, 250);
+      };
+    }
+
+    renderTopSubNavigationBar('pane-dashboard');
+    attachMapResizeObserver();
+  }
+
+  // اتصال به تغییر تب‌های اصلی سامانه جهت رفرش ابعاد نقشه Leaflet
+  function hookNavigation() {
+    if (typeof window.switchMainPane === 'function' && !window.__nezamSwitchMainHooked) {
+      var origSwitchMain = window.switchMainPane;
+      window.switchMainPane = function (paneId) {
+        var res = origSwitchMain.apply(this, arguments);
+        currentActivePaneId = paneId;
+        renderTopSubNavigationBar(paneId);
+
+        if (paneId === 'pane-croquis') {
+          setTimeout(window.forceRefreshCroquisMap, 60);
+          setTimeout(window.forceRefreshCroquisMap, 250);
+        }
+        return res;
+      };
+      window.__nezamSwitchMainHooked = true;
+    }
+
+    if (typeof window.switchCroquisViewMode === 'function' && !window.__nezamCroquisViewHooked) {
+      var origCroquisView = window.switchCroquisViewMode;
+      window.switchCroquisViewMode = function (mode) {
+        var res = origCroquisView.apply(this, arguments);
+        if (mode === 'MAP') {
+          setTimeout(window.forceRefreshCroquisMap, 50);
+          setTimeout(window.forceRefreshCroquisMap, 200);
+        }
+        return res;
+      };
+      window.__nezamCroquisViewHooked = true;
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () {
+      initSidebarAndTopSubBarLayout();
+      hookNavigation();
+    });
+  } else {
+    initSidebarAndTopSubBarLayout();
+    hookNavigation();
+  }
+  window.addEventListener('load', function () {
+    initSidebarAndTopSubBarLayout();
+    hookNavigation();
+    setTimeout(window.forceRefreshCroquisMap, 400);
+  });
+})();
+</script>
 </body>
 </html>
