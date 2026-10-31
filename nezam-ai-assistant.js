@@ -8,25 +8,25 @@ if (typeof WScript !== 'undefined') {
 }
 
 /* ==========================================================================
-   NEZAM AI ASSISTANT MODULE v24.0 (MULTI-MODEL GEMINI ONLINE + 100% OFFLINE)
+   NEZAM AI ASSISTANT MODULE v25.0 (GITHUB PAGES + MULTI-MODEL GEMINI + OFFLINE)
    سامانه هوشمند و دستیار فنی مرکز خدمات کشاورزی ۶۳۶ خفر:
-   ۱. هوش مصنوعی آنلاین با قابلیت انتخاب تمامی نسخه‌های Gemini و جستجوی برخط (Grounding)
-   ۲. خوانش تصویر اسناد، قولنامه‌ها و نقشه‌های UTM (OCR آنلاین و تحلیل حقوقی)
-   ۳. استخراج خودکار فیلدهای پرونده و مختصات از متن خام (آفلاین و آنلاین)
-   ۴. خلبان خودکار تشکیل پرونده و انتقال مستقیم به نامه استعلام و کروکی
-   ۵. سوئیچ هوشمند و خودکار بین مدل‌های جمینای، سرور آنلاین و موتور آفلاین محلی
+   ۱. هوش مصنوعی آنلاین با دریافت خودکار تمامی نسخه‌های Gemini از سرور گوگل
+   ۲. سازگاری ۱۰۰٪ با GitHub Pages، حالت آفلاین (file://) و سرور محلی
+   ۳. خوانش تصویر اسناد، قولنامه‌ها و نقشه‌های UTM (OCR آنلاین و تحلیل حقوقی)
+   ۴. استخراج خودکار فیلدهای پرونده و مختصات از متن خام (آفلاین و آنلاین)
+   ۵. خلبان خودکار تشکیل پرونده و عیب‌یاب هوشمند خطاهای کلید و تحریم
    ========================================================================== */
 
-// فهرست کامل مدل‌های قابل انتخاب Gemini
+// فهرست پیش‌فرض مدل‌های رسمی و استاندارد Google Gemini
 var GEMINI_AVAILABLE_MODELS = [
   { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (پیشنهادی - سریع و دقیق)' },
   { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (تحلیل پیشرفته اسناد و قوانین)' },
-  { id: 'gemini-2.5-flash-lite-preview-06-17', label: 'Gemini 2.5 Flash Lite (فوق سریع و کم‌مصرف)' },
+  { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite (فوق سریع و کم‌مصرف)' },
   { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash (پایدار و چندرسانه‌ای)' },
   { id: 'gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash Lite (سبک)' },
   { id: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro (نسل ۱.۵ حرفه‌ای)' },
   { id: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash (نسل ۱.۵ سریع)' },
-  { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash (نسخه سفارشی سامانه)' }
+  { id: 'gemini-1.5-flash-8b', label: 'Gemini 1.5 Flash-8B (فوق سبک)' }
 ];
 
 var aiOnlineStatus = {
@@ -41,11 +41,22 @@ var aiPendingImageBase64 = null;
 var aiPendingImageMime = 'image/jpeg';
 var aiChatHistoryBuffer = [];
 
+// تشخیص اجرا روی GitHub Pages یا فایل محلی (بدون سرور بک‌اند Node.js)
+function isStaticHostEnvironment() {
+  var host = (window.location && window.location.hostname) ? window.location.hostname.toLowerCase() : '';
+  var proto = (window.location && window.location.protocol) ? window.location.protocol : '';
+  return proto === 'file:' || host.indexOf('github.io') !== -1 || host.indexOf('pages.dev') !== -1 || host.indexOf('netlify.app') !== -1;
+}
+
 // مدیریت مدل انتخابی کاربر در حافظه محلی
 function getStoredGeminiModel() {
   try {
     var saved = (localStorage.getItem('nezam_gemini_model') || '').trim();
-    return saved || 'gemini-2.5-flash';
+    // اصلاح خودکار نام مدل غیرموجود قدیمی
+    if (!saved || saved === 'gemini-3.8-flash') {
+      return 'gemini-2.5-flash';
+    }
+    return saved;
   } catch (e) {
     return 'gemini-2.5-flash';
   }
@@ -54,7 +65,7 @@ function getStoredGeminiModel() {
 function setStoredGeminiModel(modelId) {
   try {
     if (modelId && modelId.trim()) {
-      var cleanModel = modelId.trim();
+      var cleanModel = modelId.trim().replace(/^models\//, '');
       localStorage.setItem('nezam_gemini_model', cleanModel);
       aiOnlineStatus.model = cleanModel;
     }
@@ -62,12 +73,13 @@ function setStoredGeminiModel(modelId) {
 }
 
 function getModelDisplayLabel(modelId) {
+  var cleanId = (modelId || '').replace(/^models\//, '');
   for (var i = 0; i < GEMINI_AVAILABLE_MODELS.length; i++) {
-    if (GEMINI_AVAILABLE_MODELS[i].id === modelId) {
+    if (GEMINI_AVAILABLE_MODELS[i].id === cleanId) {
       return GEMINI_AVAILABLE_MODELS[i].label;
     }
   }
-  return modelId;
+  return cleanId;
 }
 
 // تغییر مدل توسط کاربر از طریق منوی کشویی
@@ -81,21 +93,20 @@ window.changeGeminiModel = function (modelId) {
   }
 };
 
-// ایجاد یا همگام‌سازی خودکار منوی انتخاب مدل در رابط کاربری (بدون نیاز به دستکاری HTML)
+// ایجاد یا همگام‌سازی خودکار منوی انتخاب مدل در رابط کاربری
 function ensureGeminiModelSelectorUI() {
   var existingSelect = document.getElementById('gemini-model-select');
   var currentModel = getStoredGeminiModel();
 
   if (existingSelect) {
     if (existingSelect.options.length === 0) {
-      for (var i = 0; i < GEMINI_AVAILABLE_MODELS.length; i++) {
-        var opt = document.createElement('option');
-        opt.value = GEMINI_AVAILABLE_MODELS[i].id;
-        opt.textContent = GEMINI_AVAILABLE_MODELS[i].label;
-        existingSelect.appendChild(opt);
+      populateModelSelectOptions(existingSelect, GEMINI_AVAILABLE_MODELS, currentModel);
+    } else {
+      existingSelect.value = currentModel;
+      if (!existingSelect.value && existingSelect.options.length > 0) {
+        existingSelect.selectedIndex = 0;
       }
     }
-    existingSelect.value = currentModel;
     if (!existingSelect.onchange) {
       existingSelect.onchange = function () {
         window.changeGeminiModel(this.value);
@@ -104,7 +115,6 @@ function ensureGeminiModelSelectorUI() {
     return;
   }
 
-  // اگر در HTML وجود نداشت، در کنار کادر کلید API یا توضیحات وضعیت تزریق می‌شود
   var keyInput = document.getElementById('gemini-custom-api-key');
   var statusDesc = document.getElementById('ai-online-status-desc');
   var targetContainer = keyInput ? (keyInput.closest('.input-group') || keyInput.parentElement) : statusDesc;
@@ -122,17 +132,9 @@ function ensureGeminiModelSelectorUI() {
     var select = document.createElement('select');
     select.id = 'gemini-model-select';
     select.className = 'form-select form-select-sm w-auto flex-grow-1';
-    select.style.maxWidth = '340px';
+    select.style.maxWidth = '360px';
 
-    for (var j = 0; j < GEMINI_AVAILABLE_MODELS.length; j++) {
-      var option = document.createElement('option');
-      option.value = GEMINI_AVAILABLE_MODELS[j].id;
-      option.textContent = GEMINI_AVAILABLE_MODELS[j].label;
-      if (GEMINI_AVAILABLE_MODELS[j].id === currentModel) {
-        option.selected = true;
-      }
-      select.appendChild(option);
-    }
+    populateModelSelectOptions(select, GEMINI_AVAILABLE_MODELS, currentModel);
 
     select.onchange = function () {
       window.changeGeminiModel(this.value);
@@ -144,9 +146,125 @@ function ensureGeminiModelSelectorUI() {
   }
 }
 
-// ارسال درخواست مستقیم به Google Gemini API با قابلیت سوییچ خودکار روی مدل‌های جایگزین در صورت خطا
+function populateModelSelectOptions(selectEl, modelsList, selectedId) {
+  if (!selectEl) return;
+  selectEl.innerHTML = '';
+  var foundSelected = false;
+  for (var i = 0; i < modelsList.length; i++) {
+    var opt = document.createElement('option');
+    opt.value = modelsList[i].id;
+    opt.textContent = modelsList[i].label;
+    if (modelsList[i].id === selectedId) {
+      opt.selected = true;
+      foundSelected = true;
+    }
+    selectEl.appendChild(opt);
+  }
+  if (!foundSelected && selectEl.options.length > 0) {
+    selectEl.options[0].selected = true;
+    setStoredGeminiModel(selectEl.options[0].value);
+  }
+}
+
+// ترجمه دقیق خطاهای سرور گوگل به راهنمای فارسی
+function translateGeminiErrorToPersian(errMsg, status, apiKey) {
+  var msg = String(errMsg || '');
+  var cleanKey = (apiKey || '').trim();
+
+  if (cleanKey && cleanKey.indexOf('AIza') !== 0) {
+    return (
+      'کلید وارد شده (' +
+      escapeHtml(cleanKey.substring(0, 8)) +
+      '...) فرمت استاندارد Google AI Studio را ندارد. ' +
+      'کلیدهای معتبر جمینای ۳۹ کاراکتری بوده و حتماً با حروف <b><code>AIzaSy</code></b> شروع می‌شوند. ' +
+      'لطفاً وارد سایت <a href="https://aistudio.google.com/apikey" target="_blank" class="fw-bold text-danger text-decoration-underline">aistudio.google.com/apikey</a> شوید و روی دکمه <b>Create API key</b> کلیک کنید.'
+    );
+  }
+
+  if (status === 400 && /API_KEY_INVALID|key not valid|invalid argument/i.test(msg)) {
+    return 'کلید API وارد شده معتبر نیست یا منقضی شده است. لطفاً کلید جدیدی (شروع‌شونده با AIzaSy) از Google AI Studio دریافت و بدون فاصله اضافی کپی نمایید.';
+  }
+
+  if (status === 403 || /User location is not supported|location is not supported|PERMISSION_DENIED/i.test(msg)) {
+    return 'محدودیت جغرافیایی گوگل (آی‌پی ایران): سرور گوگل دسترسی مستقیم با آی‌پی ایران را مسدود کرده است. لطفاً سرویس <b>DNS شکن (Shecan)</b> یا ابزار تغییر آی‌پی خود را روشن کرده و مجدداً دکمه تست را بزنید.';
+  }
+
+  if (status === 429 || /RESOURCE_EXHAUSTED|quota|rate limit/i.test(msg)) {
+    return 'سهمیه لحظه‌ای (Rate Limit) این مدل در حساب رایگان گوگل پر شده است. لطفاً از منوی کشویی نسخه دیگری (مثلاً <code>Gemini 2.0 Flash</code> یا <code>Gemini 1.5 Flash</code>) را انتخاب نمایید.';
+  }
+
+  if (status === 404 || /not found|is not supported for generateContent/i.test(msg)) {
+    return 'مدل انتخاب‌شده در این نسخه از API یافت نشد. لطفاً از منوی کشویی، مدل دیگری (مانند <code>Gemini 2.5 Flash</code> یا <code>Gemini 2.0 Flash</code>) را انتخاب کنید.';
+  }
+
+  if (/Failed to fetch|NetworkError|Load failed/i.test(msg)) {
+    return 'عدم برقراری ارتباط شبکه با سرور گوگل (generativelanguage.googleapis.com). لطفاً اتصال اینترنت و روشن بودن DNS شکن یا فیلترشکن خود را بررسی فرمایید.';
+  }
+
+  return msg || 'خطای ناشناخته در ارتباط با سرور Gemini';
+}
+
+// دریافت خودکار لیست مدل‌های مجاز حساب کاربر از سرور گوگل
+async function fetchAvailableModelsFromGoogle(apiKey) {
+  var listUrl = 'https://generativelanguage.googleapis.com/v1beta/models?key=' + encodeURIComponent(apiKey);
+  var resp = await fetch(listUrl, { method: 'GET' });
+  if (!resp.ok) {
+    var errData = await resp.json().catch(function () { return {}; });
+    var rawMsg = (errData && errData.error && errData.error.message) ? errData.error.message : ('HTTP ' + resp.status);
+    var err = new Error(translateGeminiErrorToPersian(rawMsg, resp.status, apiKey));
+    err.status = resp.status;
+    err.rawMessage = rawMsg;
+    throw err;
+  }
+
+  var data = await resp.json();
+  if (data && Array.isArray(data.models)) {
+    var dynamicModels = [];
+    for (var i = 0; i < data.models.length; i++) {
+      var m = data.models[i];
+      var methods = m.supportedGenerationMethods || [];
+      var shortId = (m.name || '').replace(/^models\//, '');
+      // فیلتر کردن مدل‌های متنی و چندرسانه‌ای جمینای که از generateContent پشتیبانی می‌کنند
+      if (
+        shortId.indexOf('gemini-') === 0 &&
+        methods.indexOf('generateContent') !== -1 &&
+        shortId.indexOf('embedding') === -1 &&
+        shortId.indexOf('aqa') === -1
+      ) {
+        dynamicModels.push({
+          id: shortId,
+          label: getModelDisplayLabel(shortId) !== shortId
+            ? getModelDisplayLabel(shortId)
+            : (m.displayName ? m.displayName + ' (' + shortId + ')' : shortId)
+        });
+      }
+    }
+
+    if (dynamicModels.length > 0) {
+      // اولویت دادن به مدل‌های پرکاربرد در صدر لیست
+      dynamicModels.sort(function (a, b) {
+        var priority = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+        var idxA = priority.indexOf(a.id);
+        var idxB = priority.indexOf(b.id);
+        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+        if (idxA !== -1) return -1;
+        if (idxB !== -1) return 1;
+        return a.id.localeCompare(b.id);
+      });
+
+      GEMINI_AVAILABLE_MODELS = dynamicModels;
+      var selEl = document.getElementById('gemini-model-select');
+      if (selEl) {
+        populateModelSelectOptions(selEl, GEMINI_AVAILABLE_MODELS, getStoredGeminiModel());
+      }
+    }
+  }
+  return true;
+}
+
+// ارسال درخواست مستقیم به Google Gemini API با قابلیت سوییچ خودکار روی مدل‌های جایگزین
 async function fetchDirectGeminiWithFallback(apiKey, payload, preferredModel) {
-  var primaryModel = preferredModel || getStoredGeminiModel() || 'gemini-2.5-flash';
+  var primaryModel = (preferredModel || getStoredGeminiModel() || 'gemini-2.5-flash').replace(/^models\//, '');
   var fallbackQueue = [
     primaryModel,
     'gemini-2.5-flash',
@@ -155,10 +273,16 @@ async function fetchDirectGeminiWithFallback(apiKey, payload, preferredModel) {
     'gemini-1.5-pro'
   ];
 
-  // حذف مدل‌های تکراری در صف امتحان
+  // افزودن مدل‌های دریافت‌شده از حساب کاربر به صف پشتیبان
+  for (var d = 0; d < GEMINI_AVAILABLE_MODELS.length; d++) {
+    if (fallbackQueue.indexOf(GEMINI_AVAILABLE_MODELS[d].id) === -1) {
+      fallbackQueue.push(GEMINI_AVAILABLE_MODELS[d].id);
+    }
+  }
+
   var uniqueModels = [];
   for (var i = 0; i < fallbackQueue.length; i++) {
-    if (uniqueModels.indexOf(fallbackQueue[i]) === -1) {
+    if (fallbackQueue[i] && uniqueModels.indexOf(fallbackQueue[i]) === -1) {
       uniqueModels.push(fallbackQueue[i]);
     }
   }
@@ -191,19 +315,27 @@ async function fetchDirectGeminiWithFallback(apiKey, payload, preferredModel) {
         var errData = await resp.json().catch(function () {
           return {};
         });
-        var errMsg =
+        var rawMsg =
           errData && errData.error && errData.error.message
             ? errData.error.message
             : 'کد خطا ' + resp.status;
-        lastError = new Error(errMsg);
 
-        // اگر کلید API نامعتبر است (400/403 مربوط به API_KEY_INVALID)، نیازی به تست سایر مدل‌ها نیست
-        if (resp.status === 400 && /API_KEY_INVALID|key not valid/i.test(errMsg)) {
+        var friendlyMsg = translateGeminiErrorToPersian(rawMsg, resp.status, apiKey);
+        lastError = new Error(friendlyMsg);
+
+        // اگر کلید نامعتبر است یا آی‌پی مسدود است، نیازی به تست سایر مدل‌ها نیست
+        if (
+          resp.status === 400 && /API_KEY_INVALID|key not valid/i.test(rawMsg) ||
+          resp.status === 403 ||
+          /location is not supported/i.test(rawMsg) ||
+          apiKey.indexOf('AIza') !== 0
+        ) {
           break;
         }
       }
     } catch (netErr) {
-      lastError = netErr;
+      lastError = new Error(translateGeminiErrorToPersian(netErr.message, 0, apiKey));
+      break;
     }
   }
 
@@ -245,7 +377,7 @@ window.saveCustomGeminiKey = async function () {
   }
   setStoredGeminiApiKey(key);
   if (typeof showToastMsg === 'function') {
-    showToastMsg('⏳ در حال بررسی و اتصال به Google Gemini API...');
+    showToastMsg('⏳ در حال بررسی کلید و دریافت لیست مدل‌های Google Gemini...');
   }
   await testCustomGeminiKey();
 };
@@ -264,6 +396,7 @@ window.clearCustomGeminiKey = function () {
 };
 
 window.testCustomGeminiKey = async function () {
+  ensureGeminiModelSelectorUI();
   var key = getStoredGeminiApiKey();
   var inp = document.getElementById('gemini-custom-api-key');
   if (inp && inp.value.trim()) {
@@ -283,24 +416,49 @@ window.testCustomGeminiKey = async function () {
     if (fb) {
       fb.className = 'small mt-2 alert alert-warning py-1 px-2';
       fb.style.display = 'block';
-      fb.innerHTML = '⚠️ هنوز کلیدی وارد نشده است. لطفاً کلید دریافتی از Google AI Studio را درج نمایید.';
+      fb.innerHTML = '⚠️ هنوز کلیدی وارد نشده است. لطفاً کلید دریافتی از Google AI Studio (شروع‌شونده با <code>AIzaSy</code>) را درج نمایید.';
     }
+    return false;
+  }
+
+  // بررسی اولیه فرمت کلید پیش از ارسال
+  if (key.indexOf('AIza') !== 0) {
+    var formatErr = translateGeminiErrorToPersian('API_KEY_INVALID', 400, key);
+    if (fb) {
+      fb.className = 'small mt-2 alert alert-danger py-2 px-3';
+      fb.style.display = 'block';
+      fb.innerHTML = '❌ <b>فرمت کلید نامعتبر است:</b><br>' + formatErr;
+    }
+    if (pill) {
+      pill.className = 'badge bg-danger p-2';
+      pill.innerHTML = '🔴 کلید نامعتبر (باید با AIza شروع شود)';
+    }
+    updateAiBadgeStatus(false);
     return false;
   }
 
   if (fb) {
     fb.className = 'small mt-2 alert alert-info py-1 px-2';
     fb.style.display = 'block';
-    fb.innerHTML = '⏳ در حال تست اتصال مستقیم به Google Gemini API (مدل <code>' + escapeHtml(selectedModel) + '</code>)...';
+    fb.innerHTML = '⏳ در حال استعلام مدل‌های فعال و تست اتصال به Google Gemini API...';
   }
 
-  // ۱. تست مستقیم اتصال به Google Gemini API (با پشتیبانی از Fallback خودکار مدل‌ها)
+  var directErrorMsg = '';
+
+  // ۱. استعلام لیست مدل‌ها و تست مستقیم اتصال به Google Gemini API
   try {
+    await fetchAvailableModelsFromGoogle(key);
+
+    // به‌روزرسانی مدل انتخابی پس از دریافت لیست مدل‌های واقعی گوگل
+    if (selEl && selEl.value) {
+      selectedModel = selEl.value;
+    }
+
     var testResult = await fetchDirectGeminiWithFallback(
       key,
       {
-        contents: [{ parts: [{ text: 'پینگ سلامت' }] }],
-        generationConfig: { maxOutputTokens: 10 },
+        contents: [{ parts: [{ text: 'سلام' }] }],
+        generationConfig: { maxOutputTokens: 5 },
       },
       selectedModel
     );
@@ -311,25 +469,19 @@ window.testCustomGeminiKey = async function () {
       setStoredGeminiModel(activeModel);
       if (selEl) selEl.value = activeModel;
 
-      var switchedNotice =
-        activeModel !== selectedModel
-          ? ' <span class="text-muted">(مدل انتخابی در دسترس نبود؛ به صورت هوشمند روی <code>' +
-            escapeHtml(activeModel) +
-            '</code> تنظیم شد)</span>'
-          : '';
-
       if (fb) {
         fb.className = 'small mt-2 alert alert-success py-1 px-2 fw-bold';
         fb.style.display = 'block';
         fb.innerHTML =
-          '✅ اتصال به Gemini API با مدل <code>' +
+          '✅ اتصال به Google Gemini API با موفقیت برقرار شد! (مدل فعال: <code>' +
           escapeHtml(activeModel) +
-          '</code> برقرار شد! هوش مصنوعی آنلاین و خوانش اسناد فعال گردید.' +
-          switchedNotice;
+          '</code> - ' +
+          GEMINI_AVAILABLE_MODELS.length +
+          ' نسخه جمینای آماده انتخاب است).';
       }
       if (pill) {
         pill.className = 'badge bg-success p-2';
-        pill.innerHTML = '🟢 کلید اختصاصی متصل است (' + escapeHtml(activeModel) + ')';
+        pill.innerHTML = '🟢 متصل (' + escapeHtml(activeModel) + ')';
       }
       aiOnlineStatus.isOnline = true;
       aiOnlineStatus.userKeyActive = true;
@@ -338,59 +490,71 @@ window.testCustomGeminiKey = async function () {
       return true;
     }
   } catch (directErr) {
-    console.warn('Direct Google API test failed, testing proxy server...', directErr);
+    directErrorMsg = directErr.message || String(directErr);
+    console.warn('Direct Google API test error:', directErr);
   }
 
-  // ۲. تست از طریق سرور محلی (پروکسی Express)
-  try {
-    var proxyResp = await fetch('/api/ai/test-key', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-gemini-api-key': key,
-        'x-gemini-model': selectedModel,
-      },
-      body: JSON.stringify({ apiKey: key, model: selectedModel }),
-    });
+  // ۲. اگر سایت روی سرور محلی (غیر از GitHub Pages) اجرا شده باشد، پروکسی داخلی را هم بررسی کن
+  if (!isStaticHostEnvironment()) {
+    try {
+      var proxyResp = await fetch('/api/ai/test-key', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-gemini-api-key': key,
+          'x-gemini-model': selectedModel,
+        },
+        body: JSON.stringify({ apiKey: key, model: selectedModel }),
+      });
 
-    if (proxyResp.ok) {
-      setStoredGeminiApiKey(key);
-      if (fb) {
-        fb.className = 'small mt-2 alert alert-success py-1 px-2 fw-bold';
-        fb.style.display = 'block';
-        fb.innerHTML = '✅ اتصال از طریق سرور سامانه با مدل <code>' + escapeHtml(selectedModel) + '</code> با موفقیت تأیید شد.';
+      if (proxyResp.ok) {
+        setStoredGeminiApiKey(key);
+        if (fb) {
+          fb.className = 'small mt-2 alert alert-success py-1 px-2 fw-bold';
+          fb.style.display = 'block';
+          fb.innerHTML = '✅ اتصال از طریق سرور سامانه با مدل <code>' + escapeHtml(selectedModel) + '</code> با موفقیت تأیید شد.';
+        }
+        if (pill) {
+          pill.className = 'badge bg-success p-2';
+          pill.innerHTML = '🟢 کلید اختصاصی متصل است';
+        }
+        aiOnlineStatus.isOnline = true;
+        aiOnlineStatus.userKeyActive = true;
+        aiOnlineStatus.model = selectedModel;
+        updateAiBadgeStatus(true);
+        return true;
       }
-      if (pill) {
-        pill.className = 'badge bg-success p-2';
-        pill.innerHTML = '🟢 کلید اختصاصی متصل است';
-      }
-      aiOnlineStatus.isOnline = true;
-      aiOnlineStatus.userKeyActive = true;
-      aiOnlineStatus.model = selectedModel;
-      updateAiBadgeStatus(true);
-      return true;
-    } else {
-      var pData = await proxyResp.json().catch(function () { return {}; });
-      throw new Error(pData.error || 'خطا در ارتباط با سرور');
+    } catch (proxyErr) {
+      // نادیده گرفتن خطای پروکسی و نمایش خطای اصلی گوگل
     }
-  } catch (e) {
-    if (fb) {
-      fb.className = 'small mt-2 alert alert-danger py-1 px-2 fw-bold';
-      fb.style.display = 'block';
-      fb.innerHTML = '❌ خطا در اتصال به Gemini API: ' + (e.message || 'ارتباط با سرور برقرار نشد.') + '<br>لطفاً اتصال اینترنت، نسخه مدل یا صحت کلید را بررسی فرمایید.';
-    }
-    if (pill) {
-      pill.className = 'badge bg-danger p-2';
-      pill.innerHTML = '🔴 خطا در اتصال کلید';
-    }
-    return false;
   }
+
+  // نمایش دقیق علت خطا به کاربر
+  if (fb) {
+    fb.className = 'small mt-2 alert alert-danger py-2 px-3';
+    fb.style.display = 'block';
+    fb.innerHTML = '❌ <b>خطا در اتصال به Gemini API:</b><br>' + (directErrorMsg || 'ارتباط با سرور گوگل برقرار نشد.');
+  }
+  if (pill) {
+    pill.className = 'badge bg-danger p-2';
+    pill.innerHTML = '🔴 خطا در اتصال کلید';
+  }
+  aiOnlineStatus.isOnline = false;
+  updateAiBadgeStatus(false);
+  return false;
 };
 
 window.addEventListener('DOMContentLoaded', function () {
   ensureGeminiModelSelectorUI();
   checkAiServerStatus();
 });
+
+// بررسی مداوم برای اطمینان از وجود منوی انتخاب مدل در تب‌های پویا
+setInterval(function () {
+  if (!document.getElementById('gemini-model-select')) {
+    ensureGeminiModelSelectorUI();
+  }
+}, 2000);
 
 // بررسی خودکار در دسترس بودن سرور آنلاین و کلید جمینای
 async function checkAiServerStatus() {
@@ -406,8 +570,8 @@ async function checkAiServerStatus() {
 
   var pill = document.getElementById('gemini-key-status-pill');
 
-  // اگر کلید اختصاصی در حافظه موجود باشد
-  if (userKey) {
+  // اگر کلید استاندارد در حافظه موجود باشد، لیست مدل‌ها را در پس‌زمینه همگام کن
+  if (userKey && userKey.indexOf('AIza') === 0) {
     aiOnlineStatus.isOnline = true;
     aiOnlineStatus.userKeyActive = true;
     if (pill) {
@@ -415,15 +579,16 @@ async function checkAiServerStatus() {
       pill.innerHTML = '🟢 کلید اختصاصی فعال است (' + escapeHtml(currentModel) + ')';
     }
     updateAiBadgeStatus(true);
+    fetchAvailableModelsFromGoogle(userKey).catch(function () {});
     return;
   }
 
-  // اگر کاربر برنامه را با file:// اجرا کرده باشد و کلیدی تنظیم نکرده باشد
-  if (window.location.protocol === 'file:') {
+  // اگر روی GitHub Pages یا file:// هستیم و کلید معتبری تنظیم نشده
+  if (isStaticHostEnvironment()) {
     aiOnlineStatus.isOnline = false;
     if (pill) {
       pill.className = 'badge bg-warning text-dark p-2';
-      pill.innerHTML = '🟡 کلید تنظیم نشده';
+      pill.innerHTML = userKey ? '🔴 فرمت کلید نامعتبر است' : '🟡 کلید تنظیم نشده';
     }
     updateAiBadgeStatus(false);
     return;
@@ -447,7 +612,7 @@ async function checkAiServerStatus() {
     if (res.ok) {
       var data = await res.json();
       aiOnlineStatus.isOnline = Boolean(data.online && (data.hasApiKey || data.hasServerKey));
-      aiOnlineStatus.model = localStorage.getItem('nezam_gemini_model') || data.model || 'gemini-2.5-flash';
+      aiOnlineStatus.model = getStoredGeminiModel() || data.model || 'gemini-2.5-flash';
       aiOnlineStatus.searchGrounding = Boolean(data.searchGrounding);
       aiOnlineStatus.checked = true;
 
@@ -469,18 +634,10 @@ async function checkAiServerStatus() {
       updateAiBadgeStatus(aiOnlineStatus.isOnline);
     } else {
       aiOnlineStatus.isOnline = false;
-      if (pill) {
-        pill.className = 'badge bg-warning text-dark p-2';
-        pill.innerHTML = '🟡 کلید تنظیم نشده';
-      }
       updateAiBadgeStatus(false);
     }
   } catch (e) {
     aiOnlineStatus.isOnline = false;
-    if (pill) {
-      pill.className = 'badge bg-warning text-dark p-2';
-      pill.innerHTML = '🟡 کلید تنظیم نشده';
-    }
     updateAiBadgeStatus(false);
   }
 }
@@ -510,14 +667,14 @@ function updateAiBadgeStatus(online) {
       statusDesc.className = 'alert alert-success small mb-3 border-success';
       statusDesc.innerHTML =
         '✨ <b>هوش مصنوعی پیشرفته آنلاین متصل است:</b> مدل <code>' +
-        escapeHtml( getModelDisplayLabel(activeModel) ) +
+        escapeHtml(getModelDisplayLabel(activeModel)) +
         '</code> ' +
         (hasCustomKey ? 'با <b>کلید اختصاصی شما</b> ' : 'از طریق سرور مرکز ۶۳۶ ') +
         'به همراه جستجوی زنده ضوابط وزارت جهاد کشاورزی و نظام مهندسی فعال است. کلیه اسناد و سوالات آنلاین تحلیل می‌شوند.';
     } else {
       statusDesc.className = 'alert alert-info small mb-3';
       statusDesc.innerHTML =
-        '💡 <b>موتور هوشمند محلی (آفلاین):</b> در صورت قطعی اینترنت یا عدم تنظیم کلید، استخراج مشخصات متقاضی، کدملی، متراژ، زون و مختصات UTM به صورت ۱۰۰٪ آفلاین انجام می‌گیرد. برای فعال‌سازی کامل آنلاین، کلید Gemini API خود را در کادر بالا وارد فرمایید.';
+        '💡 <b>موتور هوشمند محلی (آفلاین):</b> در صورت قطعی اینترنت یا عدم تنظیم کلید، استخراج مشخصات متقاضی، کدملی، متراژ، زون و مختصات UTM به صورت ۱۰۰٪ آفلاین انجام می‌گیرد. برای فعال‌سازی کامل آنلاین، کلید استاندارد Gemini API (شروع‌شونده با <code>AIzaSy</code>) را در کادر بالا وارد فرمایید.';
     }
   }
 
@@ -646,7 +803,7 @@ function aiHandleImageSelect(input) {
   reader.readAsDataURL(file);
 }
 
-// خوانش و تحلیل هوشمند سند با Gemini (آنلاین با کلید و مدل انتخابی + پشتیبان آفلاین)
+// خوانش و تحلیل هوشمند سند با Gemini (مستقیم + سرور + پشتیبان آفلاین)
 async function aiReadDocumentImagePro() {
   if (!aiPendingImageBase64) {
     alert('ابتدا یک تصویر از سند، قولنامه یا نقشه UTM انتخاب نمایید.');
@@ -664,44 +821,8 @@ async function aiReadDocumentImagePro() {
     showToastMsg('⏳ در حال خوانش تصویر سند و استخراج مختصات UTM با مدل ' + selectedModel + '...');
   }
 
-  // ۱. ارسال به سرور با کلید و مدل انتخابی کاربر
-  try {
-    var headers = {
-      'Content-Type': 'application/json',
-      'x-gemini-model': selectedModel,
-    };
-    if (userKey) headers['x-gemini-api-key'] = userKey;
-
-    var res = await fetch('/api/ai/ocr-extract', {
-      method: 'POST',
-      headers: headers,
-      body: JSON.stringify({
-        imageBase64: aiPendingImageBase64,
-        mimeType: aiPendingImageMime,
-        rawText: rawTextEl ? rawTextEl.value : '',
-        apiKey: userKey,
-        model: selectedModel,
-      }),
-    });
-
-    if (res.ok) {
-      var result = await res.json();
-      if (result && result.success && result.data) {
-        applyOcrDataToCase(result.data, rawTextEl);
-        updateAiBadgeStatus(true);
-        if (typeof showToastMsg === 'function') {
-          showToastMsg('✅ مشخصات سند و نقاط UTM با موفقیت استخراج و بارگذاری شد.');
-        }
-        if (btn) btn.innerHTML = originalBtnText;
-        return;
-      }
-    }
-  } catch (srvErr) {
-    console.warn('Server OCR endpoint failed, trying direct Google API...', srvErr);
-  }
-
-  // ۲. فراخوانی مستقیم Google Gemini API با پشتیبانی از همه مدل‌ها و Fallback خودکار
-  if (userKey) {
+  // ۱. فراخوانی مستقیم Google Gemini API در صورت وجود کلید کاربر
+  if (userKey && userKey.indexOf('AIza') === 0) {
     try {
       var cleanBase64 =
         aiPendingImageBase64.indexOf(',') !== -1
@@ -729,14 +850,13 @@ async function aiReadDocumentImagePro() {
       if (directOcrResult && directOcrResult.ok) {
         var dResult = directOcrResult.data;
         var rawJson = dResult.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
-        // پاک‌سازی احتمالی بلاک‌های markdown
         rawJson = rawJson.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
         var parsed = JSON.parse(rawJson);
         aiOnlineStatus.model = directOcrResult.usedModel || selectedModel;
         applyOcrDataToCase(parsed, rawTextEl);
         updateAiBadgeStatus(true);
         if (typeof showToastMsg === 'function') {
-          showToastMsg('✅ مشخصات با اتصال مستقیم به ' + aiOnlineStatus.model + ' استخراج شد.');
+          showToastMsg('✅ مشخصات سند با مدل ' + aiOnlineStatus.model + ' استخراج شد.');
         }
         if (btn) btn.innerHTML = originalBtnText;
         return;
@@ -746,9 +866,47 @@ async function aiReadDocumentImagePro() {
     }
   }
 
-  // ۳. در صورت عدم موفقیت آنلاین، موتور پشتیبان آفلاین فعال می‌شود
+  // ۲. ارسال به سرور محلی (در صورتی که روی GitHub Pages نباشد)
+  if (!isStaticHostEnvironment()) {
+    try {
+      var headers = {
+        'Content-Type': 'application/json',
+        'x-gemini-model': selectedModel,
+      };
+      if (userKey) headers['x-gemini-api-key'] = userKey;
+
+      var res = await fetch('/api/ai/ocr-extract', {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify({
+          imageBase64: aiPendingImageBase64,
+          mimeType: aiPendingImageMime,
+          rawText: rawTextEl ? rawTextEl.value : '',
+          apiKey: userKey,
+          model: selectedModel,
+        }),
+      });
+
+      if (res.ok) {
+        var result = await res.json();
+        if (result && result.success && result.data) {
+          applyOcrDataToCase(result.data, rawTextEl);
+          updateAiBadgeStatus(true);
+          if (typeof showToastMsg === 'function') {
+            showToastMsg('✅ مشخصات سند و نقاط UTM با موفقیت استخراج و بارگذاری شد.');
+          }
+          if (btn) btn.innerHTML = originalBtnText;
+          return;
+        }
+      }
+    } catch (srvErr) {
+      console.warn('Server OCR endpoint failed:', srvErr);
+    }
+  }
+
+  // ۳. پشتیبان آفلاین
   if (typeof showToastMsg === 'function') {
-    showToastMsg('⚠️ سرور آنلاین در دسترس نبود؛ موتور آفلاین فعال گردید.');
+    showToastMsg('⚠️ ارتباط آنلاین برقرار نشد؛ استخراج آفلاین از متن انجام گردید.');
   }
   aiExtractFromRawText();
   if (btn) btn.innerHTML = originalBtnText;
@@ -808,7 +966,6 @@ function aiExtractFromRawText() {
   }
   var data = localOfflineExtractFields(rawText);
 
-  // انتقال اطلاعات استخراج‌شده به فرم پرونده متقاضی
   if (document.getElementById('c-name') && data.name) document.getElementById('c-name').value = data.name;
   if (document.getElementById('c-nid') && data.nid) document.getElementById('c-nid').value = typeof toFa === 'function' ? toFa(data.nid) : data.nid;
   if (document.getElementById('c-mobile') && data.mobile) document.getElementById('c-mobile').value = typeof toFa === 'function' ? toFa(data.mobile) : data.mobile;
@@ -839,7 +996,7 @@ function aiRunFullAutopilotPipeline() {
   }, 200);
 }
 
-// چت‌بات آنلاین با پشتیبانی از انتخاب مدل، Google Search Grounding و پشتیبان آفلاین
+// چت‌بات آنلاین با پشتیبانی از تمامی مدل‌های Gemini و پشتیبان آفلاین
 async function aiSendChatMessage() {
   var input = document.getElementById('ai-chat-input');
   var history = document.getElementById('ai-chat-history');
@@ -857,89 +1014,14 @@ async function aiSendChatMessage() {
   var userKey = getStoredGeminiApiKey();
   var selectedModel = getStoredGeminiModel();
 
-  // پیام در حال پردازش ربات
   var botLoadingDiv = document.createElement('div');
   botLoadingDiv.className = 'p-2 mb-2 rounded bg-white border text-secondary small';
-  botLoadingDiv.innerHTML = '🤖 <i>در حال ارتباط و جستجوی پاسخ با مدل هوشمند <code>' + escapeHtml(selectedModel) + '</code>...</i>';
+  botLoadingDiv.innerHTML = '🤖 <i>در حال ارتباط و دریافت پاسخ از مدل <code>' + escapeHtml(selectedModel) + '</code>...</i>';
   history.appendChild(botLoadingDiv);
   history.scrollTop = history.scrollHeight;
 
-  // ۱. فراخوانی از طریق سرور محلی با کلید و مدل انتخابی کاربر
-  try {
-    var headers = {
-      'Content-Type': 'application/json',
-      'x-gemini-model': selectedModel,
-    };
-    if (userKey) headers['x-gemini-api-key'] = userKey;
-
-    var res = await fetch('/api/ai/chat', {
-      method: 'POST',
-      headers: headers,
-      body: JSON.stringify({
-        message: q,
-        history: aiChatHistoryBuffer,
-        apiKey: userKey,
-        model: selectedModel,
-      }),
-    });
-
-    if (res.ok) {
-      var data = await res.json();
-      if (data && data.text) {
-        aiChatHistoryBuffer.push({ role: 'user', text: q });
-        aiChatHistoryBuffer.push({ role: 'model', text: data.text });
-
-        var formattedText = formatMarkdownToHtml(data.text);
-        var modelUsed = data.model || selectedModel;
-
-        // درج منابع جستجوی گوگل (Search Grounding Sources)
-        var sourcesHtml = '';
-        if (data.groundingChunks && data.groundingChunks.length > 0) {
-          var links = [];
-          for (var i = 0; i < data.groundingChunks.length; i++) {
-            var chunk = data.groundingChunks[i];
-            if (chunk && chunk.web && chunk.web.uri) {
-              var title = chunk.web.title || chunk.web.uri;
-              links.push(
-                '<a href="' +
-                  escapeHtml(chunk.web.uri) +
-                  '" target="_blank" rel="noopener noreferrer" class="badge bg-light text-primary text-truncate border me-1 my-1 d-inline-block" style="max-width:240px;" title="' +
-                  escapeHtml(title) +
-                  '">🔗 ' +
-                  escapeHtml(title) +
-                  '</a>'
-              );
-            }
-          }
-          if (links.length > 0) {
-            sourcesHtml =
-              '<div class="mt-2 pt-2 border-top small text-muted">' +
-              '<div class="fw-bold mb-1">🔍 منابع مستند و جستجوی برخط ضوابط:</div>' +
-              links.join(' ') +
-              '</div>';
-          }
-        }
-
-        botLoadingDiv.className = 'p-2 mb-2 rounded bg-white border text-dark shadow-sm';
-        botLoadingDiv.innerHTML =
-          '<div class="d-flex justify-content-between align-items-center mb-1">' +
-          '<b class="text-success">🤖 کارشناس هوشمند مرکز ۶۳۶ (' + escapeHtml(modelUsed) + '):</b>' +
-          '<span class="badge bg-success-subtle text-success border border-success-subtle" style="font-size:10px;">🌐 متصل به وب</span>' +
-          '</div>' +
-          formattedText +
-          sourcesHtml;
-
-        history.scrollTop = history.scrollHeight;
-        updateAiBadgeStatus(true);
-        return;
-      }
-    }
-  } catch (err) {
-    console.warn('Server chat endpoint failed, attempting direct Gemini API call...', err);
-  }
-
-  // ۲. فراخوانی مستقیم Google Gemini API در صورت قطعی سرور یا حالت مستقل file://
-  if (userKey) {
+  // ۱. فراخوانی مستقیم Google Gemini API (سازگار با GitHub Pages و ویندوز)
+  if (userKey && userKey.indexOf('AIza') === 0) {
     try {
       var directContents = [];
       if (Array.isArray(aiChatHistoryBuffer)) {
@@ -1002,11 +1084,86 @@ async function aiSendChatMessage() {
         }
       }
     } catch (dirErr) {
-      console.warn('Direct Google Gemini API call failed:', dirErr);
+      console.warn('Direct Google Gemini API chat failed:', dirErr);
     }
   }
 
-  // ۳. اگر آنلاین نبود، پاسخ از پایگاه دانش محلی آفلاین تولید می‌شود
+  // ۲. فراخوانی از طریق سرور محلی (در صورتی که روی GitHub Pages نباشد)
+  if (!isStaticHostEnvironment()) {
+    try {
+      var headers = {
+        'Content-Type': 'application/json',
+        'x-gemini-model': selectedModel,
+      };
+      if (userKey) headers['x-gemini-api-key'] = userKey;
+
+      var res = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify({
+          message: q,
+          history: aiChatHistoryBuffer,
+          apiKey: userKey,
+          model: selectedModel,
+        }),
+      });
+
+      if (res.ok) {
+        var data = await res.json();
+        if (data && data.text) {
+          aiChatHistoryBuffer.push({ role: 'user', text: q });
+          aiChatHistoryBuffer.push({ role: 'model', text: data.text });
+
+          var formattedText = formatMarkdownToHtml(data.text);
+          var modelUsed = data.model || selectedModel;
+
+          var sourcesHtml = '';
+          if (data.groundingChunks && data.groundingChunks.length > 0) {
+            var links = [];
+            for (var i = 0; i < data.groundingChunks.length; i++) {
+              var chunk = data.groundingChunks[i];
+              if (chunk && chunk.web && chunk.web.uri) {
+                var title = chunk.web.title || chunk.web.uri;
+                links.push(
+                  '<a href="' +
+                    escapeHtml(chunk.web.uri) +
+                    '" target="_blank" rel="noopener noreferrer" class="badge bg-light text-primary text-truncate border me-1 my-1 d-inline-block" style="max-width:240px;" title="' +
+                    escapeHtml(title) +
+                    '">🔗 ' +
+                    escapeHtml(title) +
+                    '</a>'
+                );
+              }
+            }
+            if (links.length > 0) {
+              sourcesHtml =
+                '<div class="mt-2 pt-2 border-top small text-muted">' +
+                '<div class="fw-bold mb-1">🔍 منابع مستند و جستجوی برخط ضوابط:</div>' +
+                links.join(' ') +
+                '</div>';
+            }
+          }
+
+          botLoadingDiv.className = 'p-2 mb-2 rounded bg-white border text-dark shadow-sm';
+          botLoadingDiv.innerHTML =
+            '<div class="d-flex justify-content-between align-items-center mb-1">' +
+            '<b class="text-success">🤖 کارشناس هوشمند مرکز ۶۳۶ (' + escapeHtml(modelUsed) + '):</b>' +
+            '<span class="badge bg-success-subtle text-success border border-success-subtle" style="font-size:10px;">🌐 متصل به وب</span>' +
+            '</div>' +
+            formattedText +
+            sourcesHtml;
+
+          history.scrollTop = history.scrollHeight;
+          updateAiBadgeStatus(true);
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn('Server chat endpoint failed:', err);
+    }
+  }
+
+  // ۳. پاسخ از پایگاه دانش محلی آفلاین در صورت عدم اتصال آنلاین
   var respText = '';
   var qLower = q.toLowerCase();
   for (var kIdx = 0; kIdx < AI_KNOWLEDGE_BASE.length; kIdx++) {
@@ -1022,7 +1179,7 @@ async function aiSendChatMessage() {
 
   if (!respText) {
     respText =
-      'در مرکز خدمات کشاورزی ۶۳۶ خفر، پرونده‌ها در ۳ گروه اصلی (۱. گلخانه و قارچ، ۲. دام و طیور و شیلات، ۳. کلینیک و داروخانه گیاهپزشکی) رسیدگی می‌شوند. برای پاسخ دقیق، کلیدواژه طرح خود (مثل گوسفند، گلخانه، قارچ یا داروخانه) را قید بفرمایید یا اتصال سرور آنلاین را برقرار کنید.';
+      'در مرکز خدمات کشاورزی ۶۳۶ خفر، پرونده‌ها در ۳ گروه اصلی (۱. گلخانه و قارچ، ۲. دام و طیور و شیلات، ۳. کلینیک و داروخانه گیاهپزشکی) رسیدگی می‌شوند. برای پاسخ دقیق، کلیدواژه طرح خود (مثل گوسفند، گلخانه، قارچ یا داروخانه) را قید بفرمایید یا کلید معتبر Gemini (شروع‌شونده با AIzaSy) را وارد کنید.';
   }
 
   botLoadingDiv.className = 'p-2 mb-2 rounded bg-white border text-dark shadow-sm';
@@ -1049,14 +1206,10 @@ function escapeHtml(str) {
 function formatMarkdownToHtml(md) {
   if (!md) return '';
   var html = escapeHtml(md);
-  // تیترها
   html = html.replace(/^### (.*$)/gim, '<h6 class="fw-bold text-success mt-2 mb-1">$1</h6>');
   html = html.replace(/^## (.*$)/gim, '<h5 class="fw-bold text-primary mt-2 mb-1">$1</h5>');
-  // پررنگ
   html = html.replace(/\*\*(.*?)\*\*/gim, '<b>$1</b>');
-  // لیست‌ها
   html = html.replace(/^\s*[-*•]\s+(.*$)/gim, '<li class="me-3">$1</li>');
-  // خطوط جدید
   html = html.replace(/\n/g, '');
   return html;
 }
