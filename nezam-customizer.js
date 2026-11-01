@@ -1986,13 +1986,13 @@ function renderActiveLayerPointsTable() {
   if (valBox) {
     if (!valRes.valid) {
       valBox.className = "alert alert-danger py-2 px-3 small fw-bold mb-2";
-      valBox.innerHTML = "❌ خطای اعتبارسنجی مختصات:<br>" + valRes.errors.join("<br>");
+      valBox.innerHTML = "❌ خطای اعتبارسنجی مختصات:<br>" + valRes.errors.map(safeHtmlText).join("<br>");
     } else if (valRes.warnings.length) {
       valBox.className = "alert alert-warning py-2 px-3 small fw-bold mb-2";
-      valBox.innerHTML = "⚠️ هشدار مختصات:<br>" + valRes.warnings.join("<br>");
+      valBox.innerHTML = "⚠️ هشدار مختصات:<br>" + valRes.warnings.map(safeHtmlText).join("<br>");
     } else {
       valBox.className = "alert alert-success py-1 px-3 small fw-bold mb-2";
-      valBox.innerHTML = "✅ مختصات لایه «" + l.name + "» در زون " + defZone + " معتبر است (" + (isGeo ? "نمایش: طول و عرض جغرافیایی" : "نمایش: متریک UTM") + "). | مساحت: " + toFa(Math.round(g.area)) + " م.م (" + toFa(g.ha.toFixed(3)) + " هکتار) | محیط/طول: " + toFa(g.perim.toFixed(1)) + " متر";
+      valBox.innerHTML = "✅ مختصات لایه «" + safeHtmlText(l.name) + "» در زون " + safeHtmlText(defZone) + " معتبر است (" + (isGeo ? "نمایش: طول و عرض جغرافیایی" : "نمایش: متریک UTM") + "). | مساحت: " + toFa(Math.round(g.area)) + " م.م (" + toFa(g.ha.toFixed(3)) + " هکتار) | محیط/طول: " + toFa(g.perim.toFixed(1)) + " متر";
     }
   }
 
@@ -2004,14 +2004,14 @@ function renderActiveLayerPointsTable() {
     var valY = isGeo ? pt.lat : pt.y;
     var fieldX = isGeo ? "lng" : "x";
     var fieldY = isGeo ? "lat" : "y";
-    var zVal = pt.zone || defZone;
+    var zVal = /^(38R|39R|40R|41R)$/.test(pt.zone || "") ? pt.zone : defZone;
 
     html += '<tr>' +
       '<td class="fw-bold">' + toFa(i + 1) + '</td>' +
-      '<td><input type="text" class="form-control form-control-sm text-center fw-bold py-0" style="min-width:52px;" value="' + (pt.label || ("P" + (i + 1))) + '" onchange="updateLayerVertex(' + i + ',\'label\',this.value)"></td>' +
-      '<td><input type="number" step="any" class="form-control form-control-sm text-center font-monospace py-0" style="min-width:98px;" value="' + valX + '" onchange="updateLayerVertex(' + i + ',\'' + fieldX + '\',this.value)"></td>' +
-      '<td><input type="number" step="any" class="form-control form-control-sm text-center font-monospace py-0" style="min-width:98px;" value="' + valY + '" onchange="updateLayerVertex(' + i + ',\'' + fieldY + '\',this.value)"></td>' +
-      '<td><input type="number" step="any" class="form-control form-control-sm text-center font-monospace py-0" style="min-width:68px;" value="' + (pt.elev !== undefined ? pt.elev : 1285) + '" onchange="updateLayerVertex(' + i + ',\'elev\',this.value)"></td>' +
+      '<td><input type="text" class="form-control form-control-sm text-center fw-bold py-0" style="min-width:52px;" value="' + safeHtmlText(pt.label || ("P" + (i + 1))) + '" onchange="updateLayerVertex(' + i + ',\'label\',this.value)"></td>' +
+      '<td><input type="number" step="any" class="form-control form-control-sm text-center font-monospace py-0" style="min-width:98px;" value="' + safeHtmlText(valX) + '" onchange="updateLayerVertex(' + i + ',\'' + fieldX + '\',this.value)"></td>' +
+      '<td><input type="number" step="any" class="form-control form-control-sm text-center font-monospace py-0" style="min-width:98px;" value="' + safeHtmlText(valY) + '" onchange="updateLayerVertex(' + i + ',\'' + fieldY + '\',this.value)"></td>' +
+      '<td><input type="number" step="any" class="form-control form-control-sm text-center font-monospace py-0" style="min-width:68px;" value="' + safeHtmlText(pt.elev !== undefined ? pt.elev : 1285) + '" onchange="updateLayerVertex(' + i + ',\'elev\',this.value)"></td>' +
       '<td>' +
         '<select class="form-select form-select-sm text-center py-0 px-1 fw-bold" style="min-width:72px;" onchange="updateLayerVertex(' + i + ',\'zone\',this.value)">' +
           '<option value="38R" ' + (zVal === "38R" ? "selected" : "") + '>38R</option>' +
@@ -2174,6 +2174,13 @@ function buildMultiLayerSvgMarkup(m, svgW, svgH, forPrint) {
   for (var lIdx = 0; lIdx < m.layers.length; lIdx++) {
     var lyr = m.layers[lIdx];
     if (!lyr.visible || !lyr.points.length) continue;
+    var layerColor = safeHexColor(lyr.color, "#15803d");
+    var layerOpacity = Number(lyr.fillOpacity);
+    if (!Number.isFinite(layerOpacity)) layerOpacity = 0.25;
+    layerOpacity = Math.min(1, Math.max(0, layerOpacity));
+    var layerStrokeWidth = Number(lyr.strokeWidth);
+    if (!Number.isFinite(layerStrokeWidth)) layerStrokeWidth = 2.5;
+    layerStrokeWidth = Math.min(10, Math.max(0.5, layerStrokeWidth));
     var gLyr = computeUtmGeometry(lyr.points, lyr.geomType);
 
     if (lyr.geomType === "POLYGON" && lyr.points.length >= 3) {
@@ -2187,8 +2194,8 @@ function buildMultiLayerSvgMarkup(m, svgW, svgH, forPrint) {
       }
       var cx = Math.round(sumCx / lyr.points.length);
       var cy = Math.round(sumCy / lyr.points.length);
-      shapesHtml += '<polygon points="' + polyPts.join(" ") + '" fill="' + lyr.color + '" fill-opacity="' + (lyr.fillOpacity || 0.25) + '" stroke="' + lyr.color + '" stroke-width="' + (lyr.strokeWidth || 2.5) + '"/>';
-      shapesHtml += '<text x="' + cx + '" y="' + cy + '" fill="' + (forPrint ? lyr.color : "#fde047") + '" font-size="10.5" font-weight="bold" text-anchor="middle">' + lyr.name + ' (' + toFa(Math.round(gLyr.area)) + ' م.م)</text>';
+      shapesHtml += '<polygon points="' + polyPts.join(" ") + '" fill="' + layerColor + '" fill-opacity="' + layerOpacity + '" stroke="' + layerColor + '" stroke-width="' + layerStrokeWidth + '"/>';
+      shapesHtml += '<text x="' + cx + '" y="' + cy + '" fill="' + (forPrint ? layerColor : "#fde047") + '" font-size="10.5" font-weight="bold" text-anchor="middle">' + safeHtmlText(lyr.name) + ' (' + toFa(Math.round(gLyr.area)) + ' م.م)</text>';
 
       // نمایش طول اضلاع و نام رئوس
       for (var p2 = 0; p2 < lyr.points.length; p2++) {
@@ -2198,8 +2205,8 @@ function buildMultiLayerSvgMarkup(m, svgW, svgH, forPrint) {
         var dist = Math.sqrt(Math.pow(lyr.points[nxt].x - lyr.points[p2].x, 2) + Math.pow(lyr.points[nxt].y - lyr.points[p2].y, 2));
         var mx = Math.round((a.x + b.x) / 2);
         var my = Math.round((a.y + b.y) / 2);
-        shapesHtml += '<circle cx="' + a.x + '" cy="' + a.y + '" r="4.5" fill="#fff" stroke="' + lyr.color + '" stroke-width="2.5"/>';
-        shapesHtml += '<text x="' + (a.x + 6) + '" y="' + (a.y - 6) + '" fill="' + textColor + '" font-size="10.5" font-weight="bold">' + (lyr.points[p2].label || ("P" + (p2 + 1))) + '</text>';
+        shapesHtml += '<circle cx="' + a.x + '" cy="' + a.y + '" r="4.5" fill="#fff" stroke="' + layerColor + '" stroke-width="2.5"/>';
+        shapesHtml += '<text x="' + (a.x + 6) + '" y="' + (a.y - 6) + '" fill="' + textColor + '" font-size="10.5" font-weight="bold">' + safeHtmlText(lyr.points[p2].label || ("P" + (p2 + 1))) + '</text>';
         shapesHtml += '<text x="' + mx + '" y="' + (my - 4) + '" fill="' + (forPrint ? "#1e40af" : "#93c5fd") + '" font-size="9.5" font-weight="bold" text-anchor="middle">' + toFa(Math.round(dist)) + ' م</text>';
       }
     } else if (lyr.geomType === "LINE" && lyr.points.length >= 2) {
@@ -2207,14 +2214,14 @@ function buildMultiLayerSvgMarkup(m, svgW, svgH, forPrint) {
       for (var p3 = 0; p3 < lyr.points.length; p3++) {
         var s3 = toScreen(lyr.points[p3]);
         linePts.push(s3.x + "," + s3.y);
-        shapesHtml += '<circle cx="' + s3.x + '" cy="' + s3.y + '" r="3.5" fill="' + lyr.color + '"/>';
+        shapesHtml += '<circle cx="' + s3.x + '" cy="' + s3.y + '" r="3.5" fill="' + layerColor + '"/>';
       }
-      shapesHtml += '<polyline points="' + linePts.join(" ") + '" fill="none" stroke="' + lyr.color + '" stroke-width="' + (lyr.strokeWidth || 3) + '" stroke-dasharray="6,3"/>';
+      shapesHtml += '<polyline points="' + linePts.join(" ") + '" fill="none" stroke="' + layerColor + '" stroke-width="' + layerStrokeWidth + '" stroke-dasharray="6,3"/>';
     } else {
       for (var p4 = 0; p4 < lyr.points.length; p4++) {
         var s4 = toScreen(lyr.points[p4]);
-        shapesHtml += '<circle cx="' + s4.x + '" cy="' + s4.y + '" r="6" fill="' + lyr.color + '" stroke="#fff" stroke-width="2"/>';
-        shapesHtml += '<text x="' + (s4.x + 8) + '" y="' + (s4.y + 4) + '" fill="' + textColor + '" font-size="10.5" font-weight="bold">' + (lyr.points[p4].label || lyr.name) + '</text>';
+        shapesHtml += '<circle cx="' + s4.x + '" cy="' + s4.y + '" r="6" fill="' + layerColor + '" stroke="#fff" stroke-width="2"/>';
+        shapesHtml += '<text x="' + (s4.x + 8) + '" y="' + (s4.y + 4) + '" fill="' + textColor + '" font-size="10.5" font-weight="bold">' + safeHtmlText(lyr.points[p4].label || lyr.name) + '</text>';
       }
     }
   }
