@@ -1543,9 +1543,14 @@ async function aiReadDocumentImagePro() {
         var result = await res.json();
         if (result && result.success && result.data) {
           var serverApplied = applyOcrDataToCase(result.data, rawTextEl);
-          updateAiBadgeStatus(true);
+          updateAiBadgeStatus(!result.offlineFallback);
           if (typeof showToastMsg === 'function') {
-            showToastMsg(serverApplied.pointCount ? '✅ ' + serverApplied.pointCount + ' نقطه از سند در جدول UTM درج شد.' : '⚠️ سند خوانده شد اما مختصات قابل‌قبول در جدول درج نشد.');
+            var pointSummary = serverApplied.pointCount
+              ? serverApplied.pointCount + ' نقطه در جدول UTM درج شد.'
+              : 'مختصات قابل‌قبولی در جدول UTM درج نشد.';
+            showToastMsg(result.offlineFallback
+              ? '⚠️ استخراج ابری انجام نشد؛ اطلاعات از متن موجود استخراج شده و باید دستی بازبینی شود. ' + pointSummary
+              : (serverApplied.pointCount ? '✅ ' + pointSummary : '⚠️ سند خوانده شد اما ' + pointSummary));
           }
           if (btn) btn.innerHTML = originalBtnText;
           syncOcrUploadControlsUI();
@@ -1557,8 +1562,17 @@ async function aiReadDocumentImagePro() {
     }
   }
 
+  var hasManualText = Boolean(rawTextEl && rawTextEl.value && rawTextEl.value.trim());
+  if (!hasManualText) {
+    if (typeof showToastMsg === 'function') {
+      showToastMsg('⚠️ سرویس خوانش آنلاین در دسترس نیست. برای استخراج آفلاین، متن سند را در کادر متن وارد کنید.');
+    }
+    if (btn) btn.innerHTML = originalBtnText;
+    syncOcrUploadControlsUI();
+    return;
+  }
   if (typeof showToastMsg === 'function') {
-    showToastMsg('⚠️ ارتباط آنلاین برقرار نشد؛ استخراج آفلاین از متن انجام گردید.');
+    showToastMsg('⚠️ ارتباط آنلاین برقرار نشد؛ فقط متن واردشده به‌صورت محلی بررسی می‌شود.');
   }
   aiExtractFromRawText();
   if (btn) btn.innerHTML = originalBtnText;
