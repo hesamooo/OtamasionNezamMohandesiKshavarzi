@@ -19,6 +19,12 @@ function toFa(s) {
   return String(s).replace(/[0-9]/g, function(w) { return d[+w]; });
 }
 
+function escapeHtmlCore(value) {
+  return String(value === null || value === undefined ? '' : value).replace(/[&<>"']/g, function (ch) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
+  });
+}
+
 function toEn(s) {
   if (s === null || s === undefined) return "";
   return String(s)
@@ -1278,34 +1284,49 @@ function renderApplicantsDirectoryTable() {
     var stMeta = statusMap[c.caseStatus || "ACTIVE"] || statusMap.ACTIVE;
     var entTitle = c.entityType === "LEGAL" ? "🏢 حقوقی" : (c.entityType === "ORG" ? "🏛️ سازمانی" : "👤 حقیقی");
     var mapsCount = (c.croquisMaps || []).length;
+    var safeId = escapeHtmlCore(c.id);
 
     html += '<tr class="' + (c.id === activeCaseId ? 'table-success border-success' : '') + '">' +
-      '<td class="fw-bold">' + toFa(c.code) + '</td>' +
+      '<td class="fw-bold">' + escapeHtmlCore(toFa(c.code)) + '</td>' +
       '<td class="text-start">' +
-        '<b>' + c.name + '</b> ' +
+        '<b>' + escapeHtmlCore(c.name) + '</b> ' +
         '<span class="badge bg-light text-dark border">' + entTitle + '</span><br>' +
-        '<small class="text-muted">کدملی/شناسه: <b>' + toFa(c.nid) + '</b> | تماس: ' + toFa(c.mobile || "---") + '</small>' +
-        (c.repName ? '<br><small class="text-primary">نماینده/مدیرعامل: ' + c.repName + '</small>' : '') +
+        '<small class="text-muted">کدملی/شناسه: <b>' + escapeHtmlCore(toFa(c.nid)) + '</b> | تماس: ' + escapeHtmlCore(toFa(c.mobile || "---")) + '</small>' +
+        (c.repName ? '<br><small class="text-primary">نماینده/مدیرعامل: ' + escapeHtmlCore(c.repName) + '</small>' : '') +
       '</td>' +
-      '<td><span class="badge ' + grpMeta.badgeClass + '">' + grpMeta.shortTitle + '</span></td>' +
-      '<td class="text-start"><b>' + c.project + '</b><br><small class="text-muted">ظرفیت: ' + toFa(c.cap) + ' | زمین: ' + toFa(c.land) + ' م.م</small></td>' +
-      '<td class="text-start"><small class="fw-bold text-success">' + c.loc + '</small><br><small class="text-muted">تاریخ ثبت: ' + toFa(c.issueDate) + '</small></td>' +
-      '<td><span class="badge ' + stMeta.cls + '">' + stMeta.txt + '</span><br><small class="text-muted">' + toFa(mapsCount) + ' نقشه کروکی</small></td>' +
+      '<td><span class="badge ' + grpMeta.badgeClass + '">' + escapeHtmlCore(grpMeta.shortTitle) + '</span></td>' +
+      '<td class="text-start"><b>' + escapeHtmlCore(c.project) + '</b><br><small class="text-muted">ظرفیت: ' + escapeHtmlCore(toFa(c.cap)) + ' | زمین: ' + escapeHtmlCore(toFa(c.land)) + ' م.م</small></td>' +
+      '<td class="text-start"><small class="fw-bold text-success">' + escapeHtmlCore(c.loc) + '</small><br><small class="text-muted">تاریخ ثبت: ' + escapeHtmlCore(toFa(c.issueDate)) + '</small></td>' +
+      '<td><span class="badge ' + stMeta.cls + '">' + stMeta.txt + '</span><br><small class="text-muted">' + escapeHtmlCore(toFa(mapsCount)) + ' نقشه کروکی</small></td>' +
       '<td>' +
         '<div class="d-flex gap-1 justify-content-center flex-wrap">' +
-          '<button class="btn btn-sm ' + (c.id === activeCaseId ? 'btn-success' : 'btn-outline-success') + ' fw-bold py-0 px-2" onclick="selectActiveCase(\'' + c.id + '\'); switchCaseSubTab(\'sub-info\');">' + (c.id === activeCaseId ? '✔ فعال (ویرایش)' : 'انتخاب پرونده') + '</button>' +
-          '<button class="btn btn-sm btn-outline-primary fw-bold py-0 px-2" onclick="selectActiveCase(\'' + c.id + '\'); switchMainPane(\'pane-croquis\');">🗺️ کروکی</button>' +
-          '<button class="btn btn-sm btn-outline-dark fw-bold py-0 px-2" onclick="selectActiveCase(\'' + c.id + '\'); switchMainPane(\'pane-letters\');">📨 نامه</button>' +
+          '<button type="button" class="btn btn-sm ' + (c.id === activeCaseId ? 'btn-success' : 'btn-outline-success') + ' fw-bold py-0 px-2" data-case-action="select" data-case-id="' + safeId + '">' + (c.id === activeCaseId ? '✔ فعال (ویرایش)' : 'انتخاب پرونده') + '</button>' +
+          '<button type="button" class="btn btn-sm btn-outline-primary fw-bold py-0 px-2" data-case-action="croquis" data-case-id="' + safeId + '">🗺️ کروکی</button>' +
+          '<button type="button" class="btn btn-sm btn-outline-dark fw-bold py-0 px-2" data-case-action="letters" data-case-id="' + safeId + '">📨 نامه</button>' +
         '</div>' +
       '</td>' +
     '</tr>';
   }
 
   tbody.innerHTML = html || '<tr><td colspan="7" class="text-center py-4 text-muted">هیچ متقاضی با فیلترهای انتخاب‌شده یافت نشد.</td></tr>';
+  if (!tbody.dataset.secureActionsBound) {
+    tbody.dataset.secureActionsBound = "1";
+    tbody.addEventListener("click", function (event) {
+      var btn = event.target.closest("button[data-case-action]");
+      if (!btn || !tbody.contains(btn)) return;
+      var id = btn.getAttribute("data-case-id");
+      var action = btn.getAttribute("data-case-action");
+      var exists = casesDB.some(function (item) { return item && String(item.id) === id; });
+      if (!exists) return;
+      selectActiveCase(id);
+      if (action === "croquis") switchMainPane("pane-croquis");
+      else if (action === "letters") switchMainPane("pane-letters");
+      else if (action === "select") switchCaseSubTab("sub-info");
+    });
+  }
   var matchCountEl = document.getElementById("adv-search-count-badge");
   if (matchCountEl) matchCountEl.textContent = toFa(matched) + " پرونده";
 }
-
 function filterDirectoryByMainGroupCard(grpCode) {
   var sel = document.getElementById("adv-filter-group");
   if (sel) sel.value = grpCode;
@@ -1318,19 +1339,19 @@ function renderActiveCaseHistory() {
   var c = getActiveCase();
   var tbody = document.getElementById("case-history-tbody");
   if (!tbody || !c) return;
-  var list = c.history || [];
+  var list = Array.isArray(c.history) ? c.history : [];
   var html = "";
   for (var i = 0; i < list.length; i++) {
+    var item = list[i] || {};
     html += '<tr>' +
-      '<td class="text-center fw-bold">' + toFa(i + 1) + '</td>' +
-      '<td class="fw-bold text-primary">' + toFa(list[i].date) + '</td>' +
-      '<td>' + list[i].action + '</td>' +
-      '<td><span class="badge bg-light text-dark border">' + (list[i].by || "مرکز ۶۳۶") + '</span></td>' +
+      '<td class="text-center fw-bold">' + escapeHtmlCore(toFa(i + 1)) + '</td>' +
+      '<td class="fw-bold text-primary">' + escapeHtmlCore(toFa(item.date)) + '</td>' +
+      '<td>' + escapeHtmlCore(item.action) + '</td>' +
+      '<td><span class="badge bg-light text-dark border">' + escapeHtmlCore(item.by || "مرکز ۶۳۶") + '</span></td>' +
     '</tr>';
   }
   tbody.innerHTML = html || '<tr><td colspan="4" class="text-center text-muted py-3">سابقه‌ای ثبت نشده است.</td></tr>';
 }
-
 function addManualHistoryNoteToCase() {
   var c = getActiveCase();
   if (!c) return;
@@ -1361,16 +1382,16 @@ function renderCustomFieldsSummary() {
   var c = getActiveCase();
   var el = document.getElementById("c-custom-fields-summary");
   if (!el || !c) return;
-  var list = c.customFields || [];
-  if (!list.length) { el.innerHTML = ""; return; }
+  var list = Array.isArray(c.customFields) ? c.customFields : [];
+  if (!list.length) { el.textContent = ""; return; }
   var html = "";
   for (var i = 0; i < list.length; i++) {
-    html += '<span class="badge bg-secondary me-1">' + list[i].label + ': ' + toFa(list[i].value) +
+    var field = list[i] || {};
+    html += '<span class="badge bg-secondary me-1">' + escapeHtmlCore(field.label) + ': ' + escapeHtmlCore(toFa(field.value)) +
       ' <span style="cursor:pointer;color:#fca5a5;" onclick="getActiveCase().customFields.splice(' + i + ',1);saveAllDB();renderCustomFieldsSummary();">✕</span></span>';
   }
   el.innerHTML = html;
 }
-
 function copyCaseFieldLatin(inputId, title) {
   var el = document.getElementById(inputId);
   if (!el) return;
