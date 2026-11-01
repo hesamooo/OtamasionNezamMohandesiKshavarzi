@@ -1517,32 +1517,81 @@ function getUploadedDocsForCase(caseId, cb) {
 }
 
 function uploadCaseDocFile(event, docCode, docTitle) {
-  var file = event.target.files[0];
+  var input = event && event.target;
+  var file = input && input.files ? input.files[0] : null;
   if (!file) return;
-  var c = requireActiveCase("بارگذاری فایل مدرک در پرونده");
-  if (!c) return;
+  var active = requireActiveCase("بارگذاری فایل مدرک در پرونده");
+  if (!active) { input.value = ""; return; }
+
+  // از بارگذاری HTML، SVG، اسکریپت و فایل اجرایی جلوگیری شود.
+  var extensionMatch = String(file.name || "").toLowerCase().match(/\.([a-z0-9]+)$/);
+  var extension = extensionMatch ? extensionMatch[1] : "";
+  var allowedTypes = {
+    pdf: ["application/pdf"],
+    jpg: ["image/jpeg"],
+    jpeg: ["image/jpeg"],
+    png: ["image/png"],
+    webp: ["image/webp"]
+  };
+  var accepted = allowedTypes[extension];
+  var mime = String(file.type || "").toLowerCase();
+  if (!accepted || (mime && accepted.indexOf(mime) === -1)) {
+    alert("فقط فایل‌های PDF، JPG، PNG و WEBP قابل بارگذاری هستند.");
+    input.value = "";
+    return;
+  }
+  if (file.size <= 0 || file.size > 12 * 1024 * 1024) {
+    alert("حجم هر مدرک باید بیشتر از صفر و حداکثر ۱۲ مگابایت باشد.");
+    input.value = "";
+    return;
+  }
 
   var reader = new FileReader();
+  reader.onerror = function () {
+    alert("خواندن فایل ناموفق بود. فایل را دوباره انتخاب کنید.");
+    input.value = "";
+  };
   reader.onload = function(e) {
+    // از ثبت ناقص فایل در صورت تغییر پرونده یا خطای خواندن جلوگیری می‌شود.
+    if (!e.target || typeof e.target.result !== "string" || e.target.result.indexOf("data:") !== 0) {
+      alert("محتوای فایل معتبر نیست.");
+      input.value = "";
+      return;
+    }
     openFilesDB(function(db) {
-      if (!db) return;
-      var tx = db.transaction(["docs"], "readwrite");
-      tx.objectStore("docs").put({
-        key: c.id + "__" + docCode,
-        caseId: c.id,
-        docCode: docCode,
-        docTitle: docTitle,
-        fileName: file.name,
-        uploadDate: todayShamsi(),
-        dataUrl: e.target.result,
-        rawBlob: file
-      });
-      tx.oncomplete = function() {
-        logCaseAction(c, "بارگذاری مدرک «" + docTitle + "» (" + file.name + ")");
-        saveAllDB();
-        renderActiveCaseDocsChecklist();
-        showToastMsg("فایل «" + docTitle + "» در پرونده «" + c.name + "» ذخیره شد.");
-      };
+      if (!db) {
+        alert("مخزن امن فایل‌های مرورگر در دسترس نیست.");
+        input.value = "";
+        return;
+      }
+      try {
+        var tx = db.transaction(["docs"], "readwrite");
+        tx.objectStore("docs").put({
+          key: active.id + "__" + docCode,
+          caseId: active.id,
+          docCode: docCode,
+          docTitle: docTitle,
+          fileName: String(file.name || "document." + extension).replace(/[\\/:*?"<>|\u0000-\u001f]/g, "_").slice(0, 140),
+          uploadDate: todayShamsi(),
+          dataUrl: e.target.result,
+          rawBlob: file
+        });
+        tx.oncomplete = function() {
+          logCaseAction(active, "بارگذاری مدرک «" + docTitle + "» (" + file.name + ")");
+          saveAllDB();
+          renderActiveCaseDocsChecklist();
+          showToastMsg("فایل «" + docTitle + "» در پرونده «" + active.name + "» ذخیره شد.");
+          input.value = "";
+        };
+        tx.onerror = function() {
+          alert("ذخیره فایل در مرورگر ناموفق بود. فضای ذخیره‌سازی را بررسی کنید.");
+          input.value = "";
+        };
+      } catch (storageError) {
+        console.error("Document storage failed:", storageError);
+        alert("ذخیره فایل انجام نشد؛ احتمالاً فضای کافی در مرورگر وجود ندارد.");
+        input.value = "";
+      }
     });
   };
   reader.readAsDataURL(file);
