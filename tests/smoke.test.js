@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import * as ts from 'typescript';
+import ts from 'typescript';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (name) => fs.readFileSync(path.join(root, name), 'utf8');
@@ -89,20 +89,20 @@ test('standalone Windows export keeps script order and matches the BAT filename'
   const core = read('nezam-core.js');
   const bat = read('Run_Windows_Offline.bat');
   const start = core.indexOf('window.downloadStandaloneWindowsHTML = async function() {');
-  const end = core.indexOf('\\nfunction initAppCore()', start);
+  const end = core.indexOf('\nfunction initAppCore()', start);
   assert.notEqual(start, -1);
   assert.notEqual(end, -1);
   const builder = core.slice(start, end);
-  assert.match(builder, /oldScript\\.parentNode\\.replaceChild/);
-  assert.match(builder, /bundledCount !== bundledNames\\.length/);
-  assert.match(builder, /Nezam636_Windows_Offline\\.html/);
-  assert.match(bat, /Nezam636_Windows_Offline\\.html/);
+  assert.match(builder, /oldScript\.parentNode\.replaceChild/);
+  assert.match(builder, /bundledCount !== bundledNames\.length/);
+  assert.match(builder, /Nezam636_Windows_Offline\.html/);
+  assert.match(bat, /Nezam636_Windows_Offline\.html/);
 });
 
 test('page does not request font files that are absent from the repository', () => {
   const html = read('index.html');
-  assert.doesNotMatch(html, /public\\/fonts\\/Vazirmatn|\\/fonts\\/Vazirmatn/);
-  assert.match(html, /font-family:\\s*Tahoma/);
+  assert.doesNotMatch(html, /public\/fonts\/Vazirmatn|\/fonts\/Vazirmatn/);
+  assert.match(html, /font-family:\s*Tahoma/);
 });
 
 test('OCR fallback does not invent an area or a location', () => {
