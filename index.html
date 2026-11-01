@@ -3403,7 +3403,11 @@
         }
 
         // و) اگر رکورد ساده متقاضی از فرم اولیه driveForm باشد
-        if (item.fullName && item.nationalCode && item.nationalCode !== 'SYSTEM_MASTER_DB' && item.fullName !== 'پشتیبان_مرکزی_اتوماسیون_۶۳۶') {
+        if (item.fullName && item.nationalCode &&
+            item.nationalCode !== 'SYSTEM_MASTER_DB' &&
+            item.nationalCode !== 'NEZAM636_KNOWLEDGE_VAULT' &&
+            item.fullName !== 'پشتیبان_مرکزی_اتوماسیون_۶۳۶' &&
+            item.fullName !== 'کتابخانه دانش مرکز ۶۳۶ خفر') {
           recoveredCases.push({
             id: 'CASE-DRV-' + String(item.nationalCode).replace(/\D/g, ''),
             code: item.caseCode || ('د-' + item.nationalCode + '/۶۳۶'),
