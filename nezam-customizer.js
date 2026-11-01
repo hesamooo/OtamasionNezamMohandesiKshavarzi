@@ -592,7 +592,7 @@ function editLetterFromSecretariat(letterId) {
       var alertEl = document.getElementById("letter-edit-alert");
       alertEl.style.display = "flex";
       alertEl.className = "alert alert-warning py-2 px-3 small fw-bold mb-3 d-flex justify-content-between align-items-center";
-      alertEl.innerHTML = '<span>✏️ در حال ویرایش نامه شماره «' + toFa(l.number) + '» (' + l.appName + ' - کاغذ ' + (l.paperSize || 'A4') + ')</span>' +
+      alertEl.innerHTML = '<span>✏️ در حال ویرایش نامه شماره «' + safeHtmlText(toFa(l.number)) + '» (' + safeHtmlText(l.appName) + ' - کاغذ ' + (l.paperSize === "A5" ? "A5" : "A4") + ')</span>' +
         '<button class="btn btn-sm btn-outline-dark py-0" onclick="editingLetterId=null;document.getElementById(\'letter-edit-alert\').style.display=\'none\';syncLetterEditorWithActiveCase();">لغو ویرایش</button>';
 
       switchMainPane("pane-letters");
@@ -973,13 +973,13 @@ function printOfficialForm(formType) {
     innerHtml =
       '<div style="border:2px solid #000;padding:5mm;border-radius:6px;">' +
         '<div style="text-align:center;font-size:13pt;font-weight:900;border-bottom:2px solid #000;padding-bottom:3mm;margin-bottom:4mm;">' +
-          'فرم مخصوص تأیید تکمیل پرونده و شناسنامه متقاضی (' + grpMeta.title + ')' +
+          'فرم مخصوص تأیید تکمیل پرونده و شناسنامه متقاضی (' + safeHtmlText(grpMeta.title) + ')' +
         '</div>' +
         '<table class="utm-table-print" style="width:100%;font-size:10.5pt;">' +
-          '<tr><td style="background:#eef3ee;"><b>نام متقاضی:</b></td><td>' + d.name + '</td><td style="background:#eef3ee;"><b>کد ملی / شناسه:</b></td><td>' + d.nid + '</td></tr>' +
-          '<tr><td style="background:#eef3ee;"><b>عنوان طرح:</b></td><td>' + d.project + '</td><td style="background:#eef3ee;"><b>ظرفیت / مساحت:</b></td><td>' + d.cap + ' / ' + d.land + ' م.م</td></tr>' +
-          '<tr><td style="background:#eef3ee;"><b>موقعیت اراضی:</b></td><td colspan="3">' + d.loc + '</td></tr>' +
-          '<tr><td style="background:#eef3ee;"><b>کلاسه بایگانی:</b></td><td>' + toFa(c.code) + '</td><td style="background:#eef3ee;"><b>تاریخ تکمیل پرونده:</b></td><td>' + d.date + '</td></tr>' +
+          '<tr><td style="background:#eef3ee;"><b>نام متقاضی:</b></td><td>' + safeHtmlText(d.name) + '</td><td style="background:#eef3ee;"><b>کد ملی / شناسه:</b></td><td>' + safeHtmlText(d.nid) + '</td></tr>' +
+          '<tr><td style="background:#eef3ee;"><b>عنوان طرح:</b></td><td>' + safeHtmlText(d.project) + '</td><td style="background:#eef3ee;"><b>ظرفیت / مساحت:</b></td><td>' + safeHtmlText(d.cap) + ' / ' + safeHtmlText(d.land) + ' م.م</td></tr>' +
+          '<tr><td style="background:#eef3ee;"><b>موقعیت اراضی:</b></td><td colspan="3">' + safeHtmlText(d.loc) + '</td></tr>' +
+          '<tr><td style="background:#eef3ee;"><b>کلاسه بایگانی:</b></td><td>' + safeHtmlText(toFa(c.code)) + '</td><td style="background:#eef3ee;"><b>تاریخ تکمیل پرونده:</b></td><td>' + safeHtmlText(d.date) + '</td></tr>' +
         '</table>' +
         '<div style="font-size:10pt;line-height:2.1;margin-top:4mm;">' +
           '☑ ۱. فرم تقاضای ثبت‌شده در درگاه ملی مجوزها و سامانه سماک / سانکا<br>' +
@@ -992,7 +992,7 @@ function printOfficialForm(formType) {
   } else if (formType === "PHARMACY_INSPECTION") {
     innerHtml =
       '<div style="text-align:center;font-size:12.5pt;font-weight:900;margin-bottom:3mm;">فرم نظارت و بازرسی داروخانه‌های گیاهپزشکی و مراکز عرضه نهاده شهرستان خفر</div>' +
-      '<div style="border:1.5px solid #000;padding:3mm;font-size:10pt;margin-bottom:3mm;"><b>متقاضی:</b> ' + d.name + ' | <b>کد ملی:</b> ' + d.nid + ' | <b>موقعیت:</b> ' + d.loc + ' | <b>تاریخ:</b> ' + d.date + '</div>' +
+      '<div style="border:1.5px solid #000;padding:3mm;font-size:10pt;margin-bottom:3mm;"><b>متقاضی:</b> ' + safeHtmlText(d.name) + ' | <b>کد ملی:</b> ' + safeHtmlText(d.nid) + ' | <b>موقعیت:</b> ' + safeHtmlText(d.loc) + ' | <b>تاریخ:</b> ' + safeHtmlText(d.date) + '</div>' +
       '<table class="utm-table-print" style="width:100%;font-size:9.2pt;">' +
         '<thead><tr style="background:#eef3ee;"><th>عنوان مورد بازدید</th><th>دارد</th><th>ندارد</th><th>عنوان مورد بازدید</th><th>دارد</th><th>ندارد</th></tr></thead>' +
         '<tbody>' +
@@ -1011,7 +1011,7 @@ function printOfficialForm(formType) {
     innerHtml =
       '<div style="text-align:center;font-size:12.5pt;font-weight:900;margin-bottom:3mm;">فرم بازدید کارشناسی و پایش فنی واحدهای گلخانه‌ای و قارچ خوراکی</div>' +
       '<div style="border:1.5px solid #000;padding:4mm;font-size:10pt;line-height:2.1;">' +
-        '<b>بهره‌بردار:</b> ' + d.name + ' | <b>کد ملی:</b> ' + d.nid + ' | <b>مساحت:</b> ' + d.land + ' م.م | <b>موقعیت:</b> ' + d.loc + '<hr>' +
+        '<b>بهره‌بردار:</b> ' + safeHtmlText(d.name) + ' | <b>کد ملی:</b> ' + safeHtmlText(d.nid) + ' | <b>مساحت:</b> ' + safeHtmlText(d.land) + ' م.م | <b>موقعیت:</b> ' + safeHtmlText(d.loc) + '<hr>' +
         '• <b>سیستم تأمین رطوبت:</b> ⬜ ایرواشر &nbsp; ⬜ مه‌پاش<br>' +
         '• <b>سیستم گرمایش:</b> ⬜ بویلر &nbsp; ⬜ جت‌هیتر / کوره هوای گرم &nbsp; ⬜ فن‌کویل<br>' +
         '• <b>سیستم سرمایش و تهویه:</b> ⬜ پد و فن استاندارد &nbsp; ⬜ فن سیرکولاسیون &nbsp; ⬜ پنجره رول‌آپ<br>' +
@@ -1022,7 +1022,7 @@ function printOfficialForm(formType) {
     innerHtml =
       '<div style="text-align:center;font-size:13pt;font-weight:900;margin-bottom:3mm;">تعهدنامه رسمی بهره‌بردار و الزامات مسئول فنی</div>' +
       '<div style="border:1.5px solid #000;padding:5mm;font-size:10.5pt;line-height:2.2;text-align:justify;">' +
-        'اینجانب <b>' + d.name + '</b> به کد ملی/شناسه <b>' + d.nid + '</b> متقاضی طرح «<b>' + d.project + '</b>» با ظرفیت <b>' + d.cap + '</b> در زمینی به مساحت <b>' + d.land + '</b> مترمربع واقع در <b>' + d.loc + '</b> متعهد می‌گردم کلیه ضوابط فنی، بهداشتی و زیست‌محیطی وزارت جهاد کشاورزی و سازمان نظام مهندسی کشاورزی و منابع طبیعی را رعایت نموده، از خدمات مسئول فنی واجد صلاحیت در سامانه سانکا استفاده نمایم و از هرگونه تغییر کاربری غیرمجاز خودداری کنم.<br><br>امضا و اثر انگشت متقاضی:' +
+        'اینجانب <b>' + safeHtmlText(d.name) + '</b> به کد ملی/شناسه <b>' + safeHtmlText(d.nid) + '</b> متقاضی طرح «<b>' + safeHtmlText(d.project) + '</b>» با ظرفیت <b>' + safeHtmlText(d.cap) + '</b> در زمینی به مساحت <b>' + safeHtmlText(d.land) + '</b> مترمربع واقع در <b>' + safeHtmlText(d.loc) + '</b> متعهد می‌گردم کلیه ضوابط فنی، بهداشتی و زیست‌محیطی وزارت جهاد کشاورزی و سازمان نظام مهندسی کشاورزی و منابع طبیعی را رعایت نموده، از خدمات مسئول فنی واجد صلاحیت در سامانه سانکا استفاده نمایم و از هرگونه تغییر کاربری غیرمجاز خودداری کنم.<br><br>امضا و اثر انگشت متقاضی:' +
       '</div>';
   } else if (formType === "BINDER_LABEL") {
     var stage = document.getElementById("a4-preview-stage");
@@ -1031,21 +1031,21 @@ function printOfficialForm(formType) {
         '<div style="border:3px double #1b5e20;border-radius:12px;padding:8mm;margin-bottom:12mm;">' +
           '<div style="display:flex;justify-content:space-between;border-bottom:2px solid #2e7d32;padding-bottom:4mm;margin-bottom:4mm;">' +
             '<div><b>سازمان نظام مهندسی کشاورزی و منابع طبیعی استان فارس</b><br>' + brandCfg.officeName + '</div>' +
-            '<div style="border:2px solid #000;padding:2mm 5mm;font-size:14pt;font-weight:900;">کلاسه: ' + toFa(c.code) + '</div>' +
+            '<div style="border:2px solid #000;padding:2mm 5mm;font-size:14pt;font-weight:900;">کلاسه: ' + safeHtmlText(toFa(c.code)) + '</div>' +
           '</div>' +
           '<div style="font-size:12pt;line-height:2.2;">' +
-            '👤 <b>متقاضی:</b> ' + d.name + ' &nbsp;|&nbsp; <b>کد ملی/شناسه:</b> ' + d.nid + '<br>' +
-            '📋 <b>موضوع طرح:</b> ' + d.project + ' (' + d.cap + ' - ' + d.land + ' مترمربع)<br>' +
-            '📍 <b>موقعیت:</b> ' + d.loc +
+            '👤 <b>متقاضی:</b> ' + safeHtmlText(d.name) + ' &nbsp;|&nbsp; <b>کد ملی/شناسه:</b> ' + safeHtmlText(d.nid) + '<br>' +
+            '📋 <b>موضوع طرح:</b> ' + safeHtmlText(d.project) + ' (' + safeHtmlText(d.cap) + ' - ' + safeHtmlText(d.land) + ' مترمربع)<br>' +
+            '📍 <b>موقعیت:</b> ' + safeHtmlText(d.loc) +
           '</div>' +
         '</div>' +
         '<div style="border:2.5px solid #000;border-radius:8px;padding:5mm;width:55mm;margin:0 auto;text-align:center;line-height:2;">' +
           '<div style="background:#1b5e20;color:#fff;font-weight:bold;">مرکز خدمات ۶۳۶ خفر</div>' +
-          '<div style="font-size:14pt;font-weight:900;margin:2mm 0;">' + toFa(c.code) + '</div>' +
-          '<div style="font-size:12pt;font-weight:900;">' + d.name + '</div>' +
-          '<div>کدملی: ' + d.nid + '</div>' +
-          '<div style="font-size:9.5pt;">' + d.project + '</div>' +
-          '<div style="font-size:8.5pt;">' + d.loc + '</div>' +
+          '<div style="font-size:14pt;font-weight:900;margin:2mm 0;">' + safeHtmlText(toFa(c.code)) + '</div>' +
+          '<div style="font-size:12pt;font-weight:900;">' + safeHtmlText(d.name) + '</div>' +
+          '<div>کدملی: ' + safeHtmlText(d.nid) + '</div>' +
+          '<div style="font-size:9.5pt;">' + safeHtmlText(d.project) + '</div>' +
+          '<div style="font-size:8.5pt;">' + safeHtmlText(d.loc) + '</div>' +
         '</div>' +
       '</div>';
     switchMainPane("pane-print");
@@ -2259,27 +2259,22 @@ function renderCroquisVisualCanvas() {
   var cadHolder = document.getElementById("crq-cad-svg-container");
   var legendHolder = document.getElementById("crq-legend-box");
   if (!m || !cadHolder) return;
-
   cadHolder.innerHTML = buildMultiLayerSvgMarkup(m, 760, 440, false);
-
   if (legendHolder) {
     var legHtml = "";
     for (var i = 0; i < m.layers.length; i++) {
       var l = m.layers[i];
-      if (!l.visible) continue;
+      if (!l || !l.visible) continue;
       var g = computeUtmGeometry(l.points, l.geomType);
       legHtml += '<span class="badge bg-white text-dark border me-2 mb-1 p-2">' +
-        '<span style="display:inline-block;width:12px;height:12px;background:' + l.color + ';border-radius:3px;margin-left:5px;vertical-align:middle;"></span>' +
-        '<b>' + l.name + '</b>' +
-        (l.geomType === "POLYGON" ? (' — مساحت: ' + toFa(Math.round(g.area)) + ' م.م (' + toFa(g.ha.toFixed(2)) + ' هکتار)') : '') +
+        '<span style="display:inline-block;width:12px;height:12px;background:' + safeHexColor(l.color, "#15803d") + ';border-radius:3px;margin-left:5px;vertical-align:middle;"></span>' +
+        '<b>' + safeHtmlText(l.name) + '</b>' +
+        (l.geomType === "POLYGON" ? (' — مساحت: ' + safeHtmlText(toFa(Math.round(g.area))) + ' م.م (' + safeHtmlText(toFa(g.ha.toFixed(2))) + ' هکتار)') : '') +
       '</span>';
     }
     legendHolder.innerHTML = legHtml;
   }
-
-  if (croquisViewMode === "MAP") {
-    renderCroquisLeafletMap();
-  }
+  if (croquisViewMode === "MAP") renderCroquisLeafletMap();
 }
 
 var leafletLoadingInProgress = false;
@@ -3459,7 +3454,8 @@ function exportStageToWordDoc() {
 }
 
 function initBrandingAndTemplatesUI() {
-  var logoHtml = brandCfg.customLogoData
+  var validBrandImage = /^data:image\/(?:png|jpeg|webp|gif);base64,[a-z0-9+/=]+$/i;
+  var logoHtml = validBrandImage.test(String(brandCfg.customLogoData || ""))
     ? '<img src="' + brandCfg.customLogoData + '" style="width:100%;height:100%;object-fit:contain;border-radius:50%;">'
     : NEZAM_LOGO_SVG;
   if (document.getElementById("nav-logo-box")) document.getElementById("nav-logo-box").innerHTML = logoHtml;
@@ -3474,7 +3470,7 @@ function initBrandingAndTemplatesUI() {
   if (document.getElementById("cfg-addr")) document.getElementById("cfg-addr").value = brandCfg.address;
   if (document.getElementById("cfg-postal")) document.getElementById("cfg-postal").value = brandCfg.postalCode;
   if (document.getElementById("cfg-phone")) document.getElementById("cfg-phone").value = brandCfg.phone;
-  if (document.getElementById("cfg-color")) document.getElementById("cfg-color").value = brandCfg.headerColor;
+  if (document.getElementById("cfg-color")) document.getElementById("cfg-color").value = safeHexColor(brandCfg.headerColor, "#1b4332");
 
   var sel = document.getElementById("cfg-tpl-key");
   if (sel) {
@@ -3516,6 +3512,16 @@ function resetOfficeBranding() {
 function uploadBrandImage(e, field) {
   var f = e.target.files[0];
   if (!f) return;
+  if (["customLogoData", "customStampData"].indexOf(field) === -1) {
+    alert("نوع محل ذخیره تصویر معتبر نیست.");
+    e.target.value = "";
+    return;
+  }
+  if (!/^image\/(png|jpeg|webp|gif)$/i.test(f.type || "") || f.size > 1500000) {
+    alert("فقط تصویر PNG، JPG، WEBP یا GIF تا حجم ۱٫۵ مگابایت مجاز است.");
+    e.target.value = "";
+    return;
+  }
   var r = new FileReader();
   r.onload = function(ev) {
     brandCfg[field] = ev.target.result;
