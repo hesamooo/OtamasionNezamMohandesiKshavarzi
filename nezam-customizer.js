@@ -2320,7 +2320,7 @@ function renderCroquisLeafletMap() {
         mapDiv.innerHTML = "";
         renderCroquisLeafletMap();
       } else {
-        mapDiv.innerHTML = '<div class="alert alert-warning m-3 fw-bold">⚠️ سیستم در حالت آفلاین قرار دارد و ارتباط با سرور آنلاین کاشی‌های ماهواره‌ای برقرار نشد.<br>کلیه محاسبات مساحت، جدول مختصات UTM، چاپ کروکی در کاغذ A4/A5 و «📐 بوم مهندسی آفلاین (CAD/SVG)» به صورت ۱۰۰٪ آفلاین فعال و آماده چاپ است.</div>';
+        mapDiv.innerHTML = '<div class="alert alert-warning m-3 fw-bold">⚠️ سیستم در حالت آفلاین قرار دارد و ارتباط با سرور آنلاین کاشی‌های ماهواره‌ای برقرار نشد.<br>محاسبات مساحت، جدول مختصات UTM و چاپ کروکی در نمای CAD/SVG آفلاین در دسترس است.</div>';
       }
     });
     return;
@@ -2331,52 +2331,59 @@ function renderCroquisLeafletMap() {
     setLeafletTileMode("GOOGLE_HYBRID");
     leafletLayerGroupObj = L.layerGroup().addTo(leafletMapObj);
   }
-
-  setTimeout(function() {
+  window.setTimeout(function() {
     if (leafletMapObj) leafletMapObj.invalidateSize();
   }, 150);
 
+  if (!leafletLayerGroupObj) leafletLayerGroupObj = L.layerGroup().addTo(leafletMapObj);
   leafletLayerGroupObj.clearLayers();
   var boundsArr = [];
   var zoneNum = parseInt(m.utmZone, 10) || 39;
 
-  for (var i = 0; i < m.layers.length; i++) {
-    var lyr = m.layers[i];
-    if (!lyr.visible || !lyr.points.length) continue;
-
+  for (var i = 0; i < (Array.isArray(m.layers) ? m.layers.length : 0); i++) {
+    var lyr = m.layers[i] || {};
+    if (!lyr.visible || !Array.isArray(lyr.points) || !lyr.points.length) continue;
+    var layerColor = safeHexColor(lyr.color, "#15803d");
+    var weight = Number(lyr.strokeWidth);
+    if (!Number.isFinite(weight)) weight = 3;
+    weight = Math.min(10, Math.max(0.5, weight));
     var latlngs = [];
+
     for (var j = 0; j < lyr.points.length; j++) {
-      var g = utmToLatLngWGS84(lyr.points[j].x, lyr.points[j].y, zoneNum, m.hemisphere !== "S");
+      var point = lyr.points[j] || {};
+      var g = utmToLatLngWGS84(point.x, point.y, zoneNum, m.hemisphere !== "S");
+      if (!g || !Number.isFinite(g.lat) || !Number.isFinite(g.lng)) continue;
       latlngs.push([g.lat, g.lng]);
       boundsArr.push([g.lat, g.lng]);
     }
+    if (!latlngs.length) continue;
 
     var gCalc = computeUtmGeometry(lyr.points, lyr.geomType);
-    var popTxt = "<b>" + lyr.name + "</b><br>مساحت: " + toFa(Math.round(gCalc.area)) + " مترمربع (" + toFa(gCalc.ha.toFixed(2)) + " هکتار)";
+    var safeName = safeHtmlText(lyr.name || "لایه بدون نام");
+    var areaText = safeHtmlText(toFa(Math.round(gCalc.area))) + " مترمربع (" + safeHtmlText(toFa(gCalc.ha.toFixed(2))) + " هکتار)";
+    var popTxt = "<b>" + safeName + "</b><br>مساحت: " + areaText;
 
     if (lyr.geomType === "POLYGON" && latlngs.length >= 3) {
-      L.polygon(latlngs, { color: lyr.color, fillColor: lyr.color, fillOpacity: 0.35, weight: lyr.strokeWidth || 3 })
+      L.polygon(latlngs, { color: layerColor, fillColor: layerColor, fillOpacity: 0.35, weight: weight })
         .bindPopup(popTxt)
         .addTo(leafletLayerGroupObj);
     } else if (lyr.geomType === "LINE" && latlngs.length >= 2) {
-      L.polyline(latlngs, { color: lyr.color, weight: lyr.strokeWidth || 3 })
-        .bindPopup("<b>" + lyr.name + "</b>")
+      L.polyline(latlngs, { color: layerColor, weight: weight })
+        .bindPopup("<b>" + safeName + "</b>")
         .addTo(leafletLayerGroupObj);
     } else {
       for (var p = 0; p < latlngs.length; p++) {
-        L.circleMarker(latlngs[p], { radius: 7, color: "#fff", fillColor: lyr.color, fillOpacity: 1, weight: 2 })
-          .bindPopup("<b>" + (lyr.points[p].label || lyr.name) + "</b>")
+        var pointLabel = lyr.points[p] && lyr.points[p].label ? lyr.points[p].label : (lyr.name || "نقطه");
+        L.circleMarker(latlngs[p], { radius: 7, color: "#fff", fillColor: layerColor, fillOpacity: 1, weight: 2 })
+          .bindPopup("<b>" + safeHtmlText(pointLabel) + "</b>")
           .addTo(leafletLayerGroupObj);
       }
     }
   }
 
-  if (boundsArr.length > 0) {
-    leafletMapObj.fitBounds(boundsArr, { padding: [28, 28], maxZoom: 19 });
-  }
+  if (boundsArr.length > 0) leafletMapObj.fitBounds(boundsArr, { padding: [28, 28], maxZoom: 19 });
 }
 
-/* انتخاب سرور نقشه گوگل‌ارث به‌روز با زوم بسیار بالا (تا زوم ۲۲) */
 function setLeafletTileMode(mode) {
   if (!leafletMapObj || typeof L === "undefined") return;
   if (leafletTileBase) leafletMapObj.removeLayer(leafletTileBase);
@@ -3475,7 +3482,11 @@ function initBrandingAndTemplatesUI() {
   var sel = document.getElementById("cfg-tpl-key");
   if (sel) {
     var opts = "";
-    for (var k in tplCfg) opts += '<option value="' + k + '">' + tplCfg[k].btnTitle + '</option>';
+    for (var k in tplCfg) {
+      if (!Object.prototype.hasOwnProperty.call(tplCfg, k)) continue;
+      var item = tplCfg[k] || {};
+      opts += '<option value="' + safeHtmlText(k) + '">' + safeHtmlText(item.btnTitle) + '</option>';
+    }
     sel.innerHTML = opts;
     loadTemplateForEdit();
   }
@@ -3533,6 +3544,10 @@ function uploadBrandImage(e, field) {
 }
 
 function clearBrandImage(field) {
+  if (["customLogoData", "customStampData"].indexOf(field) === -1) {
+    showToastMsg("محل حذف تصویر معتبر نیست.", true);
+    return;
+  }
   brandCfg[field] = "";
   localStorage.setItem("nezam636_branding_cfg", JSON.stringify(brandCfg));
   initBrandingAndTemplatesUI();
