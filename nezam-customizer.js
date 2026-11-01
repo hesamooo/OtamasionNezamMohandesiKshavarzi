@@ -1382,24 +1382,21 @@ window.initCroquisWorkspaceForActiveCase = function() {
   if (!c) return;
   var m = getActiveCroquisMap();
   if (!m) return;
-  var l = getActiveCroquisLayer();
-
-  // پر کردن لیست نقشه‌های این پرونده
   var mapSel = document.getElementById("crq-map-select");
   if (mapSel) {
     var mHtml = "";
-    for (var i = 0; i < c.croquisMaps.length; i++) {
-      var mp = c.croquisMaps[i];
-      mHtml += '<option value="' + mp.id + '" ' + (mp.id === m.id ? "selected" : "") + '>' + mp.title + ' (' + toFa(mp.date) + ')</option>';
+    var maps = Array.isArray(c.croquisMaps) ? c.croquisMaps : [];
+    for (var i = 0; i < maps.length; i++) {
+      var mp = maps[i] || {};
+      mHtml += '<option value="' + safeHtmlText(mp.id) + '" ' + (mp.id === m.id ? "selected" : "") + '>' +
+        safeHtmlText(mp.title) + ' (' + safeHtmlText(toFa(mp.date)) + ')</option>';
     }
     mapSel.innerHTML = mHtml;
   }
-
   var zoneSel = document.getElementById("crq-zone-select");
-  if (zoneSel) zoneSel.value = m.utmZone || "39R";
+  if (zoneSel) zoneSel.value = /^(38R|39R|40R|41R)$/.test(m.utmZone || "") ? m.utmZone : "39R";
   var notesEl = document.getElementById("crq-map-notes");
   if (notesEl) notesEl.value = m.notes || "";
-
   renderCroquisLayersList();
   loadActiveLayerIntoEditor();
   renderCroquisVisualCanvas();
@@ -1499,40 +1496,33 @@ function renderCroquisLayersList() {
   var m = getActiveCroquisMap();
   var holder = document.getElementById("crq-layers-list-holder");
   if (!m || !holder) return;
-
   var mainArea = 0, projArea = 0;
   var mainPoly = null;
   var outsideWarnings = [];
 
   for (var i = 0; i < m.layers.length; i++) {
     var lyr = m.layers[i];
+    if (!lyr || !Array.isArray(lyr.points)) continue;
     var g = computeUtmGeometry(lyr.points, lyr.geomType);
     lyr._calcArea = g.area;
     lyr._calcPerim = g.perim;
     if (lyr.category === "MAIN_PARCEL" && g.area > 0) {
       mainArea += g.area;
       mainPoly = lyr.points;
-    } else if (lyr.geomType === "POLYGON" && g.area > 0) {
-      projArea += g.area;
-    }
+    } else if (lyr.geomType === "POLYGON" && g.area > 0) projArea += g.area;
   }
 
-  // بررسی قرار گرفتن طرح‌های داخلی در داخل محدوده اصلی زمین
   if (mainPoly && mainPoly.length >= 3) {
     for (var j = 0; j < m.layers.length; j++) {
       var sub = m.layers[j];
-      if (sub.category === "MAIN_PARCEL" || !sub.visible || !sub.points.length) continue;
+      if (!sub || sub.category === "MAIN_PARCEL" || !sub.visible || !Array.isArray(sub.points) || !sub.points.length) continue;
       var outCnt = 0;
       for (var p = 0; p < sub.points.length; p++) {
         if (!isPointInPolygon2D(sub.points[p], mainPoly)) outCnt++;
       }
-      if (outCnt > 0) {
-        outsideWarnings.push("⚠️ هشدار هندسی: تعداد " + toFa(outCnt) + " نقطه از لایه «" + sub.name + "» خارج از مرز محدوده اصلی زمین قرار گرفته است!");
-      }
+      if (outCnt > 0) outsideWarnings.push("⚠️ هشدار هندسی: تعداد " + toFa(outCnt) + " نقطه از لایه «" + String(sub.name || "") + "» خارج از مرز محدوده اصلی زمین قرار گرفته است!");
     }
-    if (projArea > mainArea && mainArea > 0) {
-      outsideWarnings.push("⚠️ خطای مساحت: مجموع مساحت طرح‌ها و ابنیه داخلی (" + toFa(Math.round(projArea)) + " م.م) از مساحت کل زمین اصلی (" + toFa(Math.round(mainArea)) + " م.م) بیشتر است!");
-    }
+    if (projArea > mainArea && mainArea > 0) outsideWarnings.push("⚠️ خطای مساحت: مجموع مساحت طرح‌ها و ابنیه داخلی (" + toFa(Math.round(projArea)) + " م.م) از مساحت کل زمین اصلی (" + toFa(Math.round(mainArea)) + " م.م) بیشتر است!");
   }
 
   var warnBox = document.getElementById("crq-containment-warning-box");
@@ -1540,13 +1530,14 @@ function renderCroquisLayersList() {
     if (outsideWarnings.length) {
       warnBox.style.display = "block";
       warnBox.className = "alert alert-danger py-2 px-3 small fw-bold mb-2";
-      warnBox.innerHTML = outsideWarnings.join("<br>");
+      warnBox.innerHTML = outsideWarnings.map(safeHtmlText).join("<br>");
     } else if (mainArea > 0 && projArea > 0) {
       warnBox.style.display = "block";
       warnBox.className = "alert alert-success py-2 px-3 small fw-bold mb-2";
-      warnBox.innerHTML = "✅ کنترل فضایی: محدوده طرح داخلی (" + toFa(Math.round(projArea)) + " مترمربع / " + toFa((projArea / 10000).toFixed(2)) + " هکتار) کاملاً در داخل محدوده زمین اصلی (" + toFa(Math.round(mainArea)) + " مترمربع / " + toFa((mainArea / 10000).toFixed(2)) + " هکتار) قرار دارد.";
+      warnBox.textContent = "✅ کنترل فضایی: محدوده طرح داخلی (" + toFa(Math.round(projArea)) + " مترمربع / " + toFa((projArea / 10000).toFixed(2)) + " هکتار) کاملاً در داخل محدوده زمین اصلی (" + toFa(Math.round(mainArea)) + " مترمربع / " + toFa((mainArea / 10000).toFixed(2)) + " هکتار) قرار دارد.";
     } else {
       warnBox.style.display = "none";
+      warnBox.textContent = "";
     }
   }
 
@@ -1557,33 +1548,62 @@ function renderCroquisLayersList() {
 
   var html = "";
   for (var k = 0; k < m.layers.length; k++) {
-    var l = m.layers[k];
-    var isSel = l.id === activeCroquisLayerId;
-    var typeBadge = l.geomType === "POLYGON" ? "چندضلعی" : (l.geomType === "LINE" ? "خط/مسیر" : "نقطه");
-    var metricTxt = l.geomType === "POLYGON"
-      ? ("مساحت: " + toFa(Math.round(l._calcArea || 0)) + " م.م (" + toFa(((l._calcArea || 0) / 10000).toFixed(2)) + " هـ)")
-      : (l.geomType === "LINE" ? ("طول: " + toFa(Math.round(l._calcPerim || 0)) + " متر") : (toFa(l.points.length) + " نقطه"));
-
-    html += '<div class="p-2 mb-2 rounded border ' + (isSel ? 'border-success border-2 bg-success-subtle' : 'bg-white') + '" style="cursor:pointer;" onclick="selectCroquisLayer(\'' + l.id + '\')">' +
+    var layer = m.layers[k] || {};
+    var selected = layer.id === activeCroquisLayerId;
+    var typeBadge = layer.geomType === "POLYGON" ? "چندضلعی" : (layer.geomType === "LINE" ? "خط/مسیر" : "نقطه");
+    var metricTxt = layer.geomType === "POLYGON"
+      ? ("مساحت: " + toFa(Math.round(layer._calcArea || 0)) + " م.م (" + toFa(((layer._calcArea || 0) / 10000).toFixed(2)) + " هـ)")
+      : (layer.geomType === "LINE" ? ("طول: " + toFa(Math.round(layer._calcPerim || 0)) + " متر") : (toFa((layer.points || []).length) + " نقطه"));
+    var safeId = safeHtmlText(layer.id);
+    var safeColor = safeHexColor(layer.color, "#15803d");
+    html += '<div class="p-2 mb-2 rounded border ' + (selected ? 'border-success border-2 bg-success-subtle' : 'bg-white') + '" data-layer-select="' + safeId + '" style="cursor:pointer;">' +
       '<div class="d-flex justify-content-between align-items-center">' +
         '<div class="d-flex align-items-center gap-2">' +
-          '<span style="width:16px;height:16px;border-radius:4px;background:' + l.color + ';display:inline-block;border:1px solid #000;"></span>' +
-          '<b class="small">' + l.name + '</b>' +
+          '<span style="width:16px;height:16px;border-radius:4px;background:' + safeColor + ';display:inline-block;border:1px solid #000;"></span>' +
+          '<b class="small">' + safeHtmlText(layer.name) + '</b>' +
         '</div>' +
-        '<div class="d-flex gap-1" onclick="event.stopPropagation();">' +
-          '<button class="btn btn-sm btn-light border py-0 px-1" title="نمایش / مخفی کردن لایه" onclick="toggleCroquisLayerVisible(\'' + l.id + '\')">' + (l.visible ? '👁️' : '🚫') + '</button>' +
-          '<button class="btn btn-sm btn-light border py-0 px-1" title="بالا" onclick="moveCroquisLayerOrder(' + k + ',-1)">▲</button>' +
-          '<button class="btn btn-sm btn-light border py-0 px-1" title="پایین" onclick="moveCroquisLayerOrder(' + k + ',1)">▼</button>' +
-          '<button class="btn btn-sm btn-outline-danger py-0 px-1" title="حذف لایه" onclick="deleteCroquisLayer(\'' + l.id + '\')">✕</button>' +
+        '<div class="d-flex gap-1">' +
+          '<button type="button" class="btn btn-sm btn-light border py-0 px-1" title="نمایش / مخفی کردن لایه" data-layer-action="toggle" data-layer-id="' + safeId + '">' + (layer.visible ? '👁️' : '🚫') + '</button>' +
+          '<button type="button" class="btn btn-sm btn-light border py-0 px-1" title="بالا" data-layer-action="up" data-layer-index="' + k + '">▲</button>' +
+          '<button type="button" class="btn btn-sm btn-light border py-0 px-1" title="پایین" data-layer-action="down" data-layer-index="' + k + '">▼</button>' +
+          '<button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" title="حذف لایه" data-layer-action="delete" data-layer-id="' + safeId + '">✕</button>' +
         '</div>' +
       '</div>' +
       '<div class="d-flex justify-content-between align-items-center mt-1 small text-muted">' +
-        '<span><span class="badge bg-secondary">' + typeBadge + '</span> | ' + toFa(l.points.length) + ' رأس</span>' +
-        '<span class="fw-bold text-dark">' + metricTxt + '</span>' +
+        '<span><span class="badge bg-secondary">' + typeBadge + '</span> | ' + safeHtmlText(toFa((layer.points || []).length)) + ' رأس</span>' +
+        '<span class="fw-bold text-dark">' + safeHtmlText(metricTxt) + '</span>' +
       '</div>' +
     '</div>';
   }
   holder.innerHTML = html;
+
+  if (!holder.dataset.secureLayerActionsBound) {
+    holder.dataset.secureLayerActionsBound = "1";
+    holder.addEventListener("click", function (event) {
+      var actionBtn = event.target.closest("button[data-layer-action]");
+      if (actionBtn && holder.contains(actionBtn)) {
+        event.stopPropagation();
+        var action = actionBtn.getAttribute("data-layer-action");
+        var id = actionBtn.getAttribute("data-layer-id");
+        var idx = parseInt(actionBtn.getAttribute("data-layer-index"), 10);
+        var activeMap = getActiveCroquisMap();
+        if (!activeMap || !Array.isArray(activeMap.layers)) return;
+        if (action === "toggle" || action === "delete") {
+          if (!activeMap.layers.some(function (item) { return item && String(item.id) === id; })) return;
+          if (action === "toggle") toggleCroquisLayerVisible(id);
+          else deleteCroquisLayer(id);
+        } else if ((action === "up" || action === "down") && Number.isInteger(idx) && idx >= 0 && idx < activeMap.layers.length) {
+          moveCroquisLayerOrder(idx, action === "up" ? -1 : 1);
+        }
+        return;
+      }
+      var card = event.target.closest("[data-layer-select]");
+      if (!card || !holder.contains(card)) return;
+      var selectedId = card.getAttribute("data-layer-select");
+      var activeMap = getActiveCroquisMap();
+      if (activeMap && activeMap.layers.some(function (item) { return item && String(item.id) === selectedId; })) selectCroquisLayer(selectedId);
+    });
+  }
 }
 
 function selectCroquisLayer(layerId) {
