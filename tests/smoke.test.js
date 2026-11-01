@@ -15,11 +15,11 @@ test('main JavaScript modules have valid syntax', () => {
 
 test('inline scripts in index.html have valid syntax', () => {
   const html = read('index.html');
-  const scripts = [...html.matchAll(/<script\\b([^>]*)>([\\s\\S]*?)<\\/script>/gi)];
+  const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)];
   let checked = 0;
 
   for (const [, attrs, source] of scripts) {
-    if (/\\bsrc\\s*=/.test(attrs) || !source.trim()) continue;
+    if (/\bsrc\s*=/.test(attrs) || !source.trim()) continue;
     assert.doesNotThrow(() => new Function(source), 'inline script ' + checked);
     checked++;
   }
@@ -28,7 +28,7 @@ test('inline scripts in index.html have valid syntax', () => {
 
 test('all local script references in the main page exist', () => {
   const html = read('index.html');
-  const refs = [...html.matchAll(/<script\\b[^>]*\\bsrc=["']([^"']+)["']/gi)].map((m) => m[1]);
+  const refs = [...html.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["']/gi)].map((m) => m[1]);
 
   for (const ref of refs) {
     const clean = ref.split('?')[0];
@@ -40,24 +40,21 @@ test('all local script references in the main page exist', () => {
 
 test('literal HTML ids are unique', () => {
   const html = read('index.html');
-  const ids = [...html.matchAll(/\\bid=["']([^"']+)["']/g)].map((m) => m[1]);
+  const ids = [...html.matchAll(/\bid=["']([^"']+)["']/g)].map((m) => m[1]);
   const duplicates = ids.filter((id, i) => ids.indexOf(id) !== i);
   assert.deepEqual([...new Set(duplicates)], []);
 });
 
 test('Gemini model fallback preserves valid saved models and replaces the retired 2.0 model', () => {
   const ai = read('nezam-ai-assistant.js');
-  const match = ai.match(/function getStoredGeminiModel\\(\\)\\s*\\{[\\s\\S]*?\\n\\}/);
+  const match = ai.match(/function getStoredGeminiModel\(\)\s*\{[\s\S]*?\n\}/);
   assert.ok(match, 'getStoredGeminiModel must exist');
 
-  const getModel = new Function('localStorage', 'return (' + match[0] + ')')(
-    { getItem: () => '' }
-  );
   const readModel = (saved) => new Function('localStorage', 'return (' + match[0] + ')')(
     { getItem: () => saved }
   );
 
-  assert.equal(getModel(), 'gemini-3.8-flash');
+  assert.equal(readModel(''), 'gemini-3.8-flash');
   assert.equal(readModel('gemini-2.0-flash'), 'gemini-3.8-flash');
   assert.equal(readModel('models/gemini-3.6-flash'), 'gemini-3.6-flash');
   assert.equal(readModel('gemini-2.5-flash'), 'gemini-2.5-flash');
@@ -71,8 +68,8 @@ test('OCR fallback does not invent an area or a location', () => {
   assert.notEqual(fallbackEnd, -1);
   const fallback = server.slice(fallbackStart, fallbackEnd);
 
-  assert.match(fallback, /landArea:\\s*landMatch\\s*\\?/);
-  assert.match(fallback, /location:\\s*''/);
-  assert.doesNotMatch(fallback, /:\\s*'1000'/);
+  assert.match(fallback, /landArea:\s*landMatch\s*\?/);
+  assert.match(fallback, /location:\s*''/);
+  assert.doesNotMatch(fallback, /:\s*'1000'/);
   assert.doesNotMatch(fallback, /فارس، شهرستان خفر، مرکزی/);
 });
