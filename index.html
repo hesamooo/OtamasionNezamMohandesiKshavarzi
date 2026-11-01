@@ -2979,6 +2979,16 @@
       'nezam_croquis_print_zoom',
       'nezam636_active_case_id'
     ]);
+    const CLOUD_SECRET_KEY_RE = /(?:api[_-]?key|password|passwd|token|secret|credential|authorization|auth)/i;
+
+    // فقط کلیدهای داده‌ای شناخته‌شده همگام می‌شوند؛ کلید API، رمز، توکن و داده ناشناس هرگز به ابر نمی‌رود.
+    function isAllowedCloudStorageKey(key) {
+      if (typeof key !== 'string' || !key || key.startsWith('__gdrive_')) return false;
+      if (CLOUD_SECRET_KEY_RE.test(key)) return false;
+      return key.startsWith('nezam636_') ||
+        key.startsWith('nezam_croquis_') ||
+        key === 'nezam_gemini_model';
+    }
 
     // ۱. افزودن دکمه‌های «ذخیره در درایو» و «بازخوانی از درایو» در نوار بالای سایت
     function createCloudStatusUI() {
@@ -3038,7 +3048,7 @@
       const storageData = {};
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
-        if (k && !k.startsWith('__gdrive_')) {
+        if (isAllowedCloudStorageKey(k)) {
           storageData[k] = localStorage.getItem(k);
         }
       }
@@ -3415,7 +3425,7 @@
             window.__gdriveInternalFlush = true;
             const entries = Object.entries(bestSyncRecord.storage);
             for (const [k, v] of entries) {
-              if (k && !k.startsWith('__gdrive_') && typeof v === 'string') {
+              if (isAllowedCloudStorageKey(k) && typeof v === 'string') {
                 localStorage.setItem(k, v);
               }
             }
