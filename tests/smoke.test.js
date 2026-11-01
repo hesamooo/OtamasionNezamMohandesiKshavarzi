@@ -82,7 +82,7 @@ test('database writes continue independently and report localStorage failures', 
   const source = core.slice(start, end + 2);
   const build = new Function(
     'localStorage', 'casesDB', 'lettersDB', 'tasksDB', 'DOC_CHECKLISTS',
-    'ACT_SPECS', 'activeCaseId', 'window', 'showToastMsg', 'refreshAllViews',
+    'ACT_SPECS', 'activeCaseId', 'window', 'showToastMsg', 'refreshAllViews', 'console',
     source + '\nreturn saveAllDB;'
   );
 
@@ -98,7 +98,8 @@ test('database writes continue independently and report localStorage failures', 
     }, [{ id: 'case-1' }], [{ id: 'letter-1' }], [], {}, {}, 'case-1',
     { __nezam636LastStorageWarningAt: 0 },
     (...args) => warnings.push(args),
-    () => { refreshCount++; });
+    () => { refreshCount++; },
+    { error() {} });
     return { save, store, warnings, getRefreshCount: () => refreshCount };
   };
 
