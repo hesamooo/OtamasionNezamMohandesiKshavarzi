@@ -3511,13 +3511,22 @@ function croquisMapRefreshToolButtons() {
     var btn = document.getElementById(ids[i]);
     if (!btn) continue;
     var active = croquisOnlineDrawMode === modes[i];
-    btn.className = "btn btn-sm " + (active ? "btn-success" : (modes[i] === "LINE" ? "btn-outline-primary" : "btn-outline-success"));
+    btn.className = "btn btn-sm px-1 py-1 " + (active ? "btn-success" : (modes[i] === "LINE" ? "btn-outline-primary" : "btn-outline-success"));
+    btn.style.width = "36px";
+    btn.style.height = "34px";
+    btn.setAttribute("aria-pressed", active ? "true" : "false");
   }
   var finishBtn = document.getElementById("crq-draw-finish-btn");
-  if (finishBtn) finishBtn.disabled = !(croquisOnlineDrawMode === "LINE" || croquisOnlineDrawMode === "POLYGON") || croquisOnlineDraftPoints.length === 0;
+  var required = croquisOnlineDrawMode === "POLYGON" ? 3 : 2;
+  var canFinish = (croquisOnlineDrawMode === "LINE" || croquisOnlineDrawMode === "POLYGON") && croquisOnlineDraftPoints.length >= required;
+  if (finishBtn) {
+    finishBtn.disabled = !canFinish;
+    finishBtn.title = croquisOnlineDrawMode === "POLYGON" ? "ثبت و ذخیره محدوده چندضلعی" : "ثبت و ذخیره مسیر";
+    finishBtn.textContent = "💾";
+  }
   var editBtn = document.getElementById("crq-map-edit-vertices-btn");
   if (editBtn) {
-    editBtn.textContent = croquisMapVertexEditEnabled ? "✥ ویرایش نقاط: روشن" : "✥ ویرایش نقاط: خاموش";
+    editBtn.textContent = croquisMapVertexEditEnabled ? "✥ ویرایش رأس‌ها: روشن" : "✥ ویرایش رأس‌ها: خاموش";
     editBtn.className = "btn btn-sm " + (croquisMapVertexEditEnabled ? "btn-dark" : "btn-outline-dark");
   }
 }
@@ -3581,8 +3590,12 @@ function croquisMapCreatePopup(layer, point, pointIndex) {
 
 function croquisMapCommitOnlineLayer(layer) {
   var m = getActiveCroquisMap();
-  if (!m || !layer) return;
+  if (!m || !layer) return false;
   var c = getActiveCase();
+  if (!c || !c.id) {
+    croquisMapSetToolStatus("پرونده فعالی انتخاب نشده است؛ محدوده ذخیره نشد.", true);
+    return false;
+  }
   var defZone = croquisMapGetZoneString(m);
 
   for (var i = 0; i < layer.points.length; i++) {
@@ -3590,7 +3603,7 @@ function croquisMapCommitOnlineLayer(layer) {
     layer.points[i].label = layer.points[i].label || ("P" + (i + 1));
   }
 
-  if (c && layer.category === "MAIN_PARCEL") {
+  if (layer.category === "MAIN_PARCEL") {
     c.utm = layer.points.map(function (pt) {
       return pt.x + "," + pt.y + "," + (pt.elev !== undefined ? pt.elev : 0) + "," + (pt.zone || defZone);
     }).join("\n");
@@ -3608,17 +3621,55 @@ function croquisMapCommitOnlineLayer(layer) {
     }
   }
 
+  if (typeof logCaseAction === "function") {
+    logCaseAction(c, "ثبت تغییرات نقشه «" + (m.title || "") + "»؛ لایه «" + (layer.name || "") + "» با " + layer.points.length + " رأس");
+  }
+
   var keepCenter = leafletMapObj ? leafletMapObj.getCenter() : null;
   var keepZoom = leafletMapObj ? leafletMapObj.getZoom() : null;
-
   saveAllDB();
+
+  // موفقیت فقط وقتی اعلام می‌شود که داده واقعاً از LocalStorage قابل بازیابی باشد.
+  var persisted = false;
+  try {
+    var savedCases = JSON.parse(localStorage.getItem("nezam636_unified_cases") || "[]");
+    for (var ci = 0; ci < savedCases.length; ci++) {
+      if (savedCases[ci].id !== c.id || !Array.isArray(savedCases[ci].croquisMaps)) continue;
+      for (var mi = 0; mi < savedCases[ci].croquisMaps.length; mi++) {
+        var savedMap = savedCases[ci].croquisMaps[mi];
+        if (savedMap.id !== m.id || !Array.isArray(savedMap.layers)) continue;
+        for (var li = 0; li < savedMap.layers.length; li++) {
+          var savedLayer = savedMap.layers[li];
+          if (savedLayer.id !== layer.id || savedLayer.geomType !== layer.geomType ||
+              !Array.isArray(savedLayer.points) || savedLayer.points.length !== layer.points.length) continue;
+          var exact = true;
+          for (var pi = 0; pi < layer.points.length; pi++) {
+            if (Math.abs(Number(savedLayer.points[pi].x) - Number(layer.points[pi].x)) > 0.01 ||
+                Math.abs(Number(savedLayer.points[pi].y) - Number(layer.points[pi].y)) > 0.01) {
+              exact = false;
+              break;
+            }
+          }
+          if (exact) persisted = true;
+        }
+      }
+    }
+  } catch (verifyError) {
+    console.error("Croquis save verification failed:", verifyError);
+  }
+
+  if (!persisted) {
+    croquisMapSetToolStatus("ذخیره در حافظه مرورگر تأیید نشد. فضای مرورگر یا دسترسی ذخیره‌سازی را بررسی کنید و دوباره ثبت بزنید.", true);
+    return false;
+  }
+
   renderCroquisLayersList();
   loadActiveLayerIntoEditor();
   renderCroquisVisualCanvas();
-
   if (leafletMapObj && keepCenter && keepZoom !== null) {
     leafletMapObj.setView(keepCenter, keepZoom, { animate: false });
   }
+  return true;
 }
 
 function croquisMapRedrawDraft() {
@@ -3651,8 +3702,11 @@ function croquisMapHandleClick(event) {
     var point = croquisMapBuildPoint(event.latlng, layer.points.length);
     layer.points.push(point);
     croquisMapSetCoordinateReadout(point);
-    croquisMapCommitOnlineLayer(layer);
-    croquisMapSetToolStatus("✅ نقطه " + point.label + " با مختصات UTM استخراج و در لایه ذخیره شد. برای ثبت نقطه بعدی روی نقشه کلیک کنید.");
+    if (croquisMapCommitOnlineLayer(layer)) {
+      croquisMapSetToolStatus("✅ نقطه " + point.label + " با مختصات UTM در پرونده ذخیره شد. برای ثبت نقطه بعدی روی نقشه کلیک کنید.");
+    } else {
+      layer.points.pop();
+    }
     return;
   }
 
@@ -3764,34 +3818,82 @@ window.setMapDrawingMode = function (mode) {
 
 window.finishMapDrawing = function () {
   if (croquisOnlineDrawMode !== "LINE" && croquisOnlineDrawMode !== "POLYGON") {
-    croquisMapSetToolStatus("برای نقطه‌گذاری نیازی به دکمه اتمام نیست.");
+    croquisMapSetToolStatus("برای ثبت نقطه، هر کلیک به‌صورت مستقل ذخیره می‌شود.");
     return;
   }
-  var required = croquisOnlineDrawMode === "POLYGON" ? 3 : 2;
+  var finishedMode = croquisOnlineDrawMode;
+  var required = finishedMode === "POLYGON" ? 3 : 2;
   if (croquisOnlineDraftPoints.length < required) {
-    croquisMapSetToolStatus("برای این ترسیم حداقل " + required + " نقطه لازم است.", true);
+    croquisMapSetToolStatus("برای ثبت این عارضه حداقل " + required + " رأس لازم است.", true);
     return;
   }
+
+  var distinct = {};
+  for (var di = 0; di < croquisOnlineDraftPoints.length; di++) {
+    var dp = croquisOnlineDraftPoints[di];
+    distinct[Number(dp.x).toFixed(2) + "_" + Number(dp.y).toFixed(2)] = true;
+  }
+  if (Object.keys(distinct).length < required) {
+    croquisMapSetToolStatus("تعداد رأس‌های یکتا کافی نیست؛ نقاط تکراری را جابه‌جا یا حذف کنید.", true);
+    return;
+  }
+
   var layer = getActiveCroquisLayer();
-  if (!layer) return;
-  layer.geomType = croquisOnlineDrawMode;
-  layer.points = croquisOnlineDraftPoints.map(function (pt, idx) {
+  if (!layer) {
+    croquisMapSetToolStatus("لایه فعالی برای ذخیره محدوده پیدا نشد.", true);
+    return;
+  }
+
+  var newPoints = croquisOnlineDraftPoints.map(function (pt, idx) {
     var copy = Object.assign({}, pt);
     copy.label = "P" + (idx + 1);
     return copy;
   });
-  var finishedMode = croquisOnlineDrawMode;
-  var count = layer.points.length;
-  var geom = computeUtmGeometry(layer.points, finishedMode);
+  var geom = computeUtmGeometry(newPoints, finishedMode);
+  if (finishedMode === "POLYGON" && (!isFinite(geom.area) || geom.area <= 0)) {
+    croquisMapSetToolStatus("چندضلعی معتبر نیست یا مساحت آن صفر است؛ ترتیب نقاط را بررسی کنید.", true);
+    return;
+  }
+
+  var oldPoints = layer.points;
+  var oldGeomType = layer.geomType;
+  var caseObj = getActiveCase();
+  var oldCaseUtm = caseObj ? caseObj.utm : "";
+  var oldCaseLand = caseObj ? caseObj.land : "";
+
+  layer.geomType = finishedMode;
+  layer.points = newPoints;
+
+  if (!croquisMapCommitOnlineLayer(layer)) {
+    layer.points = oldPoints;
+    layer.geomType = oldGeomType;
+    if (caseObj) {
+      caseObj.utm = oldCaseUtm;
+      caseObj.land = oldCaseLand;
+      var oldUtmEl = document.getElementById("c-utm");
+      var oldLandEl = document.getElementById("c-land");
+      if (oldUtmEl) oldUtmEl.value = oldCaseUtm || "";
+      if (oldLandEl) oldLandEl.value = oldCaseLand || "";
+    }
+    croquisMapRedrawDraft();
+    croquisMapRefreshToolButtons();
+    return;
+  }
+
+  var count = newPoints.length;
   croquisOnlineDraftPoints = [];
   croquisOnlineDrawMode = "";
   if (leafletDraftLayerGroupObj) leafletDraftLayerGroupObj.clearLayers();
   if (leafletMapObj && leafletMapObj.doubleClickZoom) leafletMapObj.doubleClickZoom.enable();
-  croquisMapCommitOnlineLayer(layer);
+  if (leafletMapObj) {
+    var center = leafletMapObj.getCenter();
+    var zoom = leafletMapObj.getZoom();
+    renderCroquisLeafletMap({ preserveView: true, center: center, zoom: zoom });
+  }
   croquisMapRefreshToolButtons();
   croquisMapSetToolStatus(
-    "✅ ترسیم " + (finishedMode === "POLYGON" ? "محدوده" : "مسیر") +
-    " با " + count + " رأس ثبت شد." +
+    "✅ " + (finishedMode === "POLYGON" ? "محدوده" : "مسیر") +
+    " با " + count + " رأس در لایه «" + layer.name + "» ذخیره شد." +
     (finishedMode === "POLYGON"
       ? " مساحت: " + toFa(Math.round(geom.area)) + " مترمربع (" + toFa(geom.ha.toFixed(3)) + " هکتار)، محیط: " + toFa(geom.perim.toFixed(1)) + " متر."
       : " طول مسیر: " + toFa(geom.perim.toFixed(1)) + " متر.")
@@ -3985,3 +4087,10 @@ window.exportCroquisGeoJSON = function () {
   croquisMapSetToolStatus("خروجی GeoJSON نقشه آماده شد.");
 };
 
+
+window.toggleCroquisMapMoreTools = function (forceOpen) {
+  var panel = document.getElementById("crq-map-more-tools");
+  if (!panel) return;
+  var open = forceOpen === true ? true : (forceOpen === false ? false : panel.style.display === "none");
+  panel.style.display = open ? "block" : "none";
+};
