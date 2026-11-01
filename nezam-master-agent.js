@@ -342,6 +342,7 @@
     }
 
     if (name === 'propose_followup_task') {
+      if (state.pendingTask) throw new Error('یک پیشنهاد پیگیری هنوز تعیین تکلیف نشده است؛ ابتدا آن را تأیید یا لغو کنید.');
       var taskCase = findCase(args.case_id);
       if (!taskCase) throw new Error('برای ثبت پیگیری باید شناسه یک پرونده موجود و معتبر تعیین شود.');
       var title = String(args.title || '').trim().slice(0, 180);
