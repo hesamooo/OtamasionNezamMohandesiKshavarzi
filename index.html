@@ -3294,6 +3294,43 @@
       }
     }
 
+    // بارگذاری فایل‌های کتابخانه دانش در پوشه اختصاصی Google Drive.
+    // این عملیات از قرارداد شناخته‌شده driveForm (action=saveApplicant) استفاده می‌کند.
+    async function saveNezaam636KnowledgeFileToDrive(fileInfo) {
+      if (!fileInfo || typeof fileInfo.fileName !== 'string' || !fileInfo.fileName ||
+          typeof fileInfo.fileData !== 'string' || !fileInfo.fileData) {
+        throw new Error('اطلاعات فایل برای ذخیره در Google Drive ناقص است.');
+      }
+      const payload = {
+        action: 'saveApplicant',
+        fullName: 'کتابخانه دانش مرکز ۶۳۶ خفر',
+        nationalCode: 'NEZAM636_KNOWLEDGE_VAULT',
+        phone: 'NEZAM636-KNOWLEDGE',
+        description: String(fileInfo.description || 'سند کتابخانه دانش مرکز ۶۳۶ خفر').slice(0, 45000),
+        fileName: String(fileInfo.fileName).replace(/[\\/:*?"<>|\\u0000-\\u001f]/g, '_').slice(0, 180),
+        fileType: String(fileInfo.fileType || 'application/octet-stream').slice(0, 120),
+        fileData: fileInfo.fileData,
+        updatedAt: Date.now()
+      };
+      const response = await fetch(DRIVE_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload),
+        redirect: 'follow'
+      });
+      const raw = await response.text();
+      if (!response.ok) throw new Error('خطای HTTP در ذخیره فایل کتابخانه (' + response.status + ').');
+      let result;
+      try { result = JSON.parse(raw); }
+      catch (e) { throw new Error('پاسخ Apps Script قابل‌خواندن نیست؛ ذخیره فایل تأیید نشد.'); }
+      if (!result || result.status !== 'success') {
+        throw new Error((result && result.message) || 'Apps Script ذخیره فایل کتابخانه را تأیید نکرد.');
+      }
+      return result;
+    }
+
+    window.saveNezaam636KnowledgeFileToDrive = saveNezaam636KnowledgeFileToDrive;
+
     // استخراج هوشمند رکورد پشتیبان و پرونده‌های تکی از هر نوع خروجی گوگل اسکریپت
     function parseCloudResponse(rawResponse) {
       let bestSyncRecord = null;
@@ -4879,5 +4916,6 @@
 
   <script src="./nezam-operations.js?v=20261101-security-r1"></script>
   <script src="./nezam-master-agent.js?v=20261101-agent-r1"></script>
+  <script src="./nezam-agent-knowledge.js?v=20261101-agent-knowledge-r1"></script>
 </body>
 </html>
