@@ -22,6 +22,10 @@
   var SECTION_MAP = {
     dashboard: 'pane-dashboard',
     cases: 'pane-cases',
+    case_list: 'pane-cases',
+    case_form: 'pane-cases',
+    case_matrix: 'pane-cases',
+    case_documents: 'pane-cases',
     croquis: 'pane-croquis',
     letters: 'pane-letters',
     print: 'pane-print',
@@ -33,6 +37,10 @@
   var SECTION_LABELS = {
     dashboard: 'پیشخوان',
     cases: 'پرونده‌ها',
+    case_list: 'فهرست پرونده‌ها',
+    case_form: 'فرم مشخصات پرونده',
+    case_matrix: 'ماتریس استعلام‌ها',
+    case_documents: 'چک‌لیست مدارک پرونده',
     croquis: 'کروکی UTM',
     letters: 'دبیرخانه',
     print: 'چاپ و فرم‌ها',
@@ -47,7 +55,8 @@
     'تو فقط یک چت‌بات نیستی؛ برای فهم داده‌های واقعی اتوماسیون از ابزارهای تعریف‌شده استفاده کن.',
     'برای آمار از get_office_overview، برای یافتن متقاضی از search_cases، برای پرونده انتخاب‌شده از get_active_case و برای جزئیات از get_case_details استفاده کن.',
     'برای پیگیری‌ها از list_open_tasks و برای نامه‌های قبلی از list_recent_letters استفاده کن.',
-    'برای رفتن به بخش‌ها از navigate_to_section و برای انتخاب پرونده از select_active_case استفاده کن.',
+    'برای رفتن به بخش‌ها از navigate_to_section و برای انتخاب پرونده از select_active_case استفاده کن. برای زیر‌بخش‌های پرونده از کلیدهای case_list، case_form، case_matrix و case_documents استفاده کن.',
+    'برای ایجاد متقاضی جدید از prepare_new_case استفاده کن؛ این ابزار فقط پس از کلیک تأیید، پرونده اولیه را می‌سازد و فیلدها را در فرم قرار می‌دهد. ذخیره نهایی اطلاعات تکمیل‌شده جداگانه است.',
     'برای قوانین و ضوابط، ابتدا در search_office_knowledge جستجو کن و پاسخ را همراه نام سند و مرجع/تاریخ مرتبط ارائه بده.',
     'برای بررسی مدارک پرونده از get_case_document_checklist استفاده کن. در صورت نیاز به خواندن محتوای یک مدرک بارگذاری‌شده، ابتدا از read_uploaded_case_document استفاده کن؛ این ابزار قبل از ارسال فایل به Gemini از کاربر تأیید می‌گیرد.',
     'برای پرکردن فرم پرونده فقط prepare_case_form_fill را فراخوانی کن. این ابزار فقط پیش‌نمایش می‌سازد و اعمال روی فرم با کلیک کاربر تأیید می‌شود؛ ذخیره نهایی پرونده جداگانه است.',
@@ -119,7 +128,7 @@
         properties: {
           section: {
             type: 'STRING',
-            enum: ['dashboard', 'cases', 'croquis', 'letters', 'print', 'office', 'ai', 'guide'],
+            enum: ['dashboard', 'cases', 'case_list', 'case_form', 'case_matrix', 'case_documents', 'croquis', 'letters', 'print', 'office', 'ai', 'guide'],
             description: 'کلید صفحه مقصد'
           }
         },
@@ -207,6 +216,27 @@
           }
         },
         required: ['case_id', 'fields']
+      }
+    },
+    {
+      name: 'prepare_new_case',
+      description: 'ساخت پیشنهاد تشکیل پرونده جدید در یکی از سه گروه تخصصی. پرونده فقط پس از تأیید کاربر ایجاد می‌شود و اطلاعات در فرم قرار می‌گیرد؛ ذخیره نهایی مشخصات جداگانه است.',
+      parameters: {
+        type: 'OBJECT',
+        properties: {
+          main_group: { type: 'STRING', enum: ['GREENHOUSE_MUSHROOM', 'LIVESTOCK_POULTRY_FISHERIES', 'CLINIC_PHARMACY'] },
+          fields: {
+            type: 'OBJECT',
+            properties: {
+              entityType: { type: 'STRING' }, actType: { type: 'STRING' }, name: { type: 'STRING' },
+              nid: { type: 'STRING' }, mobile: { type: 'STRING' }, regNo: { type: 'STRING' },
+              repName: { type: 'STRING' }, count: { type: 'NUMBER' }, project: { type: 'STRING' },
+              cap: { type: 'STRING' }, land: { type: 'STRING' }, water: { type: 'STRING' },
+              loc: { type: 'STRING' }, subarea: { type: 'STRING' }, utm: { type: 'STRING' }
+            }
+          }
+        },
+        required: ['main_group', 'fields']
       }
     },
     {
@@ -462,6 +492,10 @@
       if (!pane) throw new Error('بخش درخواستی معتبر نیست.');
       if (typeof window.switchMainPane !== 'function') throw new Error('تابع جابه‌جایی صفحات در دسترس نیست.');
       window.switchMainPane(pane);
+      var subTargets = { case_list: 'sub-list', case_form: 'sub-info', case_matrix: 'sub-matrix', case_documents: 'sub-docs' };
+      if (subTargets[section] && typeof window.switchCaseSubTab === 'function') {
+        window.switchCaseSubTab(subTargets[section]);
+      }
       return { success: true, section: SECTION_LABELS[section] };
     }
 
@@ -575,6 +609,36 @@
         case_id: readCase.id,
         analysis: docText,
         model: generatedDoc.usedModel || ''
+      };
+    }
+
+    if (name === 'prepare_new_case') {
+      if (state.pendingFormFill || state.pendingLetterDraft) throw new Error('یک عملیات پیشنهادی باز است؛ ابتدا آن را تأیید یا لغو کن.');
+      var newGroup = String(args.main_group || '');
+      if (['GREENHOUSE_MUSHROOM','LIVESTOCK_POULTRY_FISHERIES','CLINIC_PHARMACY'].indexOf(newGroup) < 0) {
+        throw new Error('گروه تخصصی پرونده جدید مشخص یا معتبر نیست.');
+      }
+      var newFields = cleanFormProposal(args.fields || {});
+      newFields.mainGroup = newGroup;
+      if (newFields.actType && !(window.ACT_SPECS || {})[newFields.actType]) {
+        throw new Error('کلید نوع فعالیت در فهرست فعالیت‌های سامانه وجود ندارد.');
+      }
+      if (newFields.actType && (window.ACT_SPECS || {})[newFields.actType].mainGroup !== newGroup) {
+        throw new Error('نوع فعالیت انتخاب‌شده با گروه تخصصی پرونده مطابقت ندارد.');
+      }
+      state.pendingFormFill = {
+        newCase: true,
+        mainGroup: newGroup,
+        caseId: '',
+        caseName: 'پرونده جدید',
+        fields: newFields
+      };
+      return {
+        proposal_created: true,
+        requires_user_confirmation: true,
+        case_type: newGroup,
+        fields: newFields,
+        message: 'پیشنهاد پرونده جدید آماده شد؛ پس از تأیید، فرم ایجاد می‌شود و ذخیره مشخصات نهایی جداگانه است.'
       };
     }
 
@@ -753,7 +817,7 @@
     card.className = 'agent-pending';
     card.id = 'nezam636-agent-form-pending';
     card.innerHTML = '<b>پیشنهاد تکمیل فرم پرونده</b><div class="small mt-1"><div><b>پرونده:</b> ' +
-      escapeHtml(p.caseName) + ' (' + escapeHtml(p.caseId) + ')</div>' + preview +
+      escapeHtml(p.caseName) + (p.caseId ? ' (' + escapeHtml(p.caseId) + ')' : ' · پس از تأیید ساخته می‌شود') + '</div>' + preview +
       '</div><button type="button" class="agent-confirm" id="nezam636-agent-apply-form">تأیید و وارد کردن در فرم</button>' +
       '<button type="button" class="agent-cancel" id="nezam636-agent-cancel-form">انصراف</button>';
     host.appendChild(card);
@@ -765,17 +829,33 @@
   function applyPendingFormFill() {
     var p = state.pendingFormFill;
     if (!p) return;
-    var record = findCase(p.caseId);
-    if (!record) {
+    var record = p.newCase ? null : findCase(p.caseId);
+    if (!p.newCase && !record) {
       cancelPendingFormFill();
       addMessage('system', 'پرونده دیگر در سامانه موجود نیست؛ فرم تغییر نکرد.');
       return;
     }
-    if (typeof window.selectActiveCase !== 'function' || typeof window.switchMainPane !== 'function') {
+    if (typeof window.switchMainPane !== 'function') {
       addMessage('system', 'توابع فرم پرونده در دسترس نیستند؛ هیچ تغییری اعمال نشد.');
       return;
     }
-    window.selectActiveCase(record.id);
+    if (p.newCase) {
+      if (typeof window.startNewCaseWizard !== 'function') {
+        addMessage('system', 'فرایند تشکیل پرونده جدید در دسترس نیست.');
+        return;
+      }
+      window.startNewCaseWizard(p.mainGroup);
+      record = activeCase();
+      if (!record) {
+        addMessage('system', 'پرونده اولیه ایجاد نشد؛ عملیات متوقف شد.');
+        return;
+      }
+    } else if (typeof window.selectActiveCase === 'function') {
+      window.selectActiveCase(record.id);
+    } else {
+      addMessage('system', 'انتخاب پرونده در دسترس نیست.');
+      return;
+    }
     window.switchMainPane('pane-cases');
     if (typeof window.switchCaseSubTab === 'function') window.switchCaseSubTab('sub-info');
     if (typeof window.loadActiveCaseIntoForm === 'function') window.loadActiveCaseIntoForm();
@@ -822,7 +902,9 @@
     var pending = byId('nezam636-agent-form-pending');
     if (pending) pending.remove();
     state.pendingFormFill = null;
-    addMessage('system', 'فیلدهای پیشنهادی وارد فرم پرونده شدند. **هنوز ذخیره نشده‌اند.** اطلاعات را بررسی کن و در صورت صحت، دکمه «ذخیره تغییرات پرونده» را بزن.');
+    addMessage('system', p.newCase
+      ? 'فرم پرونده جدید ساخته و فیلدهای پیشنهادی وارد شدند. اطلاعات هنوز ذخیره نهایی نشده‌اند؛ پس از بازبینی، دکمه «ذخیره تغییرات پرونده» را بزن.'
+      : 'فیلدهای پیشنهادی وارد فرم پرونده شدند. **هنوز ذخیره نشده‌اند.** اطلاعات را بررسی کن و در صورت صحت، دکمه «ذخیره تغییرات پرونده» را بزن.');
   }
 
   function cancelPendingFormFill() {
