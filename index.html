@@ -3059,6 +3059,32 @@
     }
 
     // ۳. ارسال و ذخیره کامل کل دیتابیس در گوگل درایو
+    // تأیید پاسخ واقعی Apps Script؛ پاسخ HTML ورود یا خطای داخل JSON موفقیت محسوب نمی‌شود.
+    function validateDriveWriteResponse(res, responseText) {
+      if (!res || !res.ok) return { ok: false, message: 'پاسخ HTTP ناموفق از گوگل‌درایو (' + (res ? res.status : 'نامشخص') + ').' };
+      const raw = String(responseText || '').trim();
+      if (!raw) return { ok: false, message: 'پاسخ سرور خالی است؛ ذخیره تأیید نشد.' };
+      if (/^<!doctype html|^<html|<title>sign in|accounts\.google\.com/i.test(raw)) {
+        return { ok: false, message: 'گوگل به‌جای تأیید ذخیره، صفحه ورود یا HTML برگرداند.' };
+      }
+      try {
+        const data = JSON.parse(raw);
+        if (data === false || (data && (data.success === false || data.ok === false || data.error))) {
+          return { ok: false, message: (data && (data.message || data.error)) || 'اسکریپت گوگل خطای ذخیره گزارش کرد.' };
+        }
+        const status = data && typeof data === 'object' ? String(data.status || data.result || '').toLowerCase() : '';
+        if (/error|fail|denied|unauthorized|invalid/.test(status)) {
+          return { ok: false, message: (data && data.message) || 'اسکریپت گوگل ذخیره را نپذیرفت.' };
+        }
+        return { ok: true, message: (data && data.message) || 'پاسخ JSON دریافت شد.' };
+      } catch (parseError) {
+        if (/^(ok|success|saved|created|done)\b/i.test(raw) || /با موفقیت|ذخیره شد|ثبت شد/i.test(raw)) {
+          return { ok: true, message: raw.slice(0, 180) };
+        }
+        return { ok: false, message: 'پاسخ سرور قابل تأیید نیست؛ ذخیره موفق اعلام نشد.' };
+      }
+    }
+
     async function syncAllDataToDrive(showAlert) {
       if (isRestoring || isSyncInProgress) return false;
       if (!isInitialLoadDone && !showAlert) return false;
@@ -3109,7 +3135,9 @@
           redirect: 'follow'
         });
 
-        await res.text();
+        const responseText = await res.text();
+        const responseCheck = validateDriveWriteResponse(res, responseText);
+        if (!responseCheck.ok) throw new Error(responseCheck.message);
         localStorage.setItem('__gdrive_sync_ts', String(ts));
         localStorage.setItem('__gdrive_has_local_data', '1');
 
@@ -3236,12 +3264,15 @@
 
       try {
         setCloudStatus('⏳ ساخت پوشه متقاضی در درایو...', '#1d4ed8');
-        await fetch(DRIVE_API_URL, {
+        const folderResponse = await fetch(DRIVE_API_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify(applicantPayload),
           redirect: 'follow'
         });
+        const folderResponseText = await folderResponse.text();
+        const folderResponseCheck = validateDriveWriteResponse(folderResponse, folderResponseText);
+        if (!folderResponseCheck.ok) throw new Error(folderResponseCheck.message);
         createdFolders[folderKey] = Date.now();
         localStorage.setItem('__gdrive_folders', JSON.stringify(createdFolders));
         setCloudStatus('✅ پوشه در درایو ساخته شد', '#15803d');
@@ -3368,6 +3399,7 @@
         setCloudStatus('🔄 دریافت اطلاعات از درایو...', '#0284c7');
         const fetchUrl = DRIVE_API_URL + (DRIVE_API_URL.includes('?') ? '&' : '?') + 't=' + Date.now();
         const res = await fetch(fetchUrl, { method: 'GET', redirect: 'follow' });
+        if (!res.ok) throw new Error('پاسخ HTTP ناموفق هنگام بازخوانی از درایو: ' + res.status);
         const rawData = await res.json();
 
         const { bestSyncRecord, recoveredCases, recoveredLetters } = parseCloudResponse(rawData);
@@ -4834,5 +4866,6 @@
 }
 </style>
 
+  <script src="./nezam-operations.js?v=20261101-three-improvements"></script>
 </body>
 </html>
