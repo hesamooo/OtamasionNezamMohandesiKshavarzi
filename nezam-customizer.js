@@ -3466,3 +3466,523 @@ if (document.readyState === "loading") {
 } else {
   initBrandingAndTemplatesUI();
 }
+
+
+/* =========================================================================
+   ابزار ترسیم آنلاین روی نقشه (Leaflet): Point / Line / Polygon + تبدیل خودکار UTM
+   ========================================================================= */
+var leafletVertexLayerGroupObj = null;
+var leafletDraftLayerGroupObj = null;
+var croquisOnlineDrawMode = "";
+var croquisOnlineDraftPoints = [];
+var croquisMapVertexEditEnabled = false;
+
+function croquisMapGetLayerById(layerId) {
+  var m = getActiveCroquisMap();
+  if (!m || !Array.isArray(m.layers)) return null;
+  for (var i = 0; i < m.layers.length; i++) {
+    if (m.layers[i].id === layerId) return m.layers[i];
+  }
+  return null;
+}
+
+function croquisMapSetToolStatus(message, isError) {
+  var el = document.getElementById("crq-map-draw-status");
+  if (!el) return;
+  el.textContent = message || "";
+  el.className = "small fw-bold mt-2 " + (isError ? "text-danger" : "text-primary");
+}
+
+function croquisMapSetCoordinateReadout(point) {
+  var el = document.getElementById("crq-map-coordinate-readout");
+  if (!el || !point) return;
+  el.textContent = "Lat: " + Number(point.lat).toFixed(7) +
+    " | Lng: " + Number(point.lng).toFixed(7) +
+    " | UTM X: " + Number(point.x).toFixed(2) +
+    " | UTM Y: " + Number(point.y).toFixed(2) +
+    " | Z: " + Number(point.elev || 0).toFixed(2) +
+    " | Zone: " + point.zone;
+}
+
+function croquisMapRefreshToolButtons() {
+  var modes = ["POINT", "LINE", "POLYGON"];
+  var ids = ["crq-draw-point-btn", "crq-draw-line-btn", "crq-draw-polygon-btn"];
+  for (var i = 0; i < ids.length; i++) {
+    var btn = document.getElementById(ids[i]);
+    if (!btn) continue;
+    var active = croquisOnlineDrawMode === modes[i];
+    btn.className = "btn btn-sm " + (active ? "btn-success" : (modes[i] === "LINE" ? "btn-outline-primary" : "btn-outline-success"));
+  }
+  var finishBtn = document.getElementById("crq-draw-finish-btn");
+  if (finishBtn) finishBtn.disabled = !(croquisOnlineDrawMode === "LINE" || croquisOnlineDrawMode === "POLYGON") || croquisOnlineDraftPoints.length === 0;
+  var editBtn = document.getElementById("crq-map-edit-vertices-btn");
+  if (editBtn) {
+    editBtn.textContent = croquisMapVertexEditEnabled ? "✥ ویرایش نقاط: روشن" : "✥ ویرایش نقاط: خاموش";
+    editBtn.className = "btn btn-sm " + (croquisMapVertexEditEnabled ? "btn-dark" : "btn-outline-dark");
+  }
+}
+
+function croquisMapGetZoneString(mapObj) {
+  var selected = document.getElementById("crq-zone-select");
+  return (mapObj && mapObj.utmZone) || (selected && selected.value) || "39R";
+}
+
+function croquisMapBuildPoint(latlng, index) {
+  var m = getActiveCroquisMap();
+  var elevEl = document.getElementById("crq-map-draw-elev");
+  var elev = elevEl && elevEl.value !== "" ? parseFloat(toEn(elevEl.value)) : 0;
+  if (!isFinite(elev)) elev = 0;
+  var zone = croquisMapGetZoneString(m);
+  return createEnrichedPointFromInput(
+    Number(latlng.lng),
+    Number(latlng.lat),
+    elev,
+    zone,
+    "P" + (index + 1),
+    "GEO"
+  );
+}
+
+function croquisMapCreatePopup(layer, point, pointIndex) {
+  var wrap = document.createElement("div");
+  wrap.style.minWidth = "190px";
+  var title = document.createElement("strong");
+  title.textContent = (point.label || ("P" + (pointIndex + 1))) + " — " + (layer.name || "لایه");
+  wrap.appendChild(title);
+
+  var details = document.createElement("div");
+  details.className = "small mt-1";
+  details.textContent =
+    "X: " + Number(point.x).toFixed(2) + " | Y: " + Number(point.y).toFixed(2) +
+    " | Z: " + Number(point.elev || 0) + " | " + point.zone;
+  wrap.appendChild(details);
+
+  var actions = document.createElement("div");
+  actions.className = "d-flex gap-1 mt-2";
+  var editBtn = document.createElement("button");
+  editBtn.type = "button";
+  editBtn.className = "btn btn-sm btn-outline-primary";
+  editBtn.textContent = "ویرایش نام/ارتفاع";
+  editBtn.addEventListener("click", function () {
+    window.editCroquisMapPoint(layer.id, pointIndex);
+  });
+  var deleteBtn = document.createElement("button");
+  deleteBtn.type = "button";
+  deleteBtn.className = "btn btn-sm btn-outline-danger";
+  deleteBtn.textContent = "حذف نقطه";
+  deleteBtn.addEventListener("click", function () {
+    window.deleteCroquisMapPoint(layer.id, pointIndex);
+  });
+  actions.appendChild(editBtn);
+  actions.appendChild(deleteBtn);
+  wrap.appendChild(actions);
+  return wrap;
+}
+
+function croquisMapCommitOnlineLayer(layer) {
+  var m = getActiveCroquisMap();
+  if (!m || !layer) return;
+  var c = getActiveCase();
+  var defZone = croquisMapGetZoneString(m);
+
+  for (var i = 0; i < layer.points.length; i++) {
+    ensurePointEnriched(layer.points[i], defZone, i);
+    layer.points[i].label = layer.points[i].label || ("P" + (i + 1));
+  }
+
+  if (c && layer.category === "MAIN_PARCEL") {
+    c.utm = layer.points.map(function (pt) {
+      return pt.x + "," + pt.y + "," + (pt.elev !== undefined ? pt.elev : 0) + "," + (pt.zone || defZone);
+    }).join("\n");
+    c.utmZone = layer.points.length ? (layer.points[0].zone || defZone) : defZone;
+    var cUtm = document.getElementById("c-utm");
+    if (cUtm) cUtm.value = c.utm;
+    if (layer.geomType === "POLYGON" && layer.points.length >= 3) {
+      var areaData = computeUtmGeometry(layer.points, "POLYGON");
+      c.land = toFa(Math.round(areaData.area));
+      var landEl = document.getElementById("c-land");
+      if (landEl) landEl.value = c.land;
+    }
+  }
+
+  var keepCenter = leafletMapObj ? leafletMapObj.getCenter() : null;
+  var keepZoom = leafletMapObj ? leafletMapObj.getZoom() : null;
+
+  saveAllDB();
+  renderCroquisLayersList();
+  loadActiveLayerIntoEditor();
+  renderCroquisVisualCanvas();
+
+  if (leafletMapObj && keepCenter && keepZoom !== null) {
+    leafletMapObj.setView(keepCenter, keepZoom, { animate: false });
+  }
+}
+
+function croquisMapRedrawDraft() {
+  if (!leafletDraftLayerGroupObj || typeof L === "undefined") return;
+  leafletDraftLayerGroupObj.clearLayers();
+  if (!croquisOnlineDraftPoints.length) return;
+
+  var ll = croquisOnlineDraftPoints.map(function (pt) { return [pt.lat, pt.lng]; });
+  var draftColor = "#f59e0b";
+  if (croquisOnlineDrawMode === "POLYGON" && ll.length >= 3) {
+    L.polygon(ll, { color: draftColor, weight: 3, dashArray: "7 5", fillColor: draftColor, fillOpacity: 0.14 }).addTo(leafletDraftLayerGroupObj);
+  } else if (ll.length >= 2) {
+    L.polyline(ll, { color: draftColor, weight: 3, dashArray: "7 5" }).addTo(leafletDraftLayerGroupObj);
+  }
+  for (var i = 0; i < ll.length; i++) {
+    L.circleMarker(ll[i], { radius: 6, color: "#7c2d12", fillColor: draftColor, fillOpacity: 1, weight: 2 })
+      .bindTooltip("P" + (i + 1))
+      .addTo(leafletDraftLayerGroupObj);
+  }
+}
+
+function croquisMapHandleClick(event) {
+  if (!croquisOnlineDrawMode) return;
+  var m = getActiveCroquisMap();
+  var layer = getActiveCroquisLayer();
+  if (!m || !layer || !event || !event.latlng) return;
+
+  if (croquisOnlineDrawMode === "POINT") {
+    if (layer.geomType !== "POINT") layer.geomType = "POINT";
+    var point = croquisMapBuildPoint(event.latlng, layer.points.length);
+    layer.points.push(point);
+    croquisMapSetCoordinateReadout(point);
+    croquisMapCommitOnlineLayer(layer);
+    croquisMapSetToolStatus("✅ نقطه " + point.label + " با مختصات UTM استخراج و در لایه ذخیره شد. برای ثبت نقطه بعدی روی نقشه کلیک کنید.");
+    return;
+  }
+
+  var draftPoint = croquisMapBuildPoint(event.latlng, croquisOnlineDraftPoints.length);
+  croquisOnlineDraftPoints.push(draftPoint);
+  croquisMapSetCoordinateReadout(draftPoint);
+  croquisMapRedrawDraft();
+
+  var geom = computeUtmGeometry(croquisOnlineDraftPoints, croquisOnlineDrawMode);
+  var summary = croquisOnlineDrawMode === "POLYGON"
+    ? (" | مساحت تقریبی فعلی: " + toFa(Math.round(geom.area)) + " مترمربع")
+    : (" | طول مسیر فعلی: " + toFa(geom.perim.toFixed(1)) + " متر");
+  croquisMapSetToolStatus(
+    "نقاط ترسیم موقت: " + croquisOnlineDraftPoints.length + "؛ نقطه بعدی را انتخاب کنید." + summary
+  );
+  croquisMapRefreshToolButtons();
+}
+
+function croquisMapAttachEventsAndVertexHandles(options) {
+  if (!leafletMapObj || typeof L === "undefined") return;
+
+  if (!leafletVertexLayerGroupObj) leafletVertexLayerGroupObj = L.layerGroup().addTo(leafletMapObj);
+  if (!leafletDraftLayerGroupObj) leafletDraftLayerGroupObj = L.layerGroup().addTo(leafletMapObj);
+
+  if (!leafletMapObj.__croquisOnlineDrawingBound) {
+    leafletMapObj.on("click", croquisMapHandleClick);
+    leafletMapObj.__croquisOnlineDrawingBound = true;
+  }
+
+  leafletVertexLayerGroupObj.clearLayers();
+  var m = getActiveCroquisMap();
+  if (!m) return;
+
+  for (var i = 0; i < m.layers.length; i++) {
+    var layer = m.layers[i];
+    if (!layer.visible || !Array.isArray(layer.points)) continue;
+
+    for (var j = 0; j < layer.points.length; j++) {
+      var pt = ensurePointEnriched(layer.points[j], m.utmZone || "39R", j);
+      var ll = [pt.lat, pt.lng];
+      var marker = L.marker(ll, { draggable: croquisMapVertexEditEnabled });
+      marker.addTo(leafletVertexLayerGroupObj);
+      marker.bindPopup(croquisMapCreatePopup(layer, pt, j));
+
+      if (croquisMapVertexEditEnabled) {
+        (function (targetLayerId, targetIndex) {
+          marker.on("dragend", function (dragEvent) {
+            var next = dragEvent.target.getLatLng();
+            window.moveCroquisMapPoint(targetLayerId, targetIndex, next.lat, next.lng);
+          });
+        })(layer.id, j);
+      }
+    }
+  }
+
+  if (options && options.preserveView && options.center && options.zoom !== undefined) {
+    leafletMapObj.setView(options.center, options.zoom, { animate: false });
+  }
+}
+
+var croquisBaseRenderLeafletMap = renderCroquisLeafletMap;
+renderCroquisLeafletMap = function (options) {
+  var center = leafletMapObj ? leafletMapObj.getCenter() : null;
+  var zoom = leafletMapObj ? leafletMapObj.getZoom() : null;
+  croquisBaseRenderLeafletMap();
+  if (!leafletMapObj || typeof L === "undefined") return;
+
+  if (options && options.preserveView && center && zoom !== null) {
+    croquisMapAttachEventsAndVertexHandles({ preserveView: true, center: center, zoom: zoom });
+  } else {
+    croquisMapAttachEventsAndVertexHandles();
+  }
+  croquisMapRedrawDraft();
+};
+
+window.setMapDrawingMode = function (mode) {
+  if (["POINT", "LINE", "POLYGON"].indexOf(mode) === -1) return;
+  var layer = getActiveCroquisLayer();
+  if (!layer) {
+    alert("ابتدا یک نقشه و لایه فعال انتخاب کنید.");
+    return;
+  }
+
+  if (mode === "POINT" && layer.points.length && layer.geomType !== "POINT") {
+    if (!confirm("لایه فعال از نوع دیگری است. نقاط قبلی پاک و لایه به حالت نقطه‌ای تبدیل شود؟")) return;
+    layer.points = [];
+    layer.geomType = "POINT";
+    croquisMapCommitOnlineLayer(layer);
+  } else if ((mode === "LINE" || mode === "POLYGON") && layer.points.length) {
+    if (!confirm("این ابزار هندسه موجود لایه را با ترسیم جدید جایگزین می‌کند. ادامه می‌دهید؟")) return;
+  }
+
+  if (mode === "LINE" || mode === "POLYGON") {
+    layer.geomType = mode;
+    var typeEl = document.getElementById("edit-lyr-type");
+    if (typeEl) typeEl.value = mode;
+  }
+
+  if (croquisViewMode !== "MAP") switchCroquisViewMode("MAP");
+  croquisOnlineDrawMode = mode;
+  croquisOnlineDraftPoints = [];
+  if (leafletDraftLayerGroupObj) leafletDraftLayerGroupObj.clearLayers();
+  if (leafletMapObj && leafletMapObj.doubleClickZoom) leafletMapObj.doubleClickZoom.disable();
+  croquisMapRefreshToolButtons();
+
+  var instructions = mode === "POINT"
+    ? "ابزار ثبت نقطه فعال است؛ روی نقشه کلیک کنید. هر کلیک یک نقطه UTM در لایه فعال ذخیره می‌کند."
+    : (mode === "LINE"
+      ? "ابزار رسم مسیر فعال است؛ رأس‌ها را به ترتیب کلیک کنید و در پایان «اتمام ترسیم» را بزنید."
+      : "ابزار رسم محدوده فعال است؛ حداقل سه رأس را به ترتیب کلیک کنید و در پایان «اتمام ترسیم» را بزنید.");
+  croquisMapSetToolStatus(instructions);
+};
+
+window.finishMapDrawing = function () {
+  if (croquisOnlineDrawMode !== "LINE" && croquisOnlineDrawMode !== "POLYGON") {
+    croquisMapSetToolStatus("برای نقطه‌گذاری نیازی به دکمه اتمام نیست.");
+    return;
+  }
+  var required = croquisOnlineDrawMode === "POLYGON" ? 3 : 2;
+  if (croquisOnlineDraftPoints.length < required) {
+    croquisMapSetToolStatus("برای این ترسیم حداقل " + required + " نقطه لازم است.", true);
+    return;
+  }
+  var layer = getActiveCroquisLayer();
+  if (!layer) return;
+  layer.geomType = croquisOnlineDrawMode;
+  layer.points = croquisOnlineDraftPoints.map(function (pt, idx) {
+    var copy = Object.assign({}, pt);
+    copy.label = "P" + (idx + 1);
+    return copy;
+  });
+  var finishedMode = croquisOnlineDrawMode;
+  var count = layer.points.length;
+  var geom = computeUtmGeometry(layer.points, finishedMode);
+  croquisOnlineDraftPoints = [];
+  croquisOnlineDrawMode = "";
+  if (leafletDraftLayerGroupObj) leafletDraftLayerGroupObj.clearLayers();
+  if (leafletMapObj && leafletMapObj.doubleClickZoom) leafletMapObj.doubleClickZoom.enable();
+  croquisMapCommitOnlineLayer(layer);
+  croquisMapRefreshToolButtons();
+  croquisMapSetToolStatus(
+    "✅ ترسیم " + (finishedMode === "POLYGON" ? "محدوده" : "مسیر") +
+    " با " + count + " رأس ثبت شد." +
+    (finishedMode === "POLYGON"
+      ? " مساحت: " + toFa(Math.round(geom.area)) + " مترمربع (" + toFa(geom.ha.toFixed(3)) + " هکتار)، محیط: " + toFa(geom.perim.toFixed(1)) + " متر."
+      : " طول مسیر: " + toFa(geom.perim.toFixed(1)) + " متر.")
+  );
+};
+
+window.undoMapDrawingPoint = function () {
+  if (croquisOnlineDraftPoints.length) {
+    croquisOnlineDraftPoints.pop();
+    croquisMapRedrawDraft();
+    croquisMapRefreshToolButtons();
+    croquisMapSetToolStatus("آخرین رأس از ترسیم موقت حذف شد. تعداد رأس‌ها: " + croquisOnlineDraftPoints.length);
+    return;
+  }
+  if (croquisOnlineDrawMode === "POINT") {
+    var layer = getActiveCroquisLayer();
+    if (layer && layer.points.length) {
+      layer.points.pop();
+      croquisMapCommitOnlineLayer(layer);
+      croquisMapSetToolStatus("آخرین نقطه از لایه فعال حذف شد.");
+    }
+  }
+};
+
+window.cancelMapDrawing = function () {
+  croquisOnlineDrawMode = "";
+  croquisOnlineDraftPoints = [];
+  if (leafletDraftLayerGroupObj) leafletDraftLayerGroupObj.clearLayers();
+  if (leafletMapObj && leafletMapObj.doubleClickZoom) leafletMapObj.doubleClickZoom.enable();
+  croquisMapRefreshToolButtons();
+  croquisMapSetToolStatus("ابزار ترسیم متوقف شد؛ نقاط ذخیره‌شده حفظ شدند.");
+};
+
+window.setCroquisMapVertexEdit = function () {
+  croquisMapVertexEditEnabled = !croquisMapVertexEditEnabled;
+  croquisMapRefreshToolButtons();
+  if (leafletMapObj) {
+    var center = leafletMapObj.getCenter();
+    var zoom = leafletMapObj.getZoom();
+    renderCroquisLeafletMap({ preserveView: true, center: center, zoom: zoom });
+  }
+  croquisMapSetToolStatus(croquisMapVertexEditEnabled
+    ? "حالت ویرایش روشن است؛ نشانگر هر رأس را با ماوس جابه‌جا کنید."
+    : "حالت ویرایش نقاط خاموش شد.");
+};
+
+window.moveCroquisMapPoint = function (layerId, pointIndex, lat, lng) {
+  var layer = croquisMapGetLayerById(layerId);
+  if (!layer || !layer.points[pointIndex]) return;
+  var old = layer.points[pointIndex];
+  layer.points[pointIndex] = createEnrichedPointFromInput(
+    Number(lng), Number(lat), old.elev || 0, old.zone || croquisMapGetZoneString(getActiveCroquisMap()),
+    old.label || ("P" + (pointIndex + 1)), "GEO"
+  );
+  croquisMapSetCoordinateReadout(layer.points[pointIndex]);
+  croquisMapCommitOnlineLayer(layer);
+  croquisMapSetToolStatus("✅ جابه‌جایی رأس ذخیره شد و مختصات UTM آن دوباره محاسبه شد.");
+};
+
+window.editCroquisMapPoint = function (layerId, pointIndex) {
+  var layer = croquisMapGetLayerById(layerId);
+  if (!layer || !layer.points[pointIndex]) return;
+  var pt = layer.points[pointIndex];
+  var label = prompt("نام یا کد نقطه:", pt.label || ("P" + (pointIndex + 1)));
+  if (label === null) return;
+  var elevation = prompt("ارتفاع نقطه (متر):", String(pt.elev || 0));
+  if (elevation === null) return;
+  var elev = parseFloat(toEn(elevation));
+  if (!isFinite(elev)) {
+    alert("ارتفاع واردشده معتبر نیست.");
+    return;
+  }
+  pt.label = label.trim() || ("P" + (pointIndex + 1));
+  pt.elev = elev;
+  croquisMapCommitOnlineLayer(layer);
+  croquisMapSetToolStatus("مشخصات نقطه و ارتفاع آن ذخیره شد.");
+};
+
+window.deleteCroquisMapPoint = function (layerId, pointIndex) {
+  var layer = croquisMapGetLayerById(layerId);
+  if (!layer || !layer.points[pointIndex]) return;
+  layer.points.splice(pointIndex, 1);
+  croquisMapCommitOnlineLayer(layer);
+  croquisMapSetToolStatus("نقطه حذف شد؛ جدول UTM و نقشه به‌روزرسانی شدند.");
+};
+
+window.clearActiveMapLayerPoints = function () {
+  var layer = getActiveCroquisLayer();
+  if (!layer || !layer.points.length) return;
+  if (!confirm("تمام نقاط لایه فعال «" + layer.name + "» حذف شوند؟")) return;
+  layer.points = [];
+  croquisOnlineDraftPoints = [];
+  if (leafletDraftLayerGroupObj) leafletDraftLayerGroupObj.clearLayers();
+  croquisMapCommitOnlineLayer(layer);
+  croquisMapSetToolStatus("تمام نقاط لایه فعال پاک شدند.");
+};
+
+window.locateOnCroquisMap = function () {
+  if (!leafletMapObj) {
+    switchCroquisViewMode("MAP");
+  }
+  if (!navigator.geolocation) {
+    croquisMapSetToolStatus("مرورگر شما از موقعیت‌یابی GPS پشتیبانی نمی‌کند.", true);
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(function (position) {
+    if (!leafletMapObj) return;
+    var lat = position.coords.latitude;
+    var lng = position.coords.longitude;
+    leafletMapObj.setView([lat, lng], 19);
+    var zone = croquisMapGetZoneString(getActiveCroquisMap());
+    var pt = createEnrichedPointFromInput(lng, lat, 0, zone, "GPS", "GEO");
+    croquisMapSetCoordinateReadout(pt);
+    croquisMapSetToolStatus("موقعیت GPS دستگاه روی نقشه نمایش داده شد. برای ثبت آن، ابزار «ثبت نقطه» را فعال کرده و روی محل کلیک کنید.");
+  }, function (err) {
+    croquisMapSetToolStatus("دریافت موقعیت GPS انجام نشد: " + (err.message || "دسترسی رد شد."), true);
+  }, { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 });
+};
+
+window.copyActiveLayerUTM = function () {
+  var layer = getActiveCroquisLayer();
+  if (!layer || !layer.points.length) {
+    alert("لایه فعال نقطه‌ای برای کپی ندارد.");
+    return;
+  }
+  var m = getActiveCroquisMap();
+  var zone = croquisMapGetZoneString(m);
+  var text = layer.points.map(function (pt, idx) {
+    ensurePointEnriched(pt, zone, idx);
+    return pt.x + "," + pt.y + "," + (pt.elev || 0) + "," + (pt.zone || zone);
+  }).join("\n");
+
+  function done() { croquisMapSetToolStatus("مختصات UTM لایه فعال در حافظه موقت کپی شد."); }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(function () {
+      var ta = document.createElement("textarea");
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      ta.remove();
+      done();
+    });
+  } else {
+    var fallback = document.createElement("textarea");
+    fallback.value = text;
+    document.body.appendChild(fallback);
+    fallback.select();
+    document.execCommand("copy");
+    fallback.remove();
+    done();
+  }
+};
+
+window.exportCroquisGeoJSON = function () {
+  var m = getActiveCroquisMap();
+  if (!m) return;
+  var features = [];
+  for (var i = 0; i < m.layers.length; i++) {
+    var layer = m.layers[i];
+    if (!layer.points || !layer.points.length) continue;
+    var pts = layer.points.map(function (pt, idx) {
+      ensurePointEnriched(pt, m.utmZone || "39R", idx);
+      return [pt.lng, pt.lat, Number(pt.elev || 0)];
+    });
+    var geometry = null;
+    if (layer.geomType === "POLYGON" && pts.length >= 3) {
+      var ring = pts.slice();
+      ring.push(pts[0].slice());
+      geometry = { type: "Polygon", coordinates: [ring] };
+    } else if (layer.geomType === "LINE" && pts.length >= 2) {
+      geometry = { type: "LineString", coordinates: pts };
+    } else if (pts.length === 1) {
+      geometry = { type: "Point", coordinates: pts[0] };
+    } else {
+      geometry = { type: "MultiPoint", coordinates: pts };
+    }
+    features.push({
+      type: "Feature",
+      properties: { name: layer.name, category: layer.category, geomType: layer.geomType, utmZone: m.utmZone || "39R" },
+      geometry: geometry
+    });
+  }
+  var geojson = { type: "FeatureCollection", name: m.title || "Croquis", features: features };
+  var blob = new Blob([JSON.stringify(geojson, null, 2)], { type: "application/geo+json;charset=utf-8" });
+  var link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = (m.title || "Croquis").replace(/[^\w\u0600-\u06FF-]+/g, "_") + ".geojson";
+  link.click();
+  URL.revokeObjectURL(link.href);
+  croquisMapSetToolStatus("خروجی GeoJSON نقشه آماده شد.");
+};
+
