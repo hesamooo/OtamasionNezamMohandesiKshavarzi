@@ -1815,27 +1815,15 @@ function importFullSystemBackup(e) {
 /* دانلود نسخه تک‌فایلی مستقل ویندوز (HTML خودکفا که روی هر مرورگری با دابل‌کلیک باز می‌شود و شامل کل اطلاعات فعلی است) */
 window.downloadStandaloneWindowsHTML = async function() {
   try {
-    showToastMsg("⏳ در حال ساخت فایل تک‌صفحه‌ای مستقل ویندوز (شامل کل پرونده‌ها و نامه‌ها)...");
+    showToastMsg("⏳ در حال ساخت نسخه مستقل ویندوز و آماده‌سازی فایل‌های برنامه...");
     var docClone = document.documentElement.cloneNode(true);
-
-    // پاکسازی المان‌های موقت پیش‌نمایش در کلون تا در شروع مجدد تمیز رندر شوند
-    var scripts = docClone.querySelectorAll("script[src]");
-    var hasExternalScripts = false;
-    for (var i = 0; i < scripts.length; i++) {
-      var src = scripts[i].getAttribute("src") || "";
-      if (src.indexOf("nezam-core.js") !== -1 || src.indexOf("nezam-customizer.js") !== -1 || src.indexOf("nezam-ai-assistant.js") !== -1) {
-        hasExternalScripts = true;
-        scripts[i].remove();
-      }
-    }
-
     var bodyEl = docClone.querySelector("body");
+    if (!bodyEl) throw new Error("ساختار صفحه برای تهیه نسخه مستقل کامل نیست.");
 
-    // تزریق اسنپ‌شات اطلاعات فعلی تا در هر کامپیوتر دیگری با تمام پرونده‌ها و نامه‌ها باز شود
+    // قراردادن تصویر لحظه‌ای اطلاعات پیش از اجرای هر ماژول اصلی
     var oldSnap = docClone.querySelector("#embedded-db-snapshot");
     if (oldSnap) oldSnap.remove();
-    var snapScript = document.createElement("script");
-    snapScript.id = "embedded-db-snapshot";
+
     var snapshotPayload = {
       casesDB: casesDB,
       lettersDB: lettersDB,
@@ -1846,45 +1834,72 @@ window.downloadStandaloneWindowsHTML = async function() {
       tplCfg: typeof tplCfg !== "undefined" ? tplCfg : null,
       paperSize: typeof currentPaperSize !== "undefined" ? currentPaperSize : "A4"
     };
+    var safeSnapshotJson = JSON.stringify(snapshotPayload)
+      .replace(/</g, "\\u003c")
+      .replace(/\u2028/g, "\\u2028")
+      .replace(/\u2029/g, "\\u2029");
+
+    var snapScript = document.createElement("script");
+    snapScript.id = "embedded-db-snapshot";
     snapScript.textContent =
-      "(function(){\n" +
-      "  try {\n" +
-      "    var snap = " + JSON.stringify(snapshotPayload) + ";\n" +
-      "    if (!localStorage.getItem('nezam636_unified_cases') && snap.casesDB) localStorage.setItem('nezam636_unified_cases', JSON.stringify(snap.casesDB));\n" +
-      "    if (!localStorage.getItem('nezam636_letters') && snap.lettersDB) localStorage.setItem('nezam636_letters', JSON.stringify(snap.lettersDB));\n" +
-      "    if (!localStorage.getItem('nezam636_tasks') && snap.tasksDB) localStorage.setItem('nezam636_tasks', JSON.stringify(snap.tasksDB));\n" +
-      "    if (!localStorage.getItem('nezam636_act_specs_v3') && snap.actSpecs) localStorage.setItem('nezam636_act_specs_v3', JSON.stringify(snap.actSpecs));\n" +
-      "    if (!localStorage.getItem('nezam636_doc_checklists_v2') && snap.docChecklists) localStorage.setItem('nezam636_doc_checklists_v2', JSON.stringify(snap.docChecklists));\n" +
-      "    if (!localStorage.getItem('nezam636_branding_cfg') && snap.brandCfg) localStorage.setItem('nezam636_branding_cfg', JSON.stringify(snap.brandCfg));\n" +
-      "    if (!localStorage.getItem('nezam636_templates_cfg') && snap.tplCfg) localStorage.setItem('nezam636_templates_cfg', JSON.stringify(snap.tplCfg));\n" +
-      "    if (!localStorage.getItem('nezam636_paper_size') && snap.paperSize) localStorage.setItem('nezam636_paper_size', snap.paperSize);\n" +
-      "  } catch(e) {}\n" +
-      "})();";
+      "(function(){try{var snap=" + safeSnapshotJson + ";" +
+      "if(!localStorage.getItem('nezam636_unified_cases')&&snap.casesDB)localStorage.setItem('nezam636_unified_cases',JSON.stringify(snap.casesDB));" +
+      "if(!localStorage.getItem('nezam636_letters')&&snap.lettersDB)localStorage.setItem('nezam636_letters',JSON.stringify(snap.lettersDB));" +
+      "if(!localStorage.getItem('nezam636_tasks')&&snap.tasksDB)localStorage.setItem('nezam636_tasks',JSON.stringify(snap.tasksDB));" +
+      "if(!localStorage.getItem('nezam636_act_specs_v3')&&snap.actSpecs)localStorage.setItem('nezam636_act_specs_v3',JSON.stringify(snap.actSpecs));" +
+      "if(!localStorage.getItem('nezam636_doc_checklists_v2')&&snap.docChecklists)localStorage.setItem('nezam636_doc_checklists_v2',JSON.stringify(snap.docChecklists));" +
+      "if(!localStorage.getItem('nezam636_branding_cfg')&&snap.brandCfg)localStorage.setItem('nezam636_branding_cfg',JSON.stringify(snap.brandCfg));" +
+      "if(!localStorage.getItem('nezam636_templates_cfg')&&snap.tplCfg)localStorage.setItem('nezam636_templates_cfg',JSON.stringify(snap.tplCfg));" +
+      "if(!localStorage.getItem('nezam636_paper_size')&&snap.paperSize)localStorage.setItem('nezam636_paper_size',snap.paperSize);" +
+      "}catch(e){console.error('Nezam636 snapshot restore failed',e);}})();";
     bodyEl.insertBefore(snapScript, bodyEl.firstChild);
 
-    if (hasExternalScripts) {
-      var c1 = await fetch("./nezam-core.js").then(function(r) { return r.text(); });
-      var c2 = await fetch("./nezam-customizer.js").then(function(r) { return r.text(); });
-      var s1 = document.createElement("script"); s1.textContent = c1; bodyEl.appendChild(s1);
-      var s2 = document.createElement("script"); s2.textContent = c2; bodyEl.appendChild(s2);
-      try {
-        var c3 = await fetch("./nezam-ai-assistant.js").then(function(r) { return r.text(); });
-        var s3 = document.createElement("script"); s3.textContent = c3; bodyEl.appendChild(s3);
-      } catch (err) {}
+    // ماژول‌ها در همان جای اصلی خود به اسکریپت داخلی تبدیل می‌شوند تا ترتیب وابستگی‌ها حفظ شود.
+    var externalScripts = Array.prototype.slice.call(docClone.querySelectorAll("script[src]"));
+    var bundledNames = ["nezam-core.js", "nezam-customizer.js", "nezam-ai-assistant.js"];
+    var bundledCount = 0;
+
+    for (var i = 0; i < externalScripts.length; i++) {
+      var oldScript = externalScripts[i];
+      var src = oldScript.getAttribute("src") || "";
+      if (!bundledNames.some(function(name) { return src.indexOf(name) !== -1; })) continue;
+
+      var response = await fetch(src, { cache: "no-store" });
+      if (!response.ok) {
+        throw new Error("دریافت فایل " + src + " ناموفق بود (HTTP " + response.status + ").");
+      }
+      var scriptText = await response.text();
+      if (!scriptText.trim()) throw new Error("فایل برنامه خالی است: " + src);
+
+      var inlineScript = document.createElement("script");
+      inlineScript.textContent = scriptText.replace(/<\/script/gi, "<\\/script");
+      oldScript.parentNode.replaceChild(inlineScript, oldScript);
+      bundledCount++;
+    }
+
+    if (bundledCount !== bundledNames.length) {
+      throw new Error("همه ماژول‌های اصلی برای ساخت نسخه مستقل پیدا نشدند.");
     }
 
     var fullHtml = "<!DOCTYPE html>\n" + docClone.outerHTML;
     var blob = new Blob([fullHtml], { type: "text/html;charset=utf-8" });
-    var a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "Nezam636_Khafr_Windows_Offline.html";
-    a.click();
-    showToastMsg("✅ فایل تک‌صفحه‌ای خودکفای ویندوز دانلود شد! روی هر سیستمی بدون نیاز به نصب و اینترنت با دابل‌کلیک اجرا می‌شود.");
-  } catch (e) {
-    alert("در حالت باز بودن مستقیم از روی هارد، می‌توانید از دکمه «پشتیبان کامل (Backup)» نیز برای ذخیره اطلاعات استفاده نمایید.");
+    var objectUrl = URL.createObjectURL(blob);
+    var link = document.createElement("a");
+    link.href = objectUrl;
+    link.download = "Nezam636_Windows_Offline.html";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(function() { URL.revokeObjectURL(objectUrl); }, 3000);
+
+    showToastMsg("✅ نسخه مستقل ویندوز با ترتیب صحیح ماژول‌ها ساخته و دانلود شد.");
+  } catch (error) {
+    console.error("Standalone HTML build failed:", error);
+    alert("ساخت نسخه مستقل انجام نشد.\n" +
+      (error && error.message ? error.message : "اتصال اینترنت یا دسترسی به فایل‌های اصلی را بررسی کنید.") +
+      "\n\nبرای حفظ اطلاعات، ابتدا از بخش پشتیبان‌گیری فایل JSON تهیه کنید.");
   }
 };
-
 function initAppCore() {
   var tipBox = document.getElementById("smart-mouse-tooltip");
   if (tipBox) {
