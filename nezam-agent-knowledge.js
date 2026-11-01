@@ -216,6 +216,71 @@
       reader.readAsDataURL(file);
     });
   }
+
+  function textToBase64(text) {
+    try { return btoa(unescape(encodeURIComponent(String(text || '')))); }
+    catch (err) { throw new Error('تبدیل متن فارسی به قالب بارگذاری ابری ناموفق بود.'); }
+  }
+  async function uploadOriginalToDrive(doc, file) {
+    if (typeof window.saveNezaam636KnowledgeFileToDrive !== 'function') {
+      throw new Error('درگاه ذخیره مخزن دانش در Google Drive بارگذاری نشده است.');
+    }
+    var base64 = await fileToBase64(file);
+    var meta = {
+      kind: 'NEZAM636_KNOWLEDGE_ORIGINAL',
+      documentId: doc.id,
+      name: doc.name,
+      category: doc.category,
+      issuer: doc.issuer,
+      effectiveDate: doc.effectiveDate,
+      description: doc.description
+    };
+    var result = await window.saveNezaam636KnowledgeFileToDrive({
+      fileName: doc.id + '__' + doc.name.replace(/[\\/:*?"<>|]/g, '_'),
+      fileType: doc.mime || 'application/octet-stream',
+      fileData: base64,
+      description: JSON.stringify(meta)
+    });
+    doc.driveStatus = 'saved';
+    doc.driveSavedAt = Date.now();
+    doc.driveFileName = doc.id + '__' + doc.name;
+    doc.driveUrl = result && (result.webViewLink || result.fileUrl || result.url || result.driveUrl) || '';
+    doc.driveError = '';
+    return doc;
+  }
+  async function uploadExtractedTextToDrive(doc) {
+    if (typeof window.saveNezaam636KnowledgeFileToDrive !== 'function') {
+      throw new Error('درگاه ذخیره مخزن دانش در Google Drive بارگذاری نشده است.');
+    }
+    if (!doc.text) return;
+    var fileName = doc.id + '__متن_استخراج_شده.txt';
+    var result = await window.saveNezaam636KnowledgeFileToDrive({
+      fileName: fileName,
+      fileType: 'text/plain',
+      fileData: textToBase64(doc.text),
+      description: JSON.stringify({
+        kind: 'NEZAM636_KNOWLEDGE_TEXT',
+        documentId: doc.id,
+        sourceName: doc.name,
+        category: doc.category,
+        issuer: doc.issuer,
+        effectiveDate: doc.effectiveDate,
+        indexedAt: doc.indexedAt
+      })
+    });
+    doc.driveTextStatus = 'saved';
+    doc.driveTextSavedAt = Date.now();
+    doc.driveTextUrl = result && (result.webViewLink || result.fileUrl || result.url || result.driveUrl) || '';
+    return doc;
+  }
+  async function syncKnowledgeSnapshot(showAlert) {
+    if (typeof window.syncAllDataToDrive !== 'function') {
+      throw new Error('اتصال همگام‌سازی Google Drive در دسترس نیست.');
+    }
+    var result = await window.syncAllDataToDrive(Boolean(showAlert));
+    if (result !== true) throw new Error('پشتیبان مخزن دانش در Google Drive تأیید نشد؛ فایل محلی باقی مانده است.');
+    return true;
+  }
   function getMime(file, ext) {
     if (file.type) return file.type;
     var map = { pdf: 'application/pdf', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', bmp: 'image/bmp' };
@@ -275,6 +340,22 @@
 
     await putDocument(doc);
     renderList();
+    try {
+      await uploadOriginalToDrive(doc, file);
+      if (doc.status === 'indexed' && doc.text) await uploadExtractedTextToDrive(doc);
+      await putDocument(doc);
+      await syncKnowledgeSnapshot(false);
+      doc.cloudIndexStatus = 'saved';
+      doc.cloudIndexError = '';
+      await putDocument(doc);
+    } catch (cloudError) {
+      doc.driveStatus = doc.driveStatus || 'failed';
+      doc.driveError = String(cloudError && cloudError.message ? cloudError.message : cloudError).slice(0, 500);
+      doc.cloudIndexStatus = 'pending';
+      doc.cloudIndexError = doc.driveError;
+      await putDocument(doc);
+    }
+    renderList();
     return doc;
   }
 
@@ -330,6 +411,18 @@
       doc.extractionNote = 'متن با مدل هوش مصنوعی استخراج شده و باید با سند اصلی تطبیق داده شود؛ به‌خصوص اعداد و مواد قانونی.';
       doc.error = '';
       await putDocument(doc);
+      try {
+        await uploadExtractedTextToDrive(doc);
+        await putDocument(doc);
+        await syncKnowledgeSnapshot(false);
+        doc.cloudIndexStatus = 'saved';
+        doc.cloudIndexError = '';
+        await putDocument(doc);
+      } catch (cloudError) {
+        doc.cloudIndexStatus = 'pending';
+        doc.cloudIndexError = String(cloudError && cloudError.message ? cloudError.message : cloudError).slice(0, 500);
+        await putDocument(doc);
+      }
       renderList();
       return true;
     } catch (err) {
@@ -428,16 +521,26 @@
         var action = d.status === 'needs-ai'
           ? '<button type="button" data-kv-action="extract" data-kv-id="' + esc(d.id) + '">خواندن با Gemini</button>'
           : '';
+        var cloudLabel = d.driveStatus === 'saved'
+          ? '<span class="kv-status ok">اصل فایل در Google Drive ذخیره شد</span>'
+          : '<span class="kv-status wait">ذخیره ابری تأیید نشده</span>';
+        var retry = d.driveStatus !== 'saved' && d.blob
+          ? '<button type="button" data-kv-action="retry" data-kv-id="' + esc(d.id) + '">ارسال مجدد به Drive</button>' : '';
+        var download = d.blob
+          ? '<button type="button" data-kv-action="download" data-kv-id="' + esc(d.id) + '">دانلود فایل</button>'
+          : '<small>فایل اصلی در پوشه کتابخانه Google Drive نگهداری می‌شود.</small>';
         return '<article class="kv-doc"><div class="kv-doc-main"><b>' + esc(d.name) + '</b><small>' +
           esc(d.category || 'عمومی') + (d.issuer ? ' · ' + esc(d.issuer) : '') +
           (d.effectiveDate ? ' · ' + esc(d.effectiveDate) : '') +
-          ' · ' + formatBytes(d.size || 0) + '</small><div>' + statusLabel(d) + '</div>' +
+          ' · ' + formatBytes(d.size || 0) + '</small><div>' + statusLabel(d) + ' ' + cloudLabel + '</div>' +
           (d.error ? '<p class="kv-error">' + esc(d.error) + '</p>' : '') +
+          (d.driveError ? '<p class="kv-error">خطای Drive: ' + esc(d.driveError) + '</p>' : '') +
+          (d.cloudIndexError ? '<p class="kv-error">پشتیبان دانش: ' + esc(d.cloudIndexError) + '</p>' : '') +
           (d.extractionNote ? '<p class="kv-note">' + esc(d.extractionNote) + '</p>' : '') +
           (d.status === 'indexed' ? '<small>متن استخراج‌شده: ' + esc(d.charCount || 0) + ' نویسه · قطعه: ' + esc((d.chunks || []).length) + '</small>' : '') +
-          '</div><div class="kv-doc-actions">' + action +
+          '</div><div class="kv-doc-actions">' + action + retry +
           '<button type="button" data-kv-action="read" data-kv-id="' + esc(d.id) + '">نمایش متن</button>' +
-          '<button type="button" data-kv-action="download" data-kv-id="' + esc(d.id) + '">دانلود فایل</button>' +
+          download +
           '<button type="button" data-kv-action="delete" data-kv-id="' + esc(d.id) + '">حذف</button></div></article>';
       }).join('');
     } catch (err) {
@@ -564,6 +667,16 @@
         button.textContent = 'در حال خواندن...';
         await extractWithGemini(id);
         toast('متن سند استخراج و وارد فهرست جستجو شد.');
+      } else if (action === 'retry') {
+        var retryDoc = await getDocument(id);
+        if (!retryDoc || !retryDoc.blob) throw new Error('فایل اصلی در این مرورگر موجود نیست؛ آن را از رایانه دوباره انتخاب کن.');
+        await uploadOriginalToDrive(retryDoc, retryDoc.blob);
+        if (retryDoc.status === 'indexed' && retryDoc.text) await uploadExtractedTextToDrive(retryDoc);
+        await putDocument(retryDoc);
+        await syncKnowledgeSnapshot(false);
+        retryDoc.cloudIndexStatus = 'saved';
+        await putDocument(retryDoc);
+        toast('ذخیره سند و فهرست دانش در Google Drive تأیید شد.');
       } else if (action === 'delete') {
         if (!confirm('سند و متن استخراج‌شده آن از مخزن محلی حذف شود؟')) return;
         await deleteDocument(id);
@@ -685,6 +798,124 @@
       chars: docs.reduce(function (sum, d) { return sum + (d.charCount || 0); }, 0)
     };
   }
+  async function readCaseFilesForExport() {
+    return new Promise(function (resolve) {
+      if (!window.indexedDB) return resolve([]);
+      var req = indexedDB.open('Nezam636_UnifiedFiles_DB', 1);
+      req.onupgradeneeded = function () {
+        var db = req.result;
+        if (!db.objectStoreNames.contains('docs')) db.createObjectStore('docs', { keyPath: 'key' });
+      };
+      req.onsuccess = function () {
+        var db = req.result;
+        try {
+          var tx = db.transaction(['docs'], 'readonly');
+          var get = tx.objectStore('docs').getAll();
+          get.onsuccess = function () {
+            resolve((get.result || []).map(function (d) {
+              return {
+                key: d.key, caseId: d.caseId, docCode: d.docCode, docTitle: d.docTitle,
+                fileName: d.fileName, uploadDate: d.uploadDate,
+                dataUrl: typeof d.dataUrl === 'string' && d.dataUrl.length <= 2200000 ? d.dataUrl : '',
+                cloudOmitted: Boolean(d.dataUrl && d.dataUrl.length > 2200000)
+              };
+            }));
+          };
+          get.onerror = function () { resolve([]); };
+        } catch (e) { resolve([]); }
+      };
+      req.onerror = function () { resolve([]); };
+    });
+  }
+
+  async function writeCaseFilesFromImport(list) {
+    if (!Array.isArray(list) || !list.length || !window.indexedDB) return;
+    await new Promise(function (resolve) {
+      var req = indexedDB.open('Nezam636_UnifiedFiles_DB', 1);
+      req.onupgradeneeded = function () {
+        var db = req.result;
+        if (!db.objectStoreNames.contains('docs')) db.createObjectStore('docs', { keyPath: 'key' });
+      };
+      req.onsuccess = function () {
+        try {
+          var tx = req.result.transaction(['docs'], 'readwrite');
+          var store = tx.objectStore('docs');
+          list.forEach(function (d) {
+            if (!d || !d.key || !d.caseId || !d.dataUrl) return;
+            store.put({
+              key: String(d.key), caseId: String(d.caseId), docCode: String(d.docCode || ''),
+              docTitle: String(d.docTitle || ''), fileName: String(d.fileName || 'document'),
+              uploadDate: String(d.uploadDate || ''), dataUrl: String(d.dataUrl),
+              rawBlob: null
+            });
+          });
+          tx.oncomplete = function () { resolve(); };
+          tx.onerror = function () { resolve(); };
+        } catch (e) { resolve(); }
+      };
+      req.onerror = function () { resolve(); };
+    });
+  }
+
+  window.exportIndexedDBDocs = async function () {
+    var knowledge = await getAllDocuments();
+    var knowledgeExport = knowledge.map(function (d) {
+      return {
+        id: d.id, name: d.name, ext: d.ext, mime: d.mime, size: d.size,
+        category: d.category, issuer: d.issuer, effectiveDate: d.effectiveDate,
+        description: d.description, createdAt: d.createdAt, status: d.status,
+        text: d.text || '', chunks: d.chunks || [], keywords: d.keywords || [],
+        charCount: d.charCount || 0, error: d.error || '', extractionNote: d.extractionNote || '',
+        indexedAt: d.indexedAt || 0, extractionModel: d.extractionModel || '',
+        driveStatus: d.driveStatus || '', driveSavedAt: d.driveSavedAt || 0,
+        driveFileName: d.driveFileName || '', driveUrl: d.driveUrl || '',
+        driveTextStatus: d.driveTextStatus || '', driveTextUrl: d.driveTextUrl || '',
+        cloudIndexStatus: d.cloudIndexStatus || '', driveError: d.driveError || '',
+        cloudIndexError: d.cloudIndexError || ''
+      };
+    });
+    var caseFiles = await readCaseFilesForExport();
+    return [
+      { _type: 'NEZAM636_KNOWLEDGE_V1', documents: knowledgeExport },
+      { _type: 'NEZAM636_CASE_FILES_V1', documents: caseFiles }
+    ];
+  };
+
+  window.importIndexedDBDocs = async function (records) {
+    if (!Array.isArray(records)) return;
+    for (var i = 0; i < records.length; i++) {
+      var entry = records[i];
+      if (!entry || !Array.isArray(entry.documents)) continue;
+      if (entry._type === 'NEZAM636_KNOWLEDGE_V1') {
+        for (var j = 0; j < entry.documents.length; j++) {
+          var d = entry.documents[j];
+          if (!d || !d.id || !d.name) continue;
+          await putDocument({
+            id: String(d.id), name: String(d.name), ext: String(d.ext || ''),
+            mime: String(d.mime || ''), size: Number(d.size || 0), blob: null,
+            category: String(d.category || 'عمومی'), issuer: String(d.issuer || ''),
+            effectiveDate: String(d.effectiveDate || ''), description: String(d.description || ''),
+            createdAt: Number(d.createdAt || Date.now()), status: String(d.status || 'needs-ai'),
+            text: String(d.text || '').slice(0, MAX_TEXT_CHARS),
+            chunks: Array.isArray(d.chunks) ? d.chunks.slice(0, 1200) : [],
+            keywords: Array.isArray(d.keywords) ? d.keywords.slice(0, 100) : [],
+            charCount: Number(d.charCount || 0), error: String(d.error || ''),
+            extractionNote: String(d.extractionNote || ''), indexedAt: Number(d.indexedAt || 0),
+            extractionModel: String(d.extractionModel || ''),
+            driveStatus: String(d.driveStatus || ''), driveSavedAt: Number(d.driveSavedAt || 0),
+            driveFileName: String(d.driveFileName || ''), driveUrl: String(d.driveUrl || ''),
+            driveTextStatus: String(d.driveTextStatus || ''), driveTextUrl: String(d.driveTextUrl || ''),
+            cloudIndexStatus: String(d.cloudIndexStatus || ''), driveError: String(d.driveError || ''),
+            cloudIndexError: String(d.cloudIndexError || '')
+          });
+        }
+      } else if (entry._type === 'NEZAM636_CASE_FILES_V1') {
+        await writeCaseFilesFromImport(entry.documents);
+      }
+    }
+    renderList();
+  };
+
   window.Nezaam636Knowledge = {
     open: open,
     close: close,
@@ -692,6 +923,6 @@
     buildContext: buildContext,
     stats: getStats,
     list: getAllDocuments,
-    version: '1.0.0'
+    version: '1.1.0'
   };
 })();
