@@ -4324,5 +4324,515 @@
 }
 </style>
 
+<style id="nezam-visual-polish-2026">
+/* سامانه ۶۳۶ خفر — لایه زیباسازی ۱۴۰۵ | فقط CSS؛ بدون تغییر منطق برنامه */
+@media screen {
+  :root{
+    --viz-ink:#20352b;
+    --viz-muted:#718176;
+    --viz-line:#e2ebe4;
+    --viz-paper:#f3f7f3;
+    --viz-white:#fff;
+    --viz-green:#176044;
+    --viz-green-2:#2d805b;
+    --viz-gold:#d9b96f;
+    --viz-blue:#416c91;
+    --viz-shadow:0 12px 34px rgba(26,61,43,.085);
+    --viz-shadow-hover:0 18px 40px rgba(26,61,43,.13);
+  }
+
+  html{scroll-behavior:smooth}
+  body{
+    color:var(--viz-ink)!important;
+    background:
+      radial-gradient(ellipse at 8% 2%,rgba(88,151,113,.10),transparent 29rem),
+      radial-gradient(ellipse at 93% 28%,rgba(213,185,111,.09),transparent 27rem),
+      linear-gradient(180deg,#f7faf7 0%,#f1f6f2 48%,#f7f8f5 100%)!important;
+    background-attachment:fixed!important;
+  }
+  ::selection{background:#cfe7d6;color:#164b34}
+  :focus-visible{outline:3px solid rgba(45,128,91,.38)!important;outline-offset:2px}
+
+  /* هدر سازمانی */
+  .top-hero-bar{
+    position:relative!important;
+    isolation:isolate;
+    overflow:hidden;
+    padding:.82rem 1.25rem!important;
+    background:
+      radial-gradient(circle at 12% 10%,rgba(111,176,137,.25),transparent 17rem),
+      radial-gradient(circle at 88% 110%,rgba(217,185,111,.16),transparent 20rem),
+      linear-gradient(112deg,#102d22 0%,#174a35 48%,#1b3e30 100%)!important;
+    border-bottom:3px solid var(--viz-gold)!important;
+    box-shadow:0 10px 28px rgba(20,57,39,.18)!important;
+  }
+  .top-hero-bar::before{
+    content:"";
+    position:absolute;z-index:-1;pointer-events:none;
+    width:310px;height:310px;left:-110px;top:-215px;
+    border:1px solid rgba(255,255,255,.10);border-radius:50%;
+    box-shadow:0 0 0 28px rgba(255,255,255,.025),0 0 0 58px rgba(255,255,255,.018);
+  }
+  .top-hero-bar>div{position:relative;z-index:1;min-height:54px}
+  #nav-logo-box{
+    box-shadow:0 0 0 5px rgba(255,255,255,.08),0 5px 15px rgba(0,0,0,.2)!important;
+    transition:transform .35s ease,box-shadow .35s ease!important;
+  }
+  #nav-logo-box:hover{transform:rotate(-7deg) scale(1.06)}
+  #ui-hero-org{letter-spacing:.15px;text-shadow:0 1px 8px rgba(0,0,0,.16)}
+  #ui-hero-office{font-weight:850!important;text-shadow:0 2px 12px rgba(0,0,0,.18)}
+  .top-hero-bar .px-3.py-1.rounded{
+    background:rgba(255,255,255,.10)!important;
+    border:1px solid rgba(255,255,255,.17)!important;
+    border-radius:999px!important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.10);
+    backdrop-filter:blur(10px);
+  }
+  .nezam-windows-export-btn{
+    border:1px solid rgba(255,255,255,.2)!important;
+    border-radius:10px!important;
+    background:linear-gradient(135deg,#edcf8a,#d7ac55)!important;
+    color:#273b2e!important;
+    box-shadow:0 5px 14px rgba(0,0,0,.14)!important;
+  }
+
+  /* نوار متقاضی فعال */
+  .active-applicant-ContextBar{
+    position:relative;
+    background:linear-gradient(105deg,rgba(255,255,255,.97),rgba(239,247,241,.96))!important;
+    border-bottom:1px solid #dbe8df!important;
+    box-shadow:0 5px 18px rgba(35,75,51,.055)!important;
+  }
+  #active-case-status-badge{
+    border-radius:999px!important;
+    padding:.4rem .78rem!important;
+    box-shadow:0 3px 10px rgba(35,110,73,.14);
+  }
+  #active-case-info-summary{font-weight:600;color:#53685b!important}
+  #global-case-selector{
+    border:1px solid #cbdccf!important;
+    background-color:#fff!important;
+    box-shadow:0 2px 8px rgba(35,75,51,.04);
+  }
+  #no-active-case-warning-banner{
+    border-radius:11px!important;
+    box-shadow:0 5px 16px rgba(190,65,56,.08);
+  }
+
+  /* منوی اصلی */
+  nav.app-navbar{
+    background:
+      radial-gradient(circle at 50% 0%,rgba(89,158,114,.18),transparent 18rem),
+      linear-gradient(180deg,#123a2a 0%,#163f2e 55%,#102f23 100%)!important;
+    border-left:1px solid rgba(255,255,255,.08)!important;
+    box-shadow:inset -1px 0 rgba(255,255,255,.035),8px 0 28px rgba(22,57,39,.06)!important;
+  }
+  .nezam-sb-top-brand{
+    color:#efd99e!important;
+    letter-spacing:.2px;
+    padding:.55rem .4rem .72rem!important;
+  }
+  .nezam-sb-collapse-trigger{
+    background:rgba(255,255,255,.10)!important;
+    border:1px solid rgba(239,217,158,.38)!important;
+    transition:background .2s ease,transform .2s ease!important;
+  }
+  .nezam-sb-collapse-trigger:hover{background:#d8ba70!important;transform:rotate(90deg)}
+  nav.app-navbar .nav-link{
+    position:relative;
+    min-height:43px!important;
+    border:1px solid rgba(255,255,255,.075)!important;
+    border-radius:11px!important;
+    background:rgba(255,255,255,.055)!important;
+    color:#e8f1ea!important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.045)!important;
+    transition:background .22s ease,border-color .22s ease,transform .22s ease,box-shadow .22s ease!important;
+  }
+  nav.app-navbar .nav-link::after{
+    content:"";
+    position:absolute;right:0;top:25%;height:50%;width:3px;
+    border-radius:4px 0 0 4px;background:transparent;
+    transition:background .2s ease,height .2s ease;
+  }
+  nav.app-navbar .nav-link:hover{
+    transform:translateX(-3px)!important;
+    background:rgba(255,255,255,.12)!important;
+    border-color:rgba(255,255,255,.16)!important;
+    box-shadow:0 6px 15px rgba(0,0,0,.12)!important;
+  }
+  nav.app-navbar .nav-link.active{
+    background:linear-gradient(105deg,#f0dfb5 0%,#e1c27b 100%)!important;
+    color:#173d2b!important;
+    border-color:#f7e9c8!important;
+    box-shadow:0 6px 16px rgba(0,0,0,.17),inset 0 1px 0 rgba(255,255,255,.5)!important;
+    font-weight:800!important;
+  }
+  nav.app-navbar .nav-link.active::after{background:#176044;height:68%;top:16%}
+  body.nezam-sb-collapsed nav.app-navbar .nav-link:hover{transform:scale(1.06)!important}
+
+  /* نوار زیرمنو */
+  .nezam-top-subbar{
+    background:rgba(255,255,255,.91)!important;
+    border-bottom:1px solid #e1eae3!important;
+    box-shadow:0 5px 18px rgba(25,66,43,.055)!important;
+    backdrop-filter:blur(14px);
+  }
+  .subbar-breadcrumb{
+    color:#1b5b3e!important;
+    font-weight:800!important;
+    border-left-color:#d6e2d9!important;
+  }
+  .subbar-tab-item{
+    border:1px solid #e0eae2!important;
+    border-radius:9px!important;
+    background:#f7faf7!important;
+    color:#536b5b!important;
+    transition:all .2s ease!important;
+  }
+  .subbar-tab-item:hover{background:#eaf4ed!important;transform:translateY(-1px)!important}
+  .subbar-tab-item.active{
+    background:linear-gradient(135deg,#1c6848,#2e805b)!important;
+    color:#fff!important;border-color:#1c6848!important;
+    box-shadow:0 4px 11px rgba(31,104,71,.19)!important;
+  }
+
+  /* محتوای اصلی و ورود نرم تب‌ها */
+  .nezam-content-column>main{padding-top:1.25rem!important;padding-bottom:2rem!important}
+  .sec-pane.active{animation:nezamPaneIn .42s cubic-bezier(.2,.75,.25,1) both!important}
+  @keyframes nezamPaneIn{
+    from{opacity:0;transform:translateY(9px)}
+    to{opacity:1;transform:translateY(0)}
+  }
+
+  /* کارت‌های عمومی */
+  .card-clean{
+    position:relative;
+    border:1px solid #e1eae3!important;
+    border-radius:16px!important;
+    background:linear-gradient(145deg,#fff 0%,#fcfefc 100%)!important;
+    box-shadow:var(--viz-shadow)!important;
+    padding:1.05rem!important;
+    transition:transform .24s ease,box-shadow .24s ease,border-color .24s ease!important;
+  }
+  .card-clean::before{
+    content:"";
+    position:absolute;top:0;right:18px;left:18px;height:2px;
+    border-radius:0 0 4px 4px;
+    background:linear-gradient(90deg,transparent,#9abda4,#d9bd7a,transparent);
+    opacity:.8;pointer-events:none;
+  }
+  .card-clean:hover{
+    transform:translateY(-2px)!important;
+    border-color:#d1e2d5!important;
+    box-shadow:var(--viz-shadow-hover)!important;
+  }
+  .card-clean>.border-bottom{
+    border-bottom-color:#e7eee8!important;
+  }
+  .card-clean>.border-bottom strong{letter-spacing:-.1px}
+  .card-clean h2,.card-clean h3,.card-clean h4{letter-spacing:0!important}
+
+  /* نوار گردش کار */
+  .workflow-law-strip{
+    display:block!important;
+    padding:.82rem 1rem!important;
+    border:1px solid #d7e7db!important;
+    border-right:4px solid #39845d!important;
+    border-radius:14px!important;
+    background:
+      radial-gradient(circle at 5% 0%,rgba(255,255,255,.9),transparent 16rem),
+      linear-gradient(110deg,#edf7ef,#f9fbf7 55%,#f6f1e4)!important;
+    box-shadow:0 7px 20px rgba(37,93,57,.07)!important;
+  }
+  .workflow-law-strip>div:first-child{margin-bottom:.62rem}
+  .workflow-law-strip>div:last-child{
+    display:flex!important;flex-wrap:wrap;gap:.42rem!important;
+    align-items:center;justify-content:flex-start;
+  }
+  .workflow-step-pill{
+    border:1px solid #dce8df!important;
+    border-radius:10px!important;
+    background:rgba(255,255,255,.88)!important;
+    padding:.4rem .68rem!important;
+    box-shadow:0 2px 6px rgba(25,70,43,.045)!important;
+    transition:all .2s ease!important;
+  }
+  .workflow-step-pill:hover{
+    transform:translateY(-2px);
+    border-color:#9fc5a9!important;
+    box-shadow:0 6px 14px rgba(25,90,53,.10)!important;
+  }
+
+  /* آمار کلان */
+  .kpi-macro-card{
+    position:relative;
+    min-height:90px!important;
+    overflow:hidden;
+    border:1px solid #e4ece5!important;
+    border-radius:13px!important;
+    background:linear-gradient(135deg,#fff 0%,#f5faf6 100%)!important;
+    box-shadow:0 4px 13px rgba(28,71,45,.055)!important;
+    transition:transform .22s ease,box-shadow .22s ease!important;
+  }
+  .kpi-macro-card::before{
+    content:"";position:absolute;right:0;top:14px;bottom:14px;width:3px;
+    border-radius:3px 0 0 3px;background:linear-gradient(#8bb79a,#d6bd7c);
+  }
+  .kpi-macro-card:hover{transform:translateY(-3px)!important;box-shadow:0 9px 20px rgba(28,71,45,.11)!important}
+  .kpi-macro-card [id^="kpi-"]{font-size:1.55rem!important;line-height:1.35;text-shadow:0 2px 10px rgba(23,96,68,.08)}
+  .kpi-mini-bars{display:flex!important;opacity:.8}
+
+  /* کاشی‌های دسترسی سریع — نمایش کامل شش مورد */
+  .cmd-tile-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:.68rem!important}
+  .cmd-tile:nth-child(1),.cmd-tile:nth-child(5){display:flex!important}
+  .cmd-tile{
+    position:relative;min-height:108px!important;
+    border:1px solid #e4ece5!important;border-radius:14px!important;
+    background:linear-gradient(145deg,#fff,#f7faf7)!important;
+    padding:.78rem .55rem!important;gap:.4rem!important;
+    box-shadow:0 4px 12px rgba(25,70,43,.045)!important;
+    transition:transform .23s ease,border-color .23s ease,box-shadow .23s ease,background .23s ease!important;
+  }
+  .cmd-tile::after{
+    content:"";position:absolute;inset:0;border-radius:inherit;
+    background:linear-gradient(135deg,rgba(217,185,111,.10),transparent 52%);
+    opacity:0;pointer-events:none;transition:opacity .22s ease;
+  }
+  .cmd-tile:hover{
+    transform:translateY(-4px)!important;
+    border-color:#b8d4bf!important;
+    background:linear-gradient(145deg,#fff,#eef7f0)!important;
+    box-shadow:0 11px 22px rgba(25,92,54,.10)!important;
+  }
+  .cmd-tile:hover::after{opacity:1}
+  .cmd-tile-icon{
+    width:42px!important;height:42px!important;border-radius:12px!important;
+    border:1px solid rgba(40,83,55,.10)!important;
+    box-shadow:0 4px 9px rgba(35,76,49,.08)!important;
+    transition:transform .25s ease!important;
+  }
+  .cmd-tile:hover .cmd-tile-icon{transform:scale(1.08) rotate(-4deg)}
+  .cmd-tile strong{position:relative;z-index:1}
+
+  /* سه گروه تخصصی */
+  .tri-group-card{
+    position:relative;
+    border:1px solid #e2eae4!important;
+    border-top-width:4px!important;
+    border-radius:15px!important;
+    background:linear-gradient(145deg,#fff 0%,#fbfdfb 100%)!important;
+    box-shadow:0 7px 19px rgba(28,70,44,.065)!important;
+    transition:transform .24s ease,box-shadow .24s ease,border-color .24s ease!important;
+  }
+  .tri-group-card:hover{
+    transform:translateY(-5px)!important;
+    box-shadow:0 14px 28px rgba(28,70,44,.12)!important;
+  }
+  .tri-group-g1{border-top-color:#4d9b69!important}
+  .tri-group-g2{border-top-color:#5b87ad!important}
+  .tri-group-g3{border-top-color:#c98a52!important}
+  .tri-group-card .badge{min-width:34px;justify-content:center;border-radius:999px!important}
+  .tri-group-card .border-top{border-top-color:#e9eee9!important}
+  .tri-group-card .btn{border-radius:9px!important}
+
+  /* جدول‌ها */
+  .table-responsive{
+    border:1px solid #e4ece5!important;
+    border-radius:12px!important;
+    background:#fff;
+    box-shadow:0 4px 13px rgba(25,70,43,.035)!important;
+  }
+  .table{border-collapse:separate!important;border-spacing:0!important}
+  .table thead th{
+    position:sticky;top:0;z-index:2;
+    background:linear-gradient(180deg,#edf5ef,#e2eee5)!important;
+    color:#24583c!important;
+    border-bottom:1px solid #c9ddce!important;
+    font-weight:800!important;
+  }
+  .table th:first-child{border-top-right-radius:10px}
+  .table th:last-child{border-top-left-radius:10px}
+  .table td{border-bottom:1px solid #edf1ed!important}
+  .table tbody tr{transition:background .16s ease}
+  .table tbody tr:hover{background:#f1f8f2!important}
+  .table tbody tr:last-child td{border-bottom:0!important}
+
+  /* فرم‌ها و ورودی‌ها */
+  .form-control,.form-select{
+    min-height:36px;
+    border:1px solid #d3dfd6!important;
+    border-radius:9px!important;
+    background-color:#fff!important;
+    color:#263c30!important;
+    box-shadow:0 1px 3px rgba(25,70,43,.025)!important;
+    transition:border-color .2s ease,box-shadow .2s ease,background .2s ease!important;
+  }
+  .form-control:hover,.form-select:hover{border-color:#a9c5af!important}
+  .form-control:focus,.form-select:focus{
+    border-color:#4b9565!important;
+    box-shadow:0 0 0 3px rgba(65,139,91,.13)!important;
+    background:#fff!important;
+  }
+  textarea.form-control{line-height:1.8}
+  input[type="file"]{border-style:dashed!important;background:#f9fcf9!important}
+  .input-group-text{
+    background:linear-gradient(135deg,#edf5ef,#e3eee6)!important;
+    border-color:#d3dfd6!important;border-radius:9px!important;
+  }
+
+  /* دکمه‌ها */
+  .btn{
+    min-height:32px;
+    border-radius:9px!important;
+    font-weight:700!important;
+    letter-spacing:0!important;
+    transition:transform .18s ease,box-shadow .18s ease,filter .18s ease,background .18s ease!important;
+  }
+  .btn:hover{
+    transform:translateY(-2px)!important;
+    filter:brightness(1.025);
+    box-shadow:0 7px 15px rgba(26,66,42,.12)!important;
+  }
+  .btn:active{transform:translateY(0) scale(.98)!important;box-shadow:none!important}
+  .btn-success{
+    background:linear-gradient(135deg,#236b49,#32865d)!important;
+    border-color:#1f6747!important;color:#fff!important;
+  }
+  .btn-primary{
+    background:linear-gradient(135deg,#3e678c,#527fa6)!important;
+    border-color:#385f82!important;color:#fff!important;
+  }
+  .btn-warning{
+    background:linear-gradient(135deg,#efd28b,#dfb85e)!important;
+    border-color:#d0a64f!important;color:#293b2e!important;
+  }
+  .btn-danger{
+    background:linear-gradient(135deg,#b95d50,#cf7667)!important;
+    border-color:#ad5147!important;color:#fff!important;
+  }
+  .btn-dark{
+    background:linear-gradient(135deg,#30463a,#1d3428)!important;
+    border-color:#263b30!important;color:#fff!important;
+  }
+  .btn-outline-success,.btn-outline-primary,.btn-outline-danger,.btn-outline-dark,.btn-outline-secondary{
+    box-shadow:none!important;background:#fff!important;
+  }
+
+  /* پیام‌ها و برچسب‌ها */
+  .alert{
+    border-radius:12px!important;
+    border-width:1px!important;
+    box-shadow:0 4px 13px rgba(30,70,44,.045);
+  }
+  .badge{border-radius:999px!important;letter-spacing:0}
+  .guide-card{
+    border:1px solid #e3ebe4!important;
+    border-right:4px solid #3f8058!important;
+    border-radius:13px!important;
+    background:linear-gradient(145deg,#fff,#f8fbf8)!important;
+    padding:1rem!important;
+    box-shadow:0 5px 16px rgba(25,70,43,.055)!important;
+    transition:transform .22s ease,box-shadow .22s ease!important;
+  }
+  .guide-card:hover{transform:translateY(-3px)!important;box-shadow:0 11px 24px rgba(25,70,43,.10)!important}
+  .toast-msg{
+    border:1px solid rgba(255,255,255,.25)!important;
+    border-radius:13px!important;
+    box-shadow:0 12px 32px rgba(16,45,30,.22)!important;
+    animation:nezamToastIn .28s ease both;
+  }
+  @keyframes nezamToastIn{
+    from{opacity:0;transform:translateY(12px) scale(.98)}
+    to{opacity:1;transform:translateY(0) scale(1)}
+  }
+
+  /* دستیار هوشمند */
+  #ai-chat-history{
+    border:1px solid #e0eae2!important;
+    border-radius:13px!important;
+    background:linear-gradient(180deg,#f3f8f4,#edf4ef)!important;
+    scrollbar-width:thin;
+    scrollbar-color:#b4cdbb transparent;
+  }
+  #ai-chat-history>div{
+    border:1px solid #e3ebe4!important;
+    border-radius:12px!important;
+    box-shadow:0 3px 9px rgba(25,70,43,.045)!important;
+  }
+  #ai-online-status-desc{border-radius:11px!important}
+  #ai-ocr-preview-box{border-radius:12px!important;border-color:#b7cdbd!important}
+
+  /* مودال انتخاب متقاضی */
+  .guard-modal-overlay{
+    background:rgba(13,35,24,.60)!important;
+    backdrop-filter:blur(7px);
+  }
+  .guard-modal-card{
+    border:1px solid rgba(255,255,255,.45)!important;
+    border-radius:18px!important;
+    box-shadow:0 26px 80px rgba(0,0,0,.28)!important;
+    animation:nezamModalIn .28s cubic-bezier(.2,.75,.25,1) both;
+  }
+  @keyframes nezamModalIn{
+    from{opacity:0;transform:translateY(14px) scale(.985)}
+    to{opacity:1;transform:translateY(0) scale(1)}
+  }
+
+  /* نوار وضعیت آنلاین/آفلاین در صورت وجود */
+  #gdrive-status-btn,#gdrive-restore-btn{
+    border-radius:999px!important;
+    box-shadow:0 4px 12px rgba(0,0,0,.14)!important;
+    transition:transform .2s ease,filter .2s ease!important;
+  }
+  #gdrive-status-btn:hover,#gdrive-restore-btn:hover{transform:translateY(-2px)!important;filter:brightness(1.08)}
+
+  /* واکنش‌گرایی */
+  @media(min-width:992px){
+    nav.app-navbar{padding:.8rem .62rem!important;gap:.42rem!important}
+    .nezam-content-column>main{padding-left:1.35rem!important;padding-right:1.35rem!important}
+  }
+  @media(max-width:991px){
+    nav.app-navbar{
+      background:linear-gradient(90deg,#123a2a,#1b4b35)!important;
+      box-shadow:0 5px 16px rgba(17,58,39,.13)!important;
+    }
+    nav.app-navbar .nav-link{min-height:38px!important}
+    .workflow-law-strip{padding:.72rem!important}
+    .workflow-law-strip>div:last-child{overflow-x:auto;flex-wrap:nowrap!important;padding-bottom:.25rem}
+    .workflow-step-pill{white-space:nowrap;flex:0 0 auto}
+    .card-clean{padding:.85rem!important}
+  }
+  @media(max-width:560px){
+    .top-hero-bar{padding:.68rem .72rem!important}
+    #ui-hero-office{font-size:.9rem!important}
+    .top-hero-bar>div{gap:.65rem!important}
+    nav.app-navbar{gap:.28rem!important}
+    nav.app-navbar .nav-link{padding:.36rem .48rem!important;font-size:.72rem!important}
+    .nezam-top-subbar{padding:.38rem .55rem!important}
+    .subbar-breadcrumb{font-size:.72rem!important}
+    .subbar-tab-item{font-size:.69rem!important;padding:.3rem .5rem!important}
+    .cmd-tile-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+    .cmd-tile{min-height:96px!important}
+    .workflow-law-strip>div:first-child{align-items:flex-start!important}
+    .workflow-law-strip>div:last-child{margin-right:0!important}
+    .kpi-macro-card{min-height:80px!important}
+    .card-clean{border-radius:13px!important;padding:.72rem!important}
+    .tri-group-card{padding:.78rem!important}
+    .table{font-size:.75rem!important}
+    .table th,.table td{padding:.44rem .48rem!important}
+  }
+
+  /* احترام به تنظیم کاهش حرکت سیستم‌عامل */
+  @media(prefers-reduced-motion:reduce){
+    *,*::before,*::after{
+      animation-duration:.01ms!important;
+      animation-iteration-count:1!important;
+      scroll-behavior:auto!important;
+      transition-duration:.01ms!important;
+    }
+  }
+}
+</style>
+
 </body>
 </html>
