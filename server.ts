@@ -1,4 +1,4 @@
-import express, { Request, Response } from 'express';
+import express, { NextFunction, Request, Response } from 'express';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 import dotenv from 'dotenv';
@@ -9,8 +9,62 @@ dotenv.config();
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
+app.disable('x-powered-by');
 
-// Middleware for parsing JSON with generous limit for document/scan images
+// Basic browser security headers for the Node-hosted version.
+// GitHub Pages does not use this Express middleware.
+app.use((_req: Request, res: Response, next: NextFunction) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+  next();
+});
+
+// Lightweight per-IP API rate limit. This reduces accidental loops and basic abuse,
+// but is not authentication and must be paired with server-side access control.
+type ApiRateBucket = { startedAt: number; count: number };
+const apiRateBuckets = new Map<string, ApiRateBucket>();
+const API_RATE_WINDOW_MS = 60_000;
+
+app.use('/api/', (req: Request, res: Response, next: NextFunction) => {
+  const pathName = req.path || '';
+  const routeLimit = pathName.indexOf('/ocr-extract') !== -1 ? 6
+    : pathName.indexOf('/test-key') !== -1 ? 5
+    : pathName.indexOf('/chat') !== -1 ? 24
+    : 60;
+  const clientIp = req.ip || req.socket.remoteAddress || 'unknown';
+  const bucketKey = clientIp + ':' + pathName;
+  const now = Date.now();
+  let bucket = apiRateBuckets.get(bucketKey);
+
+  if (!bucket || now - bucket.startedAt >= API_RATE_WINDOW_MS) {
+    bucket = { startedAt: now, count: 0 };
+    apiRateBuckets.set(bucketKey, bucket);
+  }
+
+  if (bucket.count >= routeLimit) {
+    const retrySeconds = Math.max(1, Math.ceil((API_RATE_WINDOW_MS - (now - bucket.startedAt)) / 1000));
+    res.setHeader('Retry-After', String(retrySeconds));
+    res.setHeader('Cache-Control', 'no-store');
+    res.status(429).json({ success: false, error: 'تعداد درخواست‌ها بیش از حد مجاز است؛ کمی بعد دوباره تلاش کنید.' });
+    return;
+  }
+
+  bucket.count += 1;
+  res.setHeader('Cache-Control', 'no-store');
+
+  // Keep the in-memory limiter bounded on long-running instances.
+  if (apiRateBuckets.size > 3000) {
+    for (const [key, value] of apiRateBuckets) {
+      if (now - value.startedAt >= API_RATE_WINDOW_MS) apiRateBuckets.delete(key);
+    }
+  }
+  next();
+});
+
+// Middleware for parsing JSON with a bounded size for document/scan requests.
 app.use(express.json({ limit: '35mb' }));
 app.use(express.urlencoded({ extended: true, limit: '35mb' }));
 
