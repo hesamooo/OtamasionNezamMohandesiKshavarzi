@@ -623,10 +623,8 @@ try {
 
 /* ارتقای ساختاری پرونده‌های قدیمی بدون حذف هیچ اطلاعاتی */
 function normalizeAllCasesSchema() {
-  var has201 = false;
   for (var i = 0; i < casesDB.length; i++) {
     var c = casesDB[i];
-    if (c.id === "CASE-201") has201 = true;
     var sp = ACT_SPECS[c.actType] || ACT_SPECS.sheep_high;
     if (!c.mainGroup) c.mainGroup = sp.mainGroup || "LIVESTOCK_POULTRY_FISHERIES";
     if (!c.entityType) c.entityType = "INDIVIDUAL";
@@ -673,9 +671,7 @@ function normalizeAllCasesSchema() {
       }
     }
   }
-  if (!has201 && casesDB.length <= 3) {
-    casesDB.unshift(JSON.parse(JSON.stringify(DEFAULT_UNIFIED_CASES[0])));
-  }
+  // پرونده نمونه پس از حذف یا بازیابی پشتیبان، خودکار بازگردانده نمی‌شود.
 }
 normalizeAllCasesSchema();
 
@@ -1783,10 +1779,11 @@ function refreshAllViews() {
     if (lettersDB[i].type === "IN") inC++; else outC++;
   }
 
+  var openTasksCount = tasksDB.filter(function (task) { return task && task.status !== "انجام شده"; }).length;
   if (document.getElementById("kpi-total-cases")) document.getElementById("kpi-total-cases").textContent = toFa(casesDB.length);
   if (document.getElementById("kpi-out-letters")) document.getElementById("kpi-out-letters").textContent = toFa(outC);
   if (document.getElementById("kpi-in-letters")) document.getElementById("kpi-in-letters").textContent = toFa(inC);
-  if (document.getElementById("kpi-open-tasks")) document.getElementById("kpi-open-tasks").textContent = toFa(tasksDB.length);
+  if (document.getElementById("kpi-open-tasks")) document.getElementById("kpi-open-tasks").textContent = toFa(openTasksCount);
 
   var dashTbody = document.getElementById("dash-cases-summary-tbody");
   if (dashTbody) {
@@ -1797,30 +1794,45 @@ function refreshAllViews() {
       var inq = c.inquiries || {};
       var ok = 0;
       for (var k in inq) if (inq[k] === "OK") ok++;
+      var safeCaseId = escapeHtmlCore(c.id);
       dHtml += "<tr class='" + (c.id === activeCaseId ? "table-success" : "") + "'>" +
-        "<td class='fw-bold'>" + toFa(c.code) + "</td>" +
-        "<td><b>" + c.name + "</b><br><small class='text-muted'>" + toFa(c.nid) + "</small></td>" +
-        "<td><span class='badge " + grpMeta.badgeClass + " mb-1'>" + grpMeta.shortTitle + "</span><br><small>" + c.project + " (" + toFa(c.cap) + ")</small></td>" +
-        "<td class='text-success fw-bold'>" + c.loc + "</td>" +
-        "<td><span class='badge bg-success'>" + toFa(ok) + " از ۷ موافقت</span></td>" +
+        "<td class='fw-bold'>" + escapeHtmlCore(toFa(c.code)) + "</td>" +
+        "<td><b>" + escapeHtmlCore(c.name) + "</b><br><small class='text-muted'>" + escapeHtmlCore(toFa(c.nid)) + "</small></td>" +
+        "<td><span class='badge " + grpMeta.badgeClass + " mb-1'>" + escapeHtmlCore(grpMeta.shortTitle) + "</span><br><small>" + escapeHtmlCore(c.project) + " (" + escapeHtmlCore(toFa(c.cap)) + ")</small></td>" +
+        "<td class='text-success fw-bold'>" + escapeHtmlCore(c.loc) + "</td>" +
+        "<td><span class='badge bg-success'>" + escapeHtmlCore(toFa(ok)) + " از ۷ موافقت</span></td>" +
         "<td><div class='d-flex gap-1'>" +
-          "<button class='btn btn-sm btn-primary py-0 fw-bold' onclick='selectActiveCase(\"" + c.id + "\"); switchMainPane(\"pane-cases\"); switchCaseSubTab(\"sub-info\");'>پرونده</button>" +
-          "<button class='btn btn-sm btn-outline-success py-0 fw-bold' onclick='selectActiveCase(\"" + c.id + "\"); switchMainPane(\"pane-croquis\");'>🗺️ کروکی</button>" +
+          "<button type='button' class='btn btn-sm btn-primary py-0 fw-bold' data-case-action='select' data-case-id='" + safeCaseId + "'>پرونده</button>" +
+          "<button type='button' class='btn btn-sm btn-outline-success py-0 fw-bold' data-case-action='croquis' data-case-id='" + safeCaseId + "'>🗺️ کروکی</button>" +
         "</div></td>" +
       "</tr>";
     }
-    dashTbody.innerHTML = dHtml;
+    dashTbody.innerHTML = dHtml || "<tr><td colspan='6' class='text-center text-muted py-3'>پرونده‌ای ثبت نشده است.</td></tr>";
+    if (!dashTbody.dataset.secureActionsBound) {
+      dashTbody.dataset.secureActionsBound = "1";
+      dashTbody.addEventListener("click", function (event) {
+        var btn = event.target.closest("button[data-case-action]");
+        if (!btn || !dashTbody.contains(btn)) return;
+        var id = btn.getAttribute("data-case-id");
+        var action = btn.getAttribute("data-case-action");
+        var exists = casesDB.some(function (item) { return item && String(item.id) === id; });
+        if (!exists) return;
+        selectActiveCase(id);
+        if (action === "croquis") switchMainPane("pane-croquis");
+        else switchMainPane("pane-cases");
+      });
+    }
   }
 
   var tHolder = document.getElementById("tasks-list-holder");
   if (tHolder) {
     var tHtml = "";
     for (var t = 0; t < tasksDB.length; t++) {
-      var tk = tasksDB[t];
+      var tk = tasksDB[t] || {};
       var done = tk.status === "انجام شده";
       tHtml += '<div class="col-md-6"><div class="p-2 border rounded d-flex justify-content-between align-items-center ' + (done ? 'bg-success-subtle' : 'bg-white') + '">' +
-        '<div class="small"><span class="badge bg-secondary me-1">' + tk.cat + '</span> <b>' + tk.title + '</b> <small class="text-muted">(' + toFa(tk.due) + ')</small></div>' +
-        '<div class="d-flex gap-1"><button class="btn btn-sm btn-outline-success py-0" onclick="tasksDB[' + t + '].status=\'انجام شده\';saveAllDB();">✔</button><button class="btn btn-sm btn-outline-danger py-0" onclick="tasksDB.splice(' + t + ',1);saveAllDB();">✕</button></div>' +
+        '<div class="small"><span class="badge bg-secondary me-1">' + escapeHtmlCore(tk.cat) + '</span> <b>' + escapeHtmlCore(tk.title) + '</b> <small class="text-muted">(' + escapeHtmlCore(toFa(tk.due)) + ')</small></div>' +
+        '<div class="d-flex gap-1"><button type="button" class="btn btn-sm btn-outline-success py-0" onclick="tasksDB[' + t + '].status=\'انجام شده\';saveAllDB();" aria-label="علامت‌گذاری انجام شد">✔</button><button type="button" class="btn btn-sm btn-outline-danger py-0" onclick="tasksDB.splice(' + t + ',1);saveAllDB();" aria-label="حذف پیگیری">✕</button></div>' +
       '</div></div>';
     }
     tHolder.innerHTML = tHtml;
@@ -1829,7 +1841,6 @@ function refreshAllViews() {
   renderSecretariatTable();
   renderUnifiedCasesMatrix();
 }
-
 function exportFullSystemBackup() {
   var data = {
     version: "636-PRO-V3",
