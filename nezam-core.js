@@ -1715,8 +1715,8 @@ function refreshAllViews() {
       for (var k in inq) if (inq[k] === "OK") ok++;
       dHtml += "<tr class='" + (c.id === activeCaseId ? "table-success" : "") + "'>" +
         "<td class='fw-bold'>" + toFa(c.code) + "</td>" +
-        "<td><b>" + c.name + "</b><br><small class='text-muted'>" + toFa(c.nid) + "</small></td>" +
-        "<td><span class='badge " + grpMeta.badgeClass + " mb-1'>" + grpMeta.shortTitle + "</span><br><small>" + c.project + " (" + toFa(c.cap) + ")</small></td>" +
+        "<td><b>" + c.name + "</b><small class='text-muted'>" + toFa(c.nid) + "</small></td>" +
+        "<td><span class='badge " + grpMeta.badgeClass + " mb-1'>" + grpMeta.shortTitle + "</span><small>" + c.project + " (" + toFa(c.cap) + ")</small></td>" +
         "<td class='text-success fw-bold'>" + c.loc + "</td>" +
         "<td><span class='badge bg-success'>" + toFa(ok) + " از ۷ موافقت</span></td>" +
         "<td><div class='d-flex gap-1'>" +
@@ -1823,14 +1823,14 @@ window.downloadStandaloneWindowsHTML = async function() {
       "(function(){\n" +
       "  try {\n" +
       "    var snap = " + JSON.stringify(snapshotPayload) + ";\n" +
-      "    if (!localStorage.getItem('nezam636_cases_v6') && snap.casesDB) localStorage.setItem('nezam636_cases_v6', JSON.stringify(snap.casesDB));\n" +
-      "    if (!localStorage.getItem('nezam636_letters_v6') && snap.lettersDB) localStorage.setItem('nezam636_letters_v6', JSON.stringify(snap.lettersDB));\n" +
-      "    if (!localStorage.getItem('nezam636_tasks_v6') && snap.tasksDB) localStorage.setItem('nezam636_tasks_v6', JSON.stringify(snap.tasksDB));\n" +
-      "    if (!localStorage.getItem('nezam636_act_specs_v6') && snap.actSpecs) localStorage.setItem('nezam636_act_specs_v6', JSON.stringify(snap.actSpecs));\n" +
-      "    if (!localStorage.getItem('nezam636_doc_checklists_v6') && snap.docChecklists) localStorage.setItem('nezam636_doc_checklists_v6', JSON.stringify(snap.docChecklists));\n" +
+      "    if (!localStorage.getItem('nezam636_unified_cases') && snap.casesDB) localStorage.setItem('nezam636_unified_cases', JSON.stringify(snap.casesDB));\n" +
+      "    if (!localStorage.getItem('nezam636_letters') && snap.lettersDB) localStorage.setItem('nezam636_letters', JSON.stringify(snap.lettersDB));\n" +
+      "    if (!localStorage.getItem('nezam636_tasks') && snap.tasksDB) localStorage.setItem('nezam636_tasks', JSON.stringify(snap.tasksDB));\n" +
+      "    if (!localStorage.getItem('nezam636_act_specs_v3') && snap.actSpecs) localStorage.setItem('nezam636_act_specs_v3', JSON.stringify(snap.actSpecs));\n" +
+      "    if (!localStorage.getItem('nezam636_doc_checklists_v2') && snap.docChecklists) localStorage.setItem('nezam636_doc_checklists_v2', JSON.stringify(snap.docChecklists));\n" +
       "    if (!localStorage.getItem('nezam636_branding_cfg') && snap.brandCfg) localStorage.setItem('nezam636_branding_cfg', JSON.stringify(snap.brandCfg));\n" +
       "    if (!localStorage.getItem('nezam636_templates_cfg') && snap.tplCfg) localStorage.setItem('nezam636_templates_cfg', JSON.stringify(snap.tplCfg));\n" +
-      "    if (!localStorage.getItem('nezam636_paper_size_v1') && snap.paperSize) localStorage.setItem('nezam636_paper_size_v1', snap.paperSize);\n" +
+      "    if (!localStorage.getItem('nezam636_paper_size') && snap.paperSize) localStorage.setItem('nezam636_paper_size', snap.paperSize);\n" +
       "  } catch(e) {}\n" +
       "})();";
     bodyEl.insertBefore(snapScript, bodyEl.firstChild);
@@ -1897,3 +1897,177 @@ if (document.readyState === "loading") {
 } else {
   initAppCore();
 }
+
+
+/* =========================================================================
+   ۱۰. توابع پشتیبان همگام‌سازی کامل حافظه (Memory + LocalStorage + IndexedDB)
+   مخصوص ذخیره و بازخوانی ۱۰۰٪ اطلاعات در گوگل درایو بین مرورگرها و دستگاه‌ها
+   ========================================================================= */
+window.flushInMemoryStateToLocalStorage = function() {
+  try {
+    window.__gdriveInternalFlush = true;
+    localStorage.setItem("nezam636_unified_cases", JSON.stringify(casesDB));
+    localStorage.setItem("nezam636_letters", JSON.stringify(lettersDB));
+    localStorage.setItem("nezam636_tasks", JSON.stringify(tasksDB));
+    localStorage.setItem("nezam636_doc_checklists_v2", JSON.stringify(DOC_CHECKLISTS));
+    localStorage.setItem("nezam636_act_specs_v3", JSON.stringify(ACT_SPECS));
+    localStorage.setItem("nezam636_active_case_id", activeCaseId || "");
+    if (typeof brandCfg !== "undefined" && brandCfg) {
+      localStorage.setItem("nezam636_branding_cfg", JSON.stringify(brandCfg));
+    }
+    if (typeof tplCfg !== "undefined" && tplCfg) {
+      localStorage.setItem("nezam636_templates_cfg", JSON.stringify(tplCfg));
+    }
+    if (typeof currentPaperSize !== "undefined" && currentPaperSize) {
+      localStorage.setItem("nezam636_paper_size", currentPaperSize);
+    }
+  } catch (e) {
+    console.warn("Flush to localStorage warning:", e);
+  } finally {
+    window.__gdriveInternalFlush = false;
+  }
+};
+
+window.reloadAllStateFromLocalStorage = function() {
+  try {
+    window.__gdriveInternalFlush = true;
+    if (localStorage.getItem("nezam636_act_specs_v3")) {
+      var savedSpecs = JSON.parse(localStorage.getItem("nezam636_act_specs_v3"));
+      for (var sk in savedSpecs) ACT_SPECS[sk] = savedSpecs[sk];
+    }
+    var rawCases = localStorage.getItem("nezam636_unified_cases") || localStorage.getItem("nezam636_cases_v6");
+    if (rawCases) {
+      var loadedCases = JSON.parse(rawCases);
+      if (Array.isArray(loadedCases) && loadedCases.length) {
+        casesDB = loadedCases;
+      }
+    }
+    var rawLetters = localStorage.getItem("nezam636_letters") || localStorage.getItem("nezam636_letters_v6");
+    if (rawLetters) {
+      var loadedLetters = JSON.parse(rawLetters);
+      if (Array.isArray(loadedLetters)) lettersDB = loadedLetters;
+    }
+    var rawTasks = localStorage.getItem("nezam636_tasks") || localStorage.getItem("nezam636_tasks_v6");
+    if (rawTasks) {
+      var loadedTasks = JSON.parse(rawTasks);
+      if (Array.isArray(loadedTasks)) tasksDB = loadedTasks;
+    }
+    if (localStorage.getItem("nezam636_doc_checklists_v2")) {
+      var loadedDocs = JSON.parse(localStorage.getItem("nezam636_doc_checklists_v2"));
+      for (var dk in loadedDocs) DOC_CHECKLISTS[dk] = loadedDocs[dk];
+    }
+    if (localStorage.getItem("nezam636_active_case_id") !== null) {
+      activeCaseId = localStorage.getItem("nezam636_active_case_id");
+    }
+
+    normalizeAllCasesSchema();
+    var foundActive = false;
+    for (var i = 0; i < casesDB.length; i++) {
+      if (casesDB[i].id === activeCaseId) { foundActive = true; break; }
+    }
+    if (!foundActive && casesDB.length > 0) {
+      activeCaseId = casesDB[0].id;
+    }
+
+    // بازخوانی تنظیمات سربرگ و قالب‌های نامه
+    if (typeof brandCfg !== "undefined" && localStorage.getItem("nezam636_branding_cfg")) {
+      var pb = JSON.parse(localStorage.getItem("nezam636_branding_cfg"));
+      for (var bk in pb) brandCfg[bk] = pb[bk];
+    }
+    if (typeof tplCfg !== "undefined" && localStorage.getItem("nezam636_templates_cfg")) {
+      var pt = JSON.parse(localStorage.getItem("nezam636_templates_cfg"));
+      for (var tk in pt) tplCfg[tk] = pt[tk];
+    }
+    if (typeof initBrandingAndTemplatesUI === "function") {
+      initBrandingAndTemplatesUI();
+    }
+
+    refreshAllViews();
+    loadActiveCaseIntoForm();
+    renderActiveCaseDocsChecklist();
+    renderActiveCaseHistory();
+    if (typeof window.initCroquisWorkspaceForActiveCase === "function") {
+      window.initCroquisWorkspaceForActiveCase();
+    }
+    if (typeof window.syncLetterEditorWithActiveCase === "function") {
+      window.syncLetterEditorWithActiveCase();
+    }
+    if (typeof window.renderSinglePreviewSheet === "function") {
+      window.renderSinglePreviewSheet();
+    }
+  } catch (e) {
+    console.error("Error reloading state from localStorage:", e);
+  } finally {
+    window.__gdriveInternalFlush = false;
+  }
+};
+
+window.exportIndexedDBDocs = function() {
+  return new Promise(function(resolve) {
+    openFilesDB(function(db) {
+      if (!db) return resolve([]);
+      try {
+        var tx = db.transaction(["docs"], "readonly");
+        var req = tx.objectStore("docs").getAll();
+        req.onsuccess = function(e) {
+          var list = e.target.result || [];
+          var cleanList = [];
+          for (var i = 0; i < list.length; i++) {
+            var item = list[i];
+            // فقط فایل‌های با حجم معقول (زیر ۲ مگابایت) در دیتابیس JSON همگام‌سازی می‌شوند تا محدودیت گوگل اسکریپت رد نشود
+            var dUrl = item.dataUrl || "";
+            if (dUrl.length < 2200000) {
+              cleanList.push({
+                key: item.key,
+                caseId: item.caseId,
+                docCode: item.docCode,
+                docTitle: item.docTitle,
+                fileName: item.fileName,
+                uploadDate: item.uploadDate,
+                dataUrl: dUrl
+              });
+            }
+          }
+          resolve(cleanList);
+        };
+        req.onerror = function() { resolve([]); };
+      } catch (err) {
+        resolve([]);
+      }
+    });
+  });
+};
+
+window.importIndexedDBDocs = function(docsList) {
+  return new Promise(function(resolve) {
+    if (!Array.isArray(docsList) || docsList.length === 0) return resolve(false);
+    openFilesDB(function(db) {
+      if (!db) return resolve(false);
+      try {
+        var tx = db.transaction(["docs"], "readwrite");
+        var store = tx.objectStore("docs");
+        for (var i = 0; i < docsList.length; i++) {
+          var d = docsList[i];
+          if (d && d.key) {
+            store.put({
+              key: d.key,
+              caseId: d.caseId,
+              docCode: d.docCode,
+              docTitle: d.docTitle,
+              fileName: d.fileName,
+              uploadDate: d.uploadDate,
+              dataUrl: d.dataUrl
+            });
+          }
+        }
+        tx.oncomplete = function() {
+          renderActiveCaseDocsChecklist();
+          resolve(true);
+        };
+        tx.onerror = function() { resolve(false); };
+      } catch (err) {
+        resolve(false);
+      }
+    });
+  });
+};
