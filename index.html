@@ -1252,578 +1252,188 @@
             <span class="badge bg-success fs-6" id="adv-search-count-badge">0 پرونده</span>
           </div>
 
-       <!-- ماژول اصلاح‌شده و دوطرفه اتصال سامانه ۶۳۶ خفر به گوگل درایو (ذخیره و بازخوانی ۱۰۰٪ اطلاعات) -->
-  <script>
-  (function() {
-    const DRIVE_API_URL = 'https://script.google.com/macros/s/AKfycbyd7lrIZfKVUm09OzBQewj8_XRWJfMpd8vCm6DV-tAUXEkA33LgqL10UKe8Yz17TwM2/exec';
-    let syncTimer = null;
-    let isRestoring = false;
-    let isInitialLoadDone = false;
-    let isSyncInProgress = false;
+          <div class="row mb-3 p-2 rounded bg-light border">
+            <div class="col-md-4 mb-2">
+              <label class="small fw-bold" for="adv-search-q">نام و نام خانوادگی / شناسه ملی / شماره پرونده:</label>
+              <input type="text" id="adv-search-q" class="form-control form-control-sm" placeholder="مثال: نگین سبز، فروزند، ۲۲۹، گلخانه، داروخانه..." oninput="renderApplicantsDirectoryTable()" />
+            </div>
+            <div class="col-md-2 mb-2">
+              <label class="small fw-bold" for="adv-filter-group">نوع فعالیت (گروه تخصصی):</label>
+              <select id="adv-filter-group" class="form-select form-select-sm" onchange="renderApplicantsDirectoryTable()">
+                <option value="ALL">همه گروه‌های سه‌گانه</option>
+                <option value="GREENHOUSE_MUSHROOM">۱. گلخانه و قارچ</option>
+                <option value="LIVESTOCK_POULTRY_FISHERIES">۲. دام، طیور و شیلات</option>
+                <option value="CLINIC_PHARMACY">۳. کلینیک و داروخانه گیاهپزشکی</option>
+              </select>
+            </div>
+            <div class="col-md-2 mb-2">
+              <label class="small fw-bold" for="adv-filter-entity">نوع شخصیت متقاضی:</label>
+              <select id="adv-filter-entity" class="form-select form-select-sm" onchange="renderApplicantsDirectoryTable()">
+                <option value="ALL">همه (حقیقی / حقوقی / سازمانی)</option>
+                <option value="INDIVIDUAL">👤 شخص حقیقی</option>
+                <option value="LEGAL">🏢 شخص حقوقی (شرکت/تعاونی)</option>
+                <option value="ORG">🏛️ سازمان / نهاد دولتی</option>
+              </select>
+            </div>
+            <div class="col-md-2 mb-2">
+              <label class="small fw-bold" for="adv-filter-status">وضعیت پرونده:</label>
+              <select id="adv-filter-status" class="form-select form-select-sm" onchange="renderApplicantsDirectoryTable()">
+                <option value="ALL">همه وضعیت‌ها</option>
+                <option value="ACTIVE">فعال</option>
+                <option value="IN_PROGRESS">در جریان استعلام</option>
+                <option value="APPROVED">دارای مجوز / مصوب</option>
+                <option value="ARCHIVED">راکد / بایگانی</option>
+              </select>
+            </div>
+            <div class="col-md-2 mb-2">
+              <label class="small fw-bold" for="adv-filter-date">بازه تاریخی ثبت:</label>
+              <input type="text" id="adv-filter-date" class="form-control form-control-sm" placeholder="مثال: 1405/01" oninput="renderApplicantsDirectoryTable()" />
+            </div>
+          </div>
 
-    // کلیدهای سیستمی که به تنهایی نباید باعث بازنویسی خودکار دیتابیس ابری در زمان لود صفحه شوند
-    const IGNORED_STARTUP_KEYS = new Set([
-      'nezam636_paper_size',
-      'nezam636_paper_size_v1',
-      'nezam_croquis_print_map_mode',
-      'nezam_croquis_print_zoom',
-      'nezam636_active_case_id'
-    ]);
+          <div class="table-responsive">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>کلاسه پرونده</th>
+                  <th>مشخصات متقاضی / شرکت</th>
+                  <th>گروه اصلی</th>
+                  <th>نوع فعالیت و ظرفیت</th>
+                  <th>موقعیت و تاریخ ثبت</th>
+                  <th>وضعیت و کروکی</th>
+                  <th>عملیات</th>
+                </tr>
+              </thead>
+              <tbody id="applicants-directory-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
 
-    // ۱. افزودن دکمه‌های «ذخیره در درایو» و «بازخوانی از درایو» در نوار بالای سایت
-    function createCloudStatusUI() {
-      const headerRight = document.querySelector('.top-hero-bar .d-flex.flex-wrap.align-items-center.gap-2');
-      if (!headerRight || document.getElementById('gdrive-status-btn')) return;
+      <!-- زیرتب ۲: فرم ثبت و ویرایش مشخصات متقاضی (sub-info) -->
+      <div id="sub-info" class="case-subpane">
+        <div class="card-clean">
+          <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 pb-2 border-bottom">
+            <strong class="text-success">📝 فرم تخصصی مشخصات متقاضی، محاسبه سرانه فنی و جدول مختصات پایه (X, Y, Z, Zone)</strong>
+            <div class="d-flex flex-wrap gap-2">
+              <button type="button" class="btn btn-sm btn-success" onclick="saveActiveCaseChanges(false)">💾 ذخیره تغییرات پرونده</button>
+              <button type="button" class="btn btn-sm btn-primary" onclick="saveActiveCaseChanges(true)">📨 ذخیره و انتقال به صدور نامه</button>
+              <button type="button" class="btn btn-sm btn-outline-dark" onclick="addNewActivitySubgroupPrompt()">➕ افزودن زیرگروه فعالیت جدید</button>
+              <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteActiveCase()">🗑️ حذف کنترل‌شده متقاضی</button>
+            </div>
+          </div>
 
-      const restoreBtn = document.createElement('button');
-      restoreBtn.id = 'gdrive-restore-btn';
-      restoreBtn.type = 'button';
-      restoreBtn.className = 'btn btn-sm btn-primary fw-bold';
-      restoreBtn.style.border = '1px solid #93c5fd';
-      restoreBtn.innerHTML = '🔄 بازخوانی از درایو';
-      restoreBtn.title = 'دریافت آخرین اطلاعات ذخیره‌شده از گوگل درایو (مخصوص مرورگر یا دستگاه جدید)';
-      restoreBtn.onclick = function() {
-        loadFromDriveOnStartup(true);
-      };
+          <div class="row">
+            <div class="col-md-3 mb-2">
+              <label class="small fw-bold" for="c-entity-type">نوع شخصیت متقاضی:</label>
+              <select id="c-entity-type" class="form-select form-select-sm fw-bold" onchange="onEntityTypeChangedInForm()">
+                <option value="INDIVIDUAL">👤 شخص حقیقی</option>
+                <option value="LEGAL">🏢 شخص حقوقی (شرکت / تعاونی)</option>
+                <option value="ORG">🏛️ سازمان / اداره / نهاد</option>
+              </select>
+            </div>
+            <div class="col-md-3 mb-2">
+              <label class="small fw-bold" for="c-main-group">گروه اصلی فعالیت (ساختار سه‌گانه):</label>
+              <select id="c-main-group" class="form-select form-select-sm fw-bold" onchange="onMainGroupChangedInForm()">
+                <option value="GREENHOUSE_MUSHROOM">گروه اول: گلخانه و قارچ</option>
+                <option value="LIVESTOCK_POULTRY_FISHERIES">گروه دوم: دام، طیور و شیلات</option>
+                <option value="CLINIC_PHARMACY">گروه سوم: کلینیک و داروخانه گیاهپزشکی</option>
+              </select>
+            </div>
+            <div class="col-md-4 mb-2">
+              <label class="small fw-bold" for="c-act-type">زیرگروه / نوع فعالیت تخصصی:</label>
+              <select id="c-act-type" class="form-select form-select-sm fw-bold" onchange="recalcCaseSpecsFromHeadcount()"></select>
+            </div>
+            <div class="col-md-2 mb-2">
+              <label class="small fw-bold" for="c-case-status">وضعیت رسیدگی پرونده:</label>
+              <select id="c-case-status" class="form-select form-select-sm">
+                <option value="ACTIVE">فعال</option>
+                <option value="IN_PROGRESS">در جریان استعلام</option>
+                <option value="APPROVED">دارای مجوز / مصوب</option>
+                <option value="ARCHIVED">راکد / بایگانی</option>
+              </select>
+            </div>
 
-      const saveBtn = document.createElement('button');
-      saveBtn.id = 'gdrive-status-btn';
-      saveBtn.type = 'button';
-      saveBtn.className = 'btn btn-sm btn-success fw-bold';
-      saveBtn.style.border = '1px solid #86efac';
-      saveBtn.innerHTML = '☁️ گوگل درایو: آماده';
-      saveBtn.title = 'ذخیره کامل تمام پرونده‌ها، نقشه‌های کروکی، نامه‌ها و مدارک در گوگل درایو';
-      saveBtn.onclick = async function() {
-        await saveApplicantFolderToDrive(true);
-        await syncAllDataToDrive(true);
-      };
+            <div class="col-md-2 mb-2">
+              <label class="small fw-bold" for="c-code">شماره کلاسه پرونده:</label>
+              <input type="text" id="c-code" class="form-control form-control-sm fw-bold" />
+            </div>
+            <div class="col-md-4 mb-2">
+              <label class="small fw-bold" id="lbl-c-name" for="c-name">نام و نام خانوادگی متقاضی حقیقی *</label>
+              <input type="text" id="c-name" class="form-control form-control-sm fw-bold" />
+            </div>
+            <div class="col-md-3 mb-2">
+              <label class="small fw-bold" id="lbl-c-nid" for="c-nid">کد ملی متقاضی (۱۰ رقمی) *</label>
+              <input type="text" id="c-nid" class="form-control form-control-sm" />
+            </div>
+            <div class="col-md-3 mb-2">
+              <label class="small fw-bold" for="c-mobile">شماره تلفن همراه:</label>
+              <input type="text" id="c-mobile" class="form-control form-control-sm" />
+            </div>
+          </div>
 
-      headerRight.prepend(restoreBtn);
-      headerRight.prepend(saveBtn);
-    }
+          <!-- فیلدهای ویژه اشخاص حقوقی و سازمان‌ها -->
+          <div id="c-legal-extra-fields" class="row p-2 mb-2 rounded bg-light border" style="display:none;">
+            <div class="col-md-6 mb-1">
+              <label class="small fw-bold text-primary" for="c-reg-no">شماره ثبت شرکت / مجوز سازمانی:</label>
+              <input type="text" id="c-reg-no" class="form-control form-control-sm" placeholder="شماره ثبت" />
+            </div>
+            <div class="col-md-6 mb-1">
+              <label class="small fw-bold text-primary" for="c-rep-name">نام مدیرعامل / نماینده قانونی:</label>
+              <input type="text" id="c-rep-name" class="form-control form-control-sm" placeholder="نام و نام خانوادگی نماینده" />
+            </div>
+          </div>
 
-    function setCloudStatus(text, bg) {
-      const btn = document.getElementById('gdrive-status-btn');
-      if (btn) {
-        btn.innerHTML = text;
-        if (bg) btn.style.backgroundColor = bg;
-      }
-    }
+          <div class="row">
+            <div class="col-md-2 mb-2">
+              <label class="small fw-bold" for="c-count">مقدار پایه ظرفیت (عدد):</label>
+              <input type="number" id="c-count" class="form-control form-control-sm" oninput="recalcCaseSpecsFromHeadcount()" />
+            </div>
+            <div class="col-md-4 mb-2">
+              <label class="small fw-bold" for="c-project">عنوان رسمی طرح در مکاتبات:</label>
+              <input type="text" id="c-project" class="form-control form-control-sm" />
+            </div>
+            <div class="col-md-2 mb-2">
+              <label class="small fw-bold" for="c-cap">ظرفیت با واحد:</label>
+              <input type="text" id="c-cap" class="form-control form-control-sm" />
+            </div>
+            <div class="col-md-2 mb-2">
+              <label class="small fw-bold" for="c-land">مساحت زمین (مترمربع):</label>
+              <input type="text" id="c-land" class="form-control form-control-sm" />
+            </div>
+            <div class="col-md-2 mb-2">
+              <label class="small fw-bold" for="c-water">نیاز آبی (لیتر/شبانه روز):</label>
+              <input type="text" id="c-water" class="form-control form-control-sm" />
+            </div>
 
-    // تبدیل رشته یونیکد فارسی به Base64 استاندارد
-    function utf8ToBase64(str) {
-      try {
-        return btoa(unescape(encodeURIComponent(str)));
-      } catch (e) {
-        return '';
-      }
-    }
+            <div class="col-md-4 mb-2">
+              <label class="small fw-bold" for="c-loc">موقعیت اراضی (شهرستان / بخش / روستا):</label>
+              <input type="text" id="c-loc" class="form-control form-control-sm" />
+            </div>
+            <div class="col-md-4 mb-2">
+              <label class="small fw-bold" for="c-subarea">تفکیک زیربنای مسقف و محوطه:</label>
+              <input type="text" id="c-subarea" class="form-control form-control-sm" />
+            </div>
+            <div class="col-md-2 mb-2">
+              <label class="small fw-bold" for="c-issue-date">تاریخ تشکیل پرونده:</label>
+              <input type="text" id="c-issue-date" class="form-control form-control-sm" />
+            </div>
+            <div class="col-md-2 mb-2">
+              <label class="small fw-bold" for="c-exp-date">تاریخ اعتبار استعلام‌ها:</label>
+              <input type="text" id="c-exp-date" class="form-control form-control-sm" />
+            </div>
 
-    // ۲. جمع‌آوری ۱۰۰٪ اطلاعات سامانه (از متغیرهای حافظه + localStorage + IndexedDB)
-    async function collectCompleteSystemSnapshot() {
-      if (typeof window.flushInMemoryStateToLocalStorage === 'function') {
-        window.flushInMemoryStateToLocalStorage();
-      }
-
-      const storageData = {};
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (k && !k.startsWith('__gdrive_')) {
-          storageData[k] = localStorage.getItem(k);
-        }
-      }
-
-      let idbDocs = [];
-      if (typeof window.exportIndexedDBDocs === 'function') {
-        try {
-          idbDocs = await window.exportIndexedDBDocs();
-        } catch (e) {
-          console.warn('IndexedDB export warning:', e);
-        }
-      }
-
-      return {
-        storage: storageData,
-        indexedDBDocs: idbDocs
-      };
-    }
-
-    // ۳. ارسال و ذخیره کامل کل دیتابیس در گوگل درایو
-    async function syncAllDataToDrive(showAlert) {
-      if (isRestoring || isSyncInProgress) return false;
-      if (!isInitialLoadDone && !showAlert) return false;
-
-      isSyncInProgress = true;
-      try {
-        setCloudStatus('⏳ در حال ذخیره در درایو...', '#d97706');
-        const snapshot = await collectCompleteSystemSnapshot();
-
-        // جلوگیری از بازنویسی دیتابیس ابری با دیتای خالی
-        if (!snapshot.storage['nezam636_unified_cases'] && !showAlert) {
-          isSyncInProgress = false;
-          return false;
-        }
-
-        const ts = Date.now();
-        const faDate = new Date().toLocaleString('fa-IR');
-
-        const syncRecord = {
-          _type: 'FULL_STORAGE_SYNC',
-          updatedAt: ts,
-          updatedAtFa: faDate,
-          storage: snapshot.storage,
-          indexedDBDocs: snapshot.indexedDBDocs
-        };
-
-        const serializedSync = JSON.stringify(syncRecord);
-
-        // ارسال همزمان در فرمت db (برای اسکریپت sync) و فرمت driveForm (برای اسکریپت پوشه‌ساز)
-        const payload = {
-          action: 'sync',
-          updatedAt: ts,
-          fullDatabase: syncRecord,
-          db: [syncRecord],
-          fullName: 'پشتیبان_مرکزی_اتوماسیون_۶۳۶',
-          nationalCode: 'SYSTEM_MASTER_DB',
-          phone: String(ts),
-          description: serializedSync,
-          fileName: 'Nezam636_Master_DB.json',
-          fileType: 'application/json',
-          fileData: utf8ToBase64(serializedSync)
-        };
-
-        const res = await fetch(DRIVE_API_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify(payload),
-          redirect: 'follow'
-        });
-
-        await res.text();
-        localStorage.setItem('__gdrive_sync_ts', String(ts));
-        localStorage.setItem('__gdrive_has_local_data', '1');
-
-        setCloudStatus('✅ ذخیره در درایو انجام شد', '#15803d');
-        if (showAlert) {
-          if (typeof showToastMsg === 'function') {
-            showToastMsg('✅ تمامی اطلاعات سامانه (پرونده‌ها، کروکی‌ها، نامه‌ها و مدارک) در گوگل درایو ذخیره شد.');
-          } else {
-            alert('تمامی اطلاعات سامانه با موفقیت در گوگل درایو ذخیره شد.');
-          }
-        }
-        return true;
-      } catch (err) {
-        console.error('Google Drive Sync Error:', err);
-        setCloudStatus('⚠️ خطا در ارتباط با درایو', '#dc2626');
-        if (showAlert) {
-          alert('خطا در ارتباط با گوگل درایو. لطفاً اتصال اینترنت خود را بررسی نمایید.');
-        }
-        return false;
-      } finally {
-        isSyncInProgress = false;
-      }
-    }
-
-    // ۴. ساخت پوشه اختصاصی متقاضی فعال در گوگل درایو به همراه تمام جزئیات پرونده، کروکی و نامه‌ها
-    async function saveApplicantFolderToDrive(manualTrigger) {
-      if (isRestoring) return false;
-
-      const activeCase = (typeof getActiveCase === 'function') ? getActiveCase() : null;
-      const val = id => (document.getElementById(id) ? document.getElementById(id).value.trim() : '');
-      const selText = id => {
-        const el = document.getElementById(id);
-        return el && el.options && el.selectedIndex >= 0 ? el.options[el.selectedIndex].text : '';
-      };
-
-      const fullName = val('c-name') || (activeCase ? activeCase.name : '');
-      const nationalCode = val('c-nid') || (activeCase ? activeCase.nid : '') || val('c-code');
-      if (!fullName && !manualTrigger) return false;
-
-      const folderKey = (fullName || 'متقاضی') + '_' + (nationalCode || '');
-      const createdFolders = JSON.parse(localStorage.getItem('__gdrive_folders') || '{}');
-      if (!manualTrigger && createdFolders[folderKey]) return true;
-
-      // جمع‌آوری نامه‌های مرتبط با این متقاضی از دفتر اندیکاتور
-      const caseLetters = (typeof lettersDB !== 'undefined' && Array.isArray(lettersDB) && activeCase)
-        ? lettersDB.filter(l => l.caseId === activeCase.id)
-        : [];
-
-      // ساخت شیء کامل پرونده متقاضی
-      const completeCaseObject = activeCase ? JSON.parse(JSON.stringify(activeCase)) : {
-        id: 'CASE-' + Date.now(),
-        code: val('c-code'),
-        name: fullName || 'متقاضی',
-        nid: nationalCode,
-        mobile: val('c-mobile'),
-        project: val('c-project'),
-        cap: val('c-cap'),
-        land: val('c-land'),
-        water: val('c-water'),
-        loc: val('c-loc'),
-        subarea: val('c-subarea'),
-        issueDate: val('c-issue-date'),
-        expDate: val('c-exp-date'),
-        utm: val('c-utm')
-      };
-
-      // ساخت متن کامل و خوانا برای فیلد description در گوگل درایو + تگ JSON برای بازخوانی خودکار
-      const readableSummary = [
-        '=== مشخصات کامل پرونده متقاضی مرکز ۶۳۶ خفر ===',
-        'نام متقاضی / شرکت: ' + (fullName || '---'),
-        'کد ملی / شناسه ملی: ' + (nationalCode || '---'),
-        'شماره کلاسه پرونده: ' + (val('c-code') || completeCaseObject.code || '---'),
-        'شماره تماس: ' + (val('c-mobile') || completeCaseObject.mobile || '---'),
-        'نوع شخصیت: ' + (selText('c-entity-type') || completeCaseObject.entityType || '---'),
-        'گروه تخصصی: ' + (selText('c-main-group') || completeCaseObject.mainGroup || '---'),
-        'عنوان طرح: ' + (val('c-project') || completeCaseObject.project || '---'),
-        'ظرفیت: ' + (val('c-cap') || completeCaseObject.cap || '---'),
-        'مساحت زمین (مترمربع): ' + (val('c-land') || completeCaseObject.land || '---'),
-        'نیاز آبی (لیتر/شبانه‌روز): ' + (val('c-water') || completeCaseObject.water || '---'),
-        'تفکیک عرصه: ' + (val('c-subarea') || completeCaseObject.subarea || '---'),
-        'موقعیت اراضی: ' + (val('c-loc') || completeCaseObject.loc || '---'),
-        'تاریخ تشکیل پرونده: ' + (val('c-issue-date') || completeCaseObject.issueDate || '---'),
-        'تاریخ اعتبار استعلام‌ها: ' + (val('c-exp-date') || completeCaseObject.expDate || '---'),
-        'وضعیت ۷ استعلام: ' + JSON.stringify(completeCaseObject.inquiries || {}),
-        'تعداد نقشه‌های کروکی: ' + ((completeCaseObject.croquisMaps || []).length),
-        'تعداد نامه‌های صادره/وارده: ' + caseLetters.length,
-        '--- مختصات UTM ---',
-        (val('c-utm') || completeCaseObject.utm || '---'),
-        '/*NEZAM_CASE_JSON:' + JSON.stringify({ caseData: completeCaseObject, letters: caseLetters }) + ':END_NEZAM_CASE_JSON*/'
-      ].join('\n');
-
-      const fullApplicantBackupJson = JSON.stringify({
-        exportedAt: new Date().toLocaleString('fa-IR'),
-        applicantCase: completeCaseObject,
-        applicantLetters: caseLetters
-      }, null, 2);
-
-      const applicantPayload = {
-        action: 'saveApplicant',
-        fullName: fullName || 'متقاضی',
-        nationalCode: nationalCode || String(Date.now()),
-        caseCode: val('c-code') || completeCaseObject.code,
-        phone: val('c-mobile') || completeCaseObject.mobile,
-        description: readableSummary,
-        entityType: selText('c-entity-type'),
-        mainGroup: selText('c-main-group'),
-        activityType: selText('c-act-type'),
-        status: selText('c-case-status'),
-        projectTitle: val('c-project') || completeCaseObject.project,
-        capacity: val('c-cap') || completeCaseObject.cap,
-        landArea: val('c-land') || completeCaseObject.land,
-        waterNeed: val('c-water') || completeCaseObject.water,
-        location: val('c-loc') || completeCaseObject.loc,
-        subArea: val('c-subarea') || completeCaseObject.subarea,
-        issueDate: val('c-issue-date') || completeCaseObject.issueDate,
-        expireDate: val('c-exp-date') || completeCaseObject.expDate,
-        utmCoordinates: val('c-utm') || completeCaseObject.utm,
-        fullCaseData: completeCaseObject,
-        caseLetters: caseLetters,
-        fileName: 'پرونده_کامل_' + (fullName || 'متقاضی').replace(/\s+/g, '_') + '.json',
-        fileType: 'application/json',
-        fileData: utf8ToBase64(fullApplicantBackupJson)
-      };
-
-      try {
-        setCloudStatus('⏳ ساخت پوشه متقاضی در درایو...', '#1d4ed8');
-        await fetch(DRIVE_API_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify(applicantPayload),
-          redirect: 'follow'
-        });
-        createdFolders[folderKey] = Date.now();
-        localStorage.setItem('__gdrive_folders', JSON.stringify(createdFolders));
-        setCloudStatus('✅ پوشه در درایو ساخته شد', '#15803d');
-        return true;
-      } catch (err) {
-        console.error('Folder Creation Error:', err);
-        return false;
-      }
-    }
-
-    // استخراج هوشمند رکورد پشتیبان و پرونده‌های تکی از هر نوع خروجی گوگل اسکریپت
-    function parseCloudResponse(rawResponse) {
-      let bestSyncRecord = null;
-      const recoveredCases = [];
-      const recoveredLetters = [];
-
-      function inspectItem(item) {
-        if (!item || typeof item !== 'object') return;
-
-        // الف) اگر خود آیتم یک رکورد FULL_STORAGE_SYNC باشد
-        if (item._type === 'FULL_STORAGE_SYNC' && item.storage) {
-          if (!bestSyncRecord || Number(item.updatedAt || 0) >= Number(bestSyncRecord.updatedAt || 0)) {
-            bestSyncRecord = item;
-          }
-          return;
-        }
-
-        // ب) اگر داخل فیلد fullDatabase یا data باشد
-        if (item.fullDatabase && item.fullDatabase.storage) {
-          inspectItem(item.fullDatabase);
-        }
-        if (item.data && typeof item.data === 'object') {
-          if (Array.isArray(item.data)) item.data.forEach(inspectItem);
-          else inspectItem(item.data);
-        }
-        if (item.db && Array.isArray(item.db)) {
-          item.db.forEach(inspectItem);
-        }
-
-        // ج) اگر خروجی از اسکریپت driveForm باشد و کل دیتابیس در description ذخیره شده باشد
-        if (typeof item.description === 'string') {
-          const desc = item.description.trim();
-          if (desc.startsWith('{') && desc.includes('"FULL_STORAGE_SYNC"')) {
-            try {
-              const parsed = JSON.parse(desc);
-              if (parsed && parsed.storage) {
-                if (!bestSyncRecord || Number(parsed.updatedAt || 0) >= Number(bestSyncRecord.updatedAt || 0)) {
-                  bestSyncRecord = parsed;
-                }
-                return;
-              }
-            } catch (e) {}
-          }
-
-          // د) اگر پرونده تکی متقاضی همراه با تگ NEZAM_CASE_JSON در description باشد
-          const markerStart = desc.indexOf('/*NEZAM_CASE_JSON:');
-          const markerEnd = desc.indexOf(':END_NEZAM_CASE_JSON*/');
-          if (markerStart !== -1 && markerEnd !== -1 && markerEnd > markerStart) {
-            try {
-              const jsonPart = desc.substring(markerStart + 18, markerEnd);
-              const parsedCaseBundle = JSON.parse(jsonPart);
-              if (parsedCaseBundle && parsedCaseBundle.caseData) {
-                recoveredCases.push(parsedCaseBundle.caseData);
-              }
-              if (parsedCaseBundle && Array.isArray(parsedCaseBundle.letters)) {
-                recoveredLetters.push(...parsedCaseBundle.letters);
-              }
-              return;
-            } catch (e) {}
-          }
-        }
-
-        // هـ) اگر پرونده تکی دارای fullCaseData باشد
-        if (item.fullCaseData && item.fullCaseData.id) {
-          recoveredCases.push(item.fullCaseData);
-          if (Array.isArray(item.caseLetters)) {
-            recoveredLetters.push(...item.caseLetters);
-          }
-          return;
-        }
-
-        // و) اگر رکورد ساده متقاضی از فرم اولیه driveForm باشد
-        if (item.fullName && item.nationalCode && item.nationalCode !== 'SYSTEM_MASTER_DB' && item.fullName !== 'پشتیبان_مرکزی_اتوماسیون_۶۳۶') {
-          recoveredCases.push({
-            id: 'CASE-DRV-' + String(item.nationalCode).replace(/\D/g, ''),
-            code: item.caseCode || ('د-' + item.nationalCode + '/۶۳۶'),
-            entityType: 'INDIVIDUAL',
-            mainGroup: 'GREENHOUSE_MUSHROOM',
-            actType: 'greenhouse_veg',
-            name: item.fullName,
-            nid: item.nationalCode,
-            mobile: item.phone || '',
-            count: 1000,
-            project: item.projectTitle || (item.description ? item.description.split('\n')[0].slice(0, 60) : 'طرح کشاورزی ثبت‌شده در درایو'),
-            cap: item.capacity || '۱۰۰۰ مترمربع',
-            land: item.landArea || '۱۰۰۰',
-            water: item.waterNeed || '۸۰۰۰',
-            loc: item.location || 'فارس/ خفر',
-            subarea: item.subArea || '',
-            utm: item.utmCoordinates || '',
-            issueDate: item.issueDate || '۱۴۰۵/۰۲/۱۳',
-            expDate: item.expireDate || '۱۴۰۶/۰۲/۱۳',
-            caseStatus: 'ACTIVE',
-            inquiries: { water: 'WAIT', elec: 'WAIT', road: 'WAIT', gas: 'WAIT', env: 'WAIT', natres: 'WAIT', vet: 'WAIT' },
-            history: [{ date: 'ثبت در گوگل درایو', action: item.description || 'ثبت اولیه در گوگل درایو', by: 'گوگل درایو' }],
-            croquisMaps: []
-          });
-        }
-      }
-
-      if (Array.isArray(rawResponse)) {
-        rawResponse.forEach(inspectItem);
-      } else if (rawResponse && typeof rawResponse === 'object') {
-        inspectItem(rawResponse);
-      }
-
-      return { bestSyncRecord, recoveredCases, recoveredLetters };
-    }
-
-    // ۵. بازخوانی کامل اطلاعات از گوگل درایو (هنگام ورود با مرورگر/دستگاه جدید یا کلیک روی دکمه بازخوانی)
-    async function loadFromDriveOnStartup(manualForce = false) {
-      isRestoring = true;
-      try {
-        setCloudStatus('🔄 دریافت اطلاعات از درایو...', '#0284c7');
-        const fetchUrl = DRIVE_API_URL + (DRIVE_API_URL.includes('?') ? '&' : '?') + 't=' + Date.now();
-        const res = await fetch(fetchUrl, { method: 'GET', redirect: 'follow' });
-        const rawData = await res.json();
-
-        const { bestSyncRecord, recoveredCases, recoveredLetters } = parseCloudResponse(rawData);
-
-        const localTs = Number(localStorage.getItem('__gdrive_sync_ts') || 0);
-        const hasLocalData = Boolean(localStorage.getItem('__gdrive_has_local_data') && localStorage.getItem('nezam636_unified_cases'));
-        let didRestore = false;
-
-        // ۱. بازگردانی از رکورد کامل دیتابیس (FULL_STORAGE_SYNC)
-        if (bestSyncRecord && bestSyncRecord.storage) {
-          const cloudTs = Number(bestSyncRecord.updatedAt || Date.now());
-          // اگر مرورگر جدید است (!hasLocalData یا localTs === 0) یا کاربر دکمه بازخوانی را زده یا دیتای ابری جدیدتر است
-          if (manualForce || !hasLocalData || localTs === 0 || cloudTs >= localTs) {
-            window.__gdriveInternalFlush = true;
-            const entries = Object.entries(bestSyncRecord.storage);
-            for (const [k, v] of entries) {
-              if (k && !k.startsWith('__gdrive_') && typeof v === 'string') {
-                localStorage.setItem(k, v);
-              }
-            }
-            localStorage.setItem('__gdrive_sync_ts', String(cloudTs));
-            localStorage.setItem('__gdrive_has_local_data', '1');
-            window.__gdriveInternalFlush = false;
-
-            if (Array.isArray(bestSyncRecord.indexedDBDocs) && bestSyncRecord.indexedDBDocs.length > 0 && typeof window.importIndexedDBDocs === 'function') {
-              await window.importIndexedDBDocs(bestSyncRecord.indexedDBDocs);
-            }
-            didRestore = true;
-          }
-        }
-
-        // ۲. ادغام پرونده‌های تکی ذخیره‌شده در پوشه‌های درایو (در صورتی که در لیست پرونده‌ها نباشند)
-        if (recoveredCases.length > 0) {
-          let currentCases = [];
-          try {
-            currentCases = JSON.parse(localStorage.getItem('nezam636_unified_cases') || '[]');
-          } catch (e) {}
-          if (!Array.isArray(currentCases) || currentCases.length === 0) {
-            currentCases = (typeof casesDB !== 'undefined' && Array.isArray(casesDB)) ? JSON.parse(JSON.stringify(casesDB)) : [];
-          }
-
-          let addedAnyCase = false;
-          for (const rc of recoveredCases) {
-            const existsIdx = currentCases.findIndex(
-              c => (c.id && rc.id && c.id === rc.id) || (c.nid && rc.nid && String(c.nid) === String(rc.nid) && c.name === rc.name)
-            );
-            if (existsIdx === -1) {
-              currentCases.unshift(rc);
-              addedAnyCase = true;
-            } else if (manualForce) {
-              currentCases[existsIdx] = rc;
-              addedAnyCase = true;
-            }
-          }
-
-          if (addedAnyCase) {
-            window.__gdriveInternalFlush = true;
-            localStorage.setItem('nezam636_unified_cases', JSON.stringify(currentCases));
-            localStorage.setItem('__gdrive_has_local_data', '1');
-            window.__gdriveInternalFlush = false;
-            didRestore = true;
-          }
-        }
-
-        if (recoveredLetters.length > 0) {
-          let currentLetters = [];
-          try {
-            currentLetters = JSON.parse(localStorage.getItem('nezam636_letters') || '[]');
-          } catch (e) {}
-          if (Array.isArray(currentLetters)) {
-            let addedLetter = false;
-            for (const rl of recoveredLetters) {
-              if (rl && rl.id && !currentLetters.some(l => l.id === rl.id)) {
-                currentLetters.unshift(rl);
-                addedLetter = true;
-              }
-            }
-            if (addedLetter) {
-              window.__gdriveInternalFlush = true;
-              localStorage.setItem('nezam636_letters', JSON.stringify(currentLetters));
-              window.__gdriveInternalFlush = false;
-              didRestore = true;
-            }
-          }
-        }
-
-        // ۳. اعمال فوری اطلاعات بازخوانی‌شده روی تمام جداول، فرم‌ها و نقشه‌ها بدون نیاز به رفرش
-        if (didRestore) {
-          if (typeof window.reloadAllStateFromLocalStorage === 'function') {
-            window.reloadAllStateFromLocalStorage();
-          }
-          setCloudStatus('☁️ گوگل درایو: بازخوانی شد', '#15803d');
-          if (manualForce && typeof showToastMsg === 'function') {
-            showToastMsg('✅ آخرین اطلاعات پرونده‌ها، کروکی‌ها و نامه‌ها از گوگل درایو بازخوانی شد.');
-          }
-        } else {
-          setCloudStatus('☁️ گوگل درایو: متصل', '#15803d');
-          if (manualForce && typeof showToastMsg === 'function') {
-            showToastMsg('ℹ️ اطلاعات سامانه شما با آخرین نسخه گوگل درایو کاملاً منطبق است.');
-          }
-        }
-      } catch (err) {
-        console.warn('Could not load from Google Drive:', err);
-        setCloudStatus('☁️ حالت آفلاین', '#475569');
-        if (manualForce) {
-          alert('امکان دریافت اطلاعات از گوگل درایو وجود ندارد. اتصال اینترنت را بررسی نمایید.');
-        }
-      } finally {
-        isRestoring = false;
-        isInitialLoadDone = true;
-      }
-    }
-
-    // ۶. اتصال هوشمند به تغییرات حافظه (فقط پس از اتمام بارگذاری اولیه از گوگل درایو)
-    const origSetItem = Storage.prototype.setItem;
-    Storage.prototype.setItem = function(key, value) {
-      origSetItem.apply(this, arguments);
-      if (
-        isInitialLoadDone &&
-        !isRestoring &&
-        !window.__gdriveInternalFlush &&
-        key &&
-        !key.startsWith('__gdrive_') &&
-        !IGNORED_STARTUP_KEYS.has(key)
-      ) {
-        clearTimeout(syncTimer);
-        syncTimer = setTimeout(() => syncAllDataToDrive(false), 1800);
-      }
-    };
-
-    // در دسترس قرار دادن توابع در سطح window
-    window.syncAllDataToDrive = syncAllDataToDrive;
-    window.saveApplicantFolderToDrive = saveApplicantFolderToDrive;
-    window.loadFromDriveOnStartup = loadFromDriveOnStartup;
-
-    window.addEventListener('load', function() {
-      createCloudStatusUI();
-      loadFromDriveOnStartup(false);
-
-      // اتصال ترتیبی (Sequential) به دکمه ذخیره پرونده متقاضی
-      if (typeof window.saveActiveCaseChanges === 'function') {
-        const origSaveCase = window.saveActiveCaseChanges;
-        window.saveActiveCaseChanges = function() {
-          const result = origSaveCase.apply(this, arguments);
-          (async function() {
-            await saveApplicantFolderToDrive(true);
-            await syncAllDataToDrive(false);
-          })();
-          return result;
-        };
-      }
-
-      // اتصال به دکمه ساخت پوشه متقاضی در تب مدارک
-      if (typeof window.syncActiveCaseFolderToDrive === 'function') {
-        const origSyncFolder = window.syncActiveCaseFolderToDrive;
-        window.syncActiveCaseFolderToDrive = function() {
-          (async function() {
-            await saveApplicantFolderToDrive(true);
-            await syncAllDataToDrive(true);
-          })();
-          return origSyncFolder.apply(this, arguments);
-        };
-      }
-    });
-  })();
-  </script>           </div>
+            <!-- جدول بخش‌بندی‌شده ورود مختصات پایه (صفحه ۵ راهنمای PDF) -->
+            <div class="col-md-12 mb-2">
+              <div class="p-3 rounded border bg-light">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2 pb-1 border-bottom">
+                  <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <strong class="small text-success">📍 ۱. ورود مختصات پایه (جدول بخش‌بندی‌شده برای ثبت X شرقی، Y شمالی، ارتفاع Z و منطقه Zone پیش‌فرض ۳۹):</strong>
+                    <div class="btn-group btn-group-sm" role="group" aria-label="نوع سیستم مختصات پرونده">
+                      <button type="button" id="btn-case-coord-utm" class="btn btn-sm btn-success fw-bold py-0 px-2" onclick="setCoordInputMode('UTM')">📐 نقاط UTM (X, Y)</button>
+                      <button type="button" id="btn-case-coord-geo" class="btn btn-sm btn-outline-success fw-bold py-0 px-2" onclick="setCoordInputMode('GEO')">🌐 طول و عرض جغرافیایی (Lat / Lng)</button>
+                    </div>
+                  </div>
                   <span class="badge bg-success" id="utm-geometry-badge">آماده محاسبه مساحت</span>
                 </div>
 
