@@ -105,6 +105,48 @@ test('page does not request font files that are absent from the repository', () 
   assert.match(html, /font-family:\s*Tahoma/);
 });
 
+test('local offline extraction does not fabricate a default location or land area', () => {
+  const ai = read('nezam-ai-assistant.js');
+  const start = ai.indexOf('function localOfflineExtractFields(rawText) {');
+  const end = ai.indexOf('\n// نمایش وضعیت فایل غیرتصویری', start);
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+  const fnSource = ai.slice(start, end);
+  const extract = new Function(
+    'toEnglishDigits',
+    'formatUtmCoordinatesLTR',
+    fnSource + '\nreturn localOfflineExtractFields;'
+  )(
+    (value) => String(value).replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d))),
+    () => ''
+  );
+
+  const unrelated = extract('این متن هیچ اطلاعاتی درباره فعالیت و مساحت ندارد.');
+  assert.equal(unrelated.land, '');
+  assert.equal(unrelated.loc, '');
+  assert.equal(unrelated.mainGroup, '');
+  assert.equal(unrelated.actType, '');
+
+  const sheep = extract('موضوع طرح: پرواربندی بره');
+  assert.equal(sheep.mainGroup, 'LIVESTOCK_POULTRY_FISHERIES');
+  assert.equal(sheep.actType, 'lamb');
+
+  const mushroom = extract('موضوع طرح: پرورش قارچ دکمه‌ای');
+  assert.equal(mushroom.mainGroup, 'GREENHOUSE_MUSHROOM');
+  assert.equal(mushroom.actType, 'mushroom_button');
+
+  const measured = extract('مساحت زمین: ۲۴۵۰ مترمربع');
+  assert.equal(measured.land, '2450');
+});
+
+test('ambiguous OCR activity does not force a default activity into a case', () => {
+  const ai = read('nezam-ai-assistant.js');
+  const apply = ai.slice(ai.indexOf('function applyOcrDataToCase'), ai.indexOf('function aiExtractFromRawText'));
+  const offline = ai.slice(ai.indexOf('function aiExtractFromRawText'), ai.indexOf('function aiRunFullAutopilotPipeline'));
+  assert.match(apply, /if\(d\.mainGroup&&d\.actType&&document\.getElementById\('c-main-group'\)\)/);
+  assert.match(offline, /if\(data\.mainGroup&&data\.actType&&document\.getElementById\('c-main-group'\)\)/);
+});
+
 test('OCR fallback does not invent an area or a location', () => {
   const server = read('server.ts');
   const fallbackStart = server.indexOf('const fallbackData = {');
