@@ -3597,11 +3597,14 @@ function croquisMapCommitOnlineLayer(layer) {
     c.utmZone = layer.points.length ? (layer.points[0].zone || defZone) : defZone;
     var cUtm = document.getElementById("c-utm");
     if (cUtm) cUtm.value = c.utm;
+    var landEl = document.getElementById("c-land");
     if (layer.geomType === "POLYGON" && layer.points.length >= 3) {
       var areaData = computeUtmGeometry(layer.points, "POLYGON");
       c.land = toFa(Math.round(areaData.area));
-      var landEl = document.getElementById("c-land");
       if (landEl) landEl.value = c.land;
+    } else {
+      c.land = "";
+      if (landEl) landEl.value = "";
     }
   }
 
