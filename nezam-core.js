@@ -1832,7 +1832,8 @@ window.downloadStandaloneWindowsHTML = async function() {
       docChecklists: DOC_CHECKLISTS,
       brandCfg: typeof brandCfg !== "undefined" ? brandCfg : null,
       tplCfg: typeof tplCfg !== "undefined" ? tplCfg : null,
-      paperSize: typeof currentPaperSize !== "undefined" ? currentPaperSize : "A4"
+      paperSize: typeof currentPaperSize !== "undefined" ? currentPaperSize : "A4",
+      activeCaseId: typeof activeCaseId !== "undefined" ? activeCaseId : ""
     };
     var safeSnapshotJson = JSON.stringify(snapshotPayload)
       .replace(/</g, "\\u003c")
@@ -1851,6 +1852,7 @@ window.downloadStandaloneWindowsHTML = async function() {
       "if(!localStorage.getItem('nezam636_branding_cfg')&&snap.brandCfg)localStorage.setItem('nezam636_branding_cfg',JSON.stringify(snap.brandCfg));" +
       "if(!localStorage.getItem('nezam636_templates_cfg')&&snap.tplCfg)localStorage.setItem('nezam636_templates_cfg',JSON.stringify(snap.tplCfg));" +
       "if(!localStorage.getItem('nezam636_paper_size')&&snap.paperSize)localStorage.setItem('nezam636_paper_size',snap.paperSize);" +
+      "if(!localStorage.getItem('nezam636_active_case_id')&&snap.activeCaseId)localStorage.setItem('nezam636_active_case_id',snap.activeCaseId);" +
       "}catch(e){console.error('Nezam636 snapshot restore failed',e);}})();";
     bodyEl.insertBefore(snapScript, bodyEl.firstChild);
 
