@@ -1763,31 +1763,34 @@ window.renderCaseSegmentedPointsTable = function() {
   var isGeo = coordInputMode === "GEO";
   var c = getActiveCase();
   var defZone = (c && c.utmZone) ? c.utmZone : "39R";
-
   var html = "";
+
   for (var i = 0; i < pts.length; i++) {
     var pt = ensurePointEnriched(pts[i], defZone, i);
-    var valX = isGeo ? pt.lng : pt.x;
-    var valY = isGeo ? pt.lat : pt.y;
+    var valX = Number(isGeo ? pt.lng : pt.x);
+    var valY = Number(isGeo ? pt.lat : pt.y);
+    var elev = Number(pt.elev !== undefined ? pt.elev : 1285);
+    var safeX = Number.isFinite(valX) ? String(valX) : "";
+    var safeY = Number.isFinite(valY) ? String(valY) : "";
+    var safeElev = Number.isFinite(elev) ? String(elev) : "1285";
     var fieldX = isGeo ? "lng" : "x";
     var fieldY = isGeo ? "lat" : "y";
-    var zVal = pt.zone || defZone || "39R";
+    var zVal = /^(38R|39R|40R|41R)$/.test(pt.zone || "") ? pt.zone : (defZone || "39R");
+    var safeIndex = String(i);
 
     html += '<tr>' +
-      '<td class="fw-bold">' + toFa(i + 1) + '</td>' +
-      '<td><input type="text" class="form-control form-control-sm text-center fw-bold py-0" style="min-width:48px;" value="' + (pt.label || ("P" + (i + 1))) + '" onchange="updateCaseFormPoint(' + i + ',\'label\',this.value)"></td>' +
-      '<td><input type="number" step="any" class="form-control form-control-sm text-center font-monospace py-0" style="min-width:95px;" value="' + valX + '" onchange="updateCaseFormPoint(' + i + ',\'' + fieldX + '\',this.value)"></td>' +
-      '<td><input type="number" step="any" class="form-control form-control-sm text-center font-monospace py-0" style="min-width:95px;" value="' + valY + '" onchange="updateCaseFormPoint(' + i + ',\'' + fieldY + '\',this.value)"></td>' +
-      '<td><input type="number" step="any" class="form-control form-control-sm text-center font-monospace py-0" style="min-width:68px;" value="' + (pt.elev !== undefined ? pt.elev : 1285) + '" onchange="updateCaseFormPoint(' + i + ',\'elev\',this.value)"></td>' +
-      '<td>' +
-        '<select class="form-select form-select-sm text-center py-0 px-1 fw-bold" style="min-width:72px;" onchange="updateCaseFormPoint(' + i + ',\'zone\',this.value)">' +
-          '<option value="38R" ' + (zVal === "38R" ? "selected" : "") + '>38R</option>' +
-          '<option value="39R" ' + (zVal === "39R" ? "selected" : "") + '>39R</option>' +
-          '<option value="40R" ' + (zVal === "40R" ? "selected" : "") + '>40R</option>' +
-          '<option value="41R" ' + (zVal === "41R" ? "selected" : "") + '>41R</option>' +
-        '</select>' +
-      '</td>' +
-      '<td><button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" onclick="removeCaseFormPoint(' + i + ')">🗑️</button></td>' +
+      '<td class="fw-bold">' + safeHtmlText(toFa(i + 1)) + '</td>' +
+      '<td><input type="text" class="form-control form-control-sm text-center fw-bold py-0" style="min-width:48px;" value="' + safeHtmlText(pt.label || ("P" + (i + 1))) + '" onchange="updateCaseFormPoint(' + safeIndex + ',\'label\',this.value)"></td>' +
+      '<td><input type="number" step="any" class="form-control form-control-sm text-center font-monospace py-0" style="min-width:95px;" value="' + safeX + '" onchange="updateCaseFormPoint(' + safeIndex + ',\'' + fieldX + '\',this.value)"></td>' +
+      '<td><input type="number" step="any" class="form-control form-control-sm text-center font-monospace py-0" style="min-width:95px;" value="' + safeY + '" onchange="updateCaseFormPoint(' + safeIndex + ',\'' + fieldY + '\',this.value)"></td>' +
+      '<td><input type="number" step="any" class="form-control form-control-sm text-center font-monospace py-0" style="min-width:68px;" value="' + safeElev + '" onchange="updateCaseFormPoint(' + safeIndex + ',\'elev\',this.value)"></td>' +
+      '<td><select class="form-select form-select-sm text-center py-0 px-1 fw-bold" style="min-width:72px;" onchange="updateCaseFormPoint(' + safeIndex + ',\'zone\',this.value)">' +
+        '<option value="38R" ' + (zVal === "38R" ? "selected" : "") + '>38R</option>' +
+        '<option value="39R" ' + (zVal === "39R" ? "selected" : "") + '>39R</option>' +
+        '<option value="40R" ' + (zVal === "40R" ? "selected" : "") + '>40R</option>' +
+        '<option value="41R" ' + (zVal === "41R" ? "selected" : "") + '>41R</option>' +
+      '</select></td>' +
+      '<td><button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" onclick="removeCaseFormPoint(' + safeIndex + ')">🗑️</button></td>' +
     '</tr>';
   }
   tbody.innerHTML = html || '<tr><td colspan="7" class="text-center text-muted py-2">نقطه‌ای ثبت نشده است. از ردیف بالا نقطه جدید اضافه کنید.</td></tr>';
