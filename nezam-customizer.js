@@ -2437,23 +2437,23 @@ try {
 } catch (e) {}
 
 window.setCroquisPrintMapMode = function(mode) {
+  var allowedModes = ["GOOGLE_SAT", "GOOGLE_HYBRID", "CAD"];
+  if (allowedModes.indexOf(String(mode)) === -1) mode = "GOOGLE_SAT";
   croquisPrintMapMode = mode;
   try { localStorage.setItem("nezam_croquis_print_map_mode", mode); } catch (e) {}
-  
+
   var sel = document.getElementById("crq-print-mode-select");
   if (sel && sel.value !== mode) sel.value = mode;
+  if (currentPreviewMode === "CROQUIS") printUtmSketchSheet();
 
-  if (currentPreviewMode === "CROQUIS") {
-    printUtmSketchSheet();
-  }
   var modeTitle = mode === "GOOGLE_SAT" ? "نقشه ماهواره‌ای گوگل‌ارث" : (mode === "GOOGLE_HYBRID" ? "نقشه ترکیبی هیبرید گوگل‌ارث" : "بوم مهندسی برداری CAD");
-  if (typeof showToastMsg === "function") {
-    showToastMsg("حالت نقشه در چاپ تنظیم شد: " + modeTitle);
-  }
+  if (typeof showToastMsg === "function") showToastMsg("حالت نقشه در چاپ تنظیم شد: " + modeTitle);
 };
 
 window.setCroquisPrintZoom = function(zoomVal) {
-  croquisPrintZoomLevel = String(zoomVal || "AUTO");
+  var requestedZoom = String(zoomVal || "AUTO");
+  var allowedZooms = ["AUTO", "14", "15", "16", "17", "18", "19", "20", "21"];
+  croquisPrintZoomLevel = allowedZooms.indexOf(requestedZoom) !== -1 ? requestedZoom : "AUTO";
   try { localStorage.setItem("nezam_croquis_print_zoom", croquisPrintZoomLevel); } catch (e) {}
 
   var sel1 = document.getElementById("crq-print-zoom-select");
@@ -2515,10 +2515,14 @@ window.setCroquisCropOption = function(key, val) {
       croquisPrintLabelOpts.boxHeightA4 = Math.max(240, Math.min(440, hVal));
     }
   } else if (key === "coordDisplayMode") {
-    croquisPrintLabelOpts.coordDisplayMode = String(val || "OUTER_CODE");
+    var safeCoordModes = ["OUTER_CODE", "OUTER_CALLOUT_XY", "OUTER_WITH_SUBLAYERS", "NONE"];
+    var requestedCoordMode = String(val || "OUTER_CODE");
+    croquisPrintLabelOpts.coordDisplayMode = safeCoordModes.indexOf(requestedCoordMode) !== -1 ? requestedCoordMode : "OUTER_CODE";
     croquisPrintLabelOpts.showPoints = (croquisPrintLabelOpts.coordDisplayMode !== "NONE");
   } else if (key === "polyFillOpacity") {
-    croquisPrintLabelOpts.polyFillOpacity = parseFloat(val) || 0;
+    var opacityValue = Number(val);
+    if (!Number.isFinite(opacityValue)) opacityValue = 0.05;
+    croquisPrintLabelOpts.polyFillOpacity = Math.min(1, Math.max(0, opacityValue));
   } else if (key === "interactiveCropBoxMode") {
     croquisPrintLabelOpts.interactiveCropBoxMode = !!val;
   }
