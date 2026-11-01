@@ -1221,16 +1221,17 @@ var AI_KNOWLEDGE_BASE = [
 
 // موتور آفلاین استخراج اطلاعات با عبارات باقاعده (همراه با فرمت X,Y,Z,Zone چپ‌به‌راست)
 function localOfflineExtractFields(rawText) {
-  var clean = toEnglishDigits(rawText);
+  var source = String(rawText || '');
+  var clean = toEnglishDigits(source);
   var result = {
     name: '',
     nid: '',
     mobile: '',
-    loc: 'فارس/ خفر/ مرکزی',
-    land: '1000',
-    count: 1000,
-    mainGroup: 'GREENHOUSE_MUSHROOM',
-    actType: 'greenhouse_veg',
+    loc: '',
+    land: '',
+    count: '',
+    mainGroup: '',
+    actType: '',
     utm: '',
   };
 
@@ -1240,33 +1241,52 @@ function localOfflineExtractFields(rawText) {
   var phoneMatch = clean.match(/(09\d{9})/);
   if (phoneMatch) result.mobile = phoneMatch[1];
 
-  var nameMatch = rawText.match(/(?:متقاضی|نام\s*و\s*نام\s*خانوادگی|نام|آقای|خانم|شرکت)[:\s]*([^\n،,\d]{3,35})/);
+  var nameMatch = source.match(/(?:متقاضی|نام\s*و\s*نام\s*خانوادگی|نام|آقای|خانم|شرکت)[:\s]*([^\n،,\d]{3,35})/);
   if (nameMatch) result.name = nameMatch[1].trim();
 
+  // فقط مساحتی که صریحاً در متن سند آمده است ثبت می‌شود.
   var landMatch = clean.match(/(?:مساحت|عرصه|متراژ|زمین)[:\s]*([0-9.,]+)/);
   if (landMatch) result.land = landMatch[1].replace(/,/g, '');
 
-  if (/دام|گوسفند|بز|گاو|طیور|مرغ|شیلات|ماهی/.test(rawText)) {
+  var isLivestock = /دام|گوسفند|بره|بز|گاو|گوساله|شتر|طیور|مرغ|بوقلمون|شیلات|ماهی/i.test(source);
+  var isClinic = /کلینیک|داروخانه|گیاهپزشکی|سموم/i.test(source);
+  var isMushroom = /قارچ/i.test(source);
+  var isGreenhouse = /گلخانه/i.test(source);
+
+  if (isLivestock) {
     result.mainGroup = 'LIVESTOCK_POULTRY_FISHERIES';
-    if (/گوسفند|بز/.test(rawText)) result.actType = 'sheep_high';
-    else if (/گاو|گوساله/.test(rawText)) result.actType = 'cattle_dairy';
-    else if (/مرغ|طیور/.test(rawText)) result.actType = 'broiler';
-    else if (/ماهی|شیلات/.test(rawText)) result.actType = 'fish_cold';
-  } else if (/کلینیک|داروخانه|گیاهپزشکی|سموم/.test(rawText)) {
+    if (/گوسفند.*پرتولید|پرتولید.*گوسفند/i.test(source)) result.actType = 'sheep_high';
+    else if (/بره.*پرواربندی|پرواربندی.*بره/i.test(source)) result.actType = 'lamb';
+    else if (/بز.*(?:مولد|شیری)|(?:مولد|شیری).*بز/i.test(source)) result.actType = 'goat';
+    else if (/گاو.*شیری|گاوداری.*شیری/i.test(source)) result.actType = 'cow';
+    else if (/گوساله.*پرواربندی|پرواربندی.*گوساله/i.test(source)) result.actType = 'calf';
+    else if (/شتر/i.test(source)) result.actType = 'camel';
+    else if (/مرغ.*گوشتی|گوشتی.*مرغ/i.test(source)) result.actType = 'poultry_broiler';
+    else if (/بوقلمون|شترمرغ|طیور.*خاص/i.test(source)) result.actType = 'poultry_turkey';
+    else if (/قزل.?آلا|سردابی/i.test(source)) result.actType = 'fish_trout';
+    else if (/گرمابی/i.test(source)) result.actType = 'fish_warm';
+  } else if (isClinic) {
     result.mainGroup = 'CLINIC_PHARMACY';
-    result.actType = /داروخانه/.test(rawText) ? 'pharmacy_center' : 'clinic_center';
-  } else {
+    if (/شرکت.*(?:دفع آفات|ضدعفونی)|(?:دفع آفات|ضدعفونی).*شرکت/i.test(source)) {
+      result.actType = 'pest_control_co';
+    } else if (/داروخانه/i.test(source)) {
+      result.actType = 'pharmacy';
+    } else if (/کلینیک|گیاهپزشکی/i.test(source)) {
+      result.actType = 'clinic_plant';
+    }
+  } else if (isMushroom || isGreenhouse) {
     result.mainGroup = 'GREENHOUSE_MUSHROOM';
-    if (/قارچ/.test(rawText)) result.actType = 'mushroom_button';
-    else if (/گل|زینتی/.test(rawText)) result.actType = 'greenhouse_flower';
-    else result.actType = 'greenhouse_veg';
+    if (/قارچ.*صدفی|صدفی.*قارچ/i.test(source)) result.actType = 'mushroom_oyster';
+    else if (isMushroom) result.actType = 'mushroom_button';
+    else if (/گلخانه.*(?:گیاهان دارویی|دارویی)|(?:گیاهان دارویی|دارویی).*گلخانه/i.test(source)) result.actType = 'greenhouse_medicinal';
+    else if (/گلخانه.*(?:گل|زینتی)|(?:گلخانه|گیاهان زینتی).*(?:گل|زینتی)/i.test(source)) result.actType = 'greenhouse_flower';
+    else if (/گلخانه.*(?:سبزی|صیفی)|(?:سبزی|صیفی).*گلخانه/i.test(source)) result.actType = 'greenhouse_veg';
   }
 
-  // استخراج و نرمال‌سازی مختصات UTM با فرمت چپ‌به‌راست: X,Y,Z,Zone (پیش‌فرض 39)
+  // زون فقط برای استخراج مختصات خفر به عنوان پیش‌فرض فنی استفاده می‌شود؛
+  // هیچ مساحت، موقعیت یا نوع فعالیتی بدون قرینه به متقاضی تحمیل نمی‌شود.
   var formattedUtm = formatUtmCoordinatesLTR(clean, 39);
-  if (formattedUtm) {
-    result.utm = formattedUtm;
-  }
+  if (formattedUtm) result.utm = formattedUtm;
 
   return result;
 }
@@ -1613,10 +1633,12 @@ function applyOcrDataToCase(d,rawTextEl){
   if(d.nationalId&&document.getElementById('c-nid'))document.getElementById('c-nid').value=typeof toFa==='function'?toFa(d.nationalId):d.nationalId;
   if(d.phoneNumber&&document.getElementById('c-mobile'))document.getElementById('c-mobile').value=typeof toFa==='function'?toFa(d.phoneNumber):d.phoneNumber;
   if(d.location&&document.getElementById('c-loc'))document.getElementById('c-loc').value=d.location;
-  if(d.mainGroup&&document.getElementById('c-main-group')){
+  // گروه و نوع فعالیت فقط وقتی با هم و با کلید معتبر تشخیص داده شده‌اند تغییر می‌کنند.
+  if(d.mainGroup&&d.actType&&document.getElementById('c-main-group')){
     document.getElementById('c-main-group').value=d.mainGroup;
     if(typeof onMainGroupChangedInForm==='function')onMainGroupChangedInForm();
-    if(document.getElementById('c-act-type')&&d.actType)document.getElementById('c-act-type').value=d.actType;
+    var recognizedAct=document.getElementById('c-act-type');
+    if(recognizedAct)recognizedAct.value=d.actType;
     if(typeof recalcCaseSpecsFromHeadcount==='function')recalcCaseSpecsFromHeadcount();
   }
   if(d.landArea&&document.getElementById('c-land'))document.getElementById('c-land').value=typeof toFa==='function'?toFa(d.landArea):d.landArea;
@@ -1633,10 +1655,12 @@ function aiExtractFromRawText(){
   if(data.nid&&document.getElementById('c-nid'))document.getElementById('c-nid').value=typeof toFa==='function'?toFa(data.nid):data.nid;
   if(data.mobile&&document.getElementById('c-mobile'))document.getElementById('c-mobile').value=typeof toFa==='function'?toFa(data.mobile):data.mobile;
   if(data.loc&&document.getElementById('c-loc'))document.getElementById('c-loc').value=data.loc;
-  if(document.getElementById('c-main-group')){
+  // از انتخاب خودکار فعالیت اول فهرست در زمان تشخیص مبهم جلوگیری می‌شود.
+  if(data.mainGroup&&data.actType&&document.getElementById('c-main-group')){
     document.getElementById('c-main-group').value=data.mainGroup;
     if(typeof onMainGroupChangedInForm==='function')onMainGroupChangedInForm();
-    if(document.getElementById('c-act-type')&&data.actType)document.getElementById('c-act-type').value=data.actType;
+    var recognizedAct=document.getElementById('c-act-type');
+    if(recognizedAct)recognizedAct.value=data.actType;
     if(typeof recalcCaseSpecsFromHeadcount==='function')recalcCaseSpecsFromHeadcount();
   }
   if(data.land&&document.getElementById('c-land'))document.getElementById('c-land').value=typeof toFa==='function'?toFa(data.land):data.land;
