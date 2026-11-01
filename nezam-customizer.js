@@ -714,54 +714,68 @@ function buildSingleA4HTML(rec, bodyTxt, numStr, dateStr, attachStr, utmRaw, isN
   var c = getActiveCase();
   var showUtm = includeUtm !== false;
   var utmTableHtml = (!isRawHtml && showUtm && (utmRaw || c)) ? buildAllSelectedFeaturesUtmTableHTML(c, utmRaw, isNatRes) : "";
-
-  var headerLogo = brandCfg.customLogoData
-    ? '<img src="' + brandCfg.customLogoData + '" style="width:60px;height:60px;object-fit:contain;">'
+  var safeHeaderColor = safeHexColor(brandCfg.headerColor, "#1b4332");
+  var logoData = String(brandCfg.customLogoData || "");
+  var stampData = String(brandCfg.customStampData || "");
+  var safeImagePattern = /^data:image\/(?:png|jpeg|webp|gif);base64,[a-z0-9+/=]+$/i;
+  var headerLogo = safeImagePattern.test(logoData)
+    ? '<img src="' + logoData + '" style="width:60px;height:60px;object-fit:contain;">'
     : PRINT_HEADER_LOGO_SVG;
-
-  var customStampHtml = brandCfg.customStampData
-    ? '<div style="margin-top:2mm;"><img src="' + brandCfg.customStampData + '" style="max-width:125px;max-height:90px;object-fit:contain;"></div>'
+  var customStampHtml = safeImagePattern.test(stampData)
+    ? '<div style="margin-top:2mm;"><img src="' + stampData + '" style="max-width:125px;max-height:90px;object-fit:contain;"></div>'
     : '<div style="height:' + (pSize === "A5" ? "14mm" : "20mm") + ';"></div>';
-
-  var renderedBody = isRawHtml ? bodyTxt : toFa(bodyTxt);
+  var renderedBody = isRawHtml ? bodyTxt : safeHtmlText(toFa(bodyTxt)).replace(/\n/g, "<br>");
+  var safeRec = safeHtmlText(rec);
+  var safeSheetTag = safeHtmlText(sheetTag);
+  var safeNum = safeHtmlText(toFa(numStr));
+  var safeDate = safeHtmlText(toFa(dateStr));
+  var safeAttach = safeHtmlText(attachStr);
+  var safeOrg = safeHtmlText(brandCfg.orgSubtitle);
+  var safeOffice = safeHtmlText(brandCfg.officeName);
+  var safeManagerTitle = safeHtmlText(brandCfg.managerTitle);
+  var safeManagerName = safeHtmlText(brandCfg.managerName);
+  var safeAddress = safeHtmlText(brandCfg.address);
+  var safePostal = safeHtmlText(toFa(brandCfg.postalCode));
+  var safePhone = safeHtmlText(toFa(brandCfg.phone));
+  var safeEmail = safeHtmlText(brandCfg.email);
 
   return '<div class="a4-page' + (pSize === "A5" ? ' paper-a5' : '') + '" data-paper-size="' + pSize + '">' +
-    '<div class="lh-top" style="background:' + brandCfg.headerColor + ';">' +
+    '<div class="lh-top" style="background:' + safeHeaderColor + ';">' +
       '<div class="lh-r">' +
         '<div style="margin-bottom:1.5mm;">' + headerLogo + '</div>' +
-        '<div class="lh-sub">' + brandCfg.orgSubtitle + '</div>' +
-        '<div class="lh-main">' + brandCfg.officeName + '</div>' +
+        '<div class="lh-sub">' + safeOrg + '</div>' +
+        '<div class="lh-main">' + safeOffice + '</div>' +
       '</div>' +
       '<div class="lh-c">' +
         '<div>بسمه تعالی</div>' +
-        (sheetTag ? '<div class="badge bg-warning text-dark mt-1" style="font-size:8.5pt;">' + sheetTag + '</div>' : '') +
+        (sheetTag ? '<div class="badge bg-warning text-dark mt-1" style="font-size:8.5pt;">' + safeSheetTag + '</div>' : '') +
       '</div>' +
       '<div class="lh-l">' +
-        '<div class="m-row"><span>شماره:</span><span class="paper-meta-num" contenteditable="true">' + toFa(numStr) + '</span></div>' +
-        '<div class="m-row"><span>تاریخ:</span><span class="paper-meta-date" contenteditable="true">' + toFa(dateStr) + '</span></div>' +
-        '<div class="m-row"><span>پیوست:</span><span class="paper-meta-attach" contenteditable="true">' + attachStr + '</span></div>' +
+        '<div class="m-row"><span>شماره:</span><span class="paper-meta-num" contenteditable="true">' + safeNum + '</span></div>' +
+        '<div class="m-row"><span>تاریخ:</span><span class="paper-meta-date" contenteditable="true">' + safeDate + '</span></div>' +
+        '<div class="m-row"><span>پیوست:</span><span class="paper-meta-attach" contenteditable="true">' + safeAttach + '</span></div>' +
       '</div>' +
     '</div>' +
     '<div class="lh-body">' +
       '<div class="lh-content-wrap">' +
-        (rec ? '<div class="l-rec" contenteditable="true">' + rec + '</div><div style="font-weight:800;margin-bottom:2mm;font-size:10.5pt;" contenteditable="true">با سلام</div>' : '') +
+        (rec ? '<div class="l-rec" contenteditable="true">' + safeRec + '</div><div style="font-weight:800;margin-bottom:2mm;font-size:10.5pt;" contenteditable="true">با سلام</div>' : '') +
         '<div class="l-txt" style="' + (isRawHtml ? 'white-space:normal;' : '') + '" contenteditable="true">' + renderedBody + '</div>' +
         utmTableHtml +
       '</div>' +
       '<div class="sign-area">' +
         '<div class="sign-box" contenteditable="true">' +
           '<div>با تشکر</div>' +
-          '<div>' + brandCfg.managerTitle + '</div>' +
-          '<div>' + brandCfg.managerName + '</div>' +
+          '<div>' + safeManagerTitle + '</div>' +
+          '<div>' + safeManagerName + '</div>' +
           customStampHtml +
         '</div>' +
       '</div>' +
     '</div>' +
-    '<div class="lh-foot" style="background:' + brandCfg.headerColor + ';">' +
-      '<div class="f-warn">این سربرگ صرفاً با اصل مهر و امضاء معتبر خواهد بود' + (sheetTag ? (' (' + sheetTag + ')') : '') + '</div>' +
+    '<div class="lh-foot" style="background:' + safeHeaderColor + ';">' +
+      '<div class="f-warn">این سربرگ صرفاً با اصل مهر و امضاء معتبر خواهد بود' + (sheetTag ? (' (' + safeSheetTag + ')') : '') + '</div>' +
       '<div class="f-info">' +
-        '<div>آدرس: ' + brandCfg.address + '<br>کدپستی: ' + toFa(brandCfg.postalCode) + '</div>' +
-        '<div style="text-align:left;direction:ltr;">تلفن: ' + toFa(brandCfg.phone) + '<br>' + brandCfg.email + '</div>' +
+        '<div>آدرس: ' + safeAddress + '<br>کدپستی: ' + safePostal + '</div>' +
+        '<div style="text-align:left;direction:ltr;">تلفن: ' + safePhone + '<br>' + safeEmail + '</div>' +
       '</div>' +
     '</div>' +
   '</div>';
