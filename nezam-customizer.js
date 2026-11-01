@@ -3028,21 +3028,34 @@ function printUtmSketchSheet() {
 
   var isA5 = currentPaperSize === "A5";
   var svgW = 680;
-  var svgH = isA5 ? (croquisPrintLabelOpts.boxHeightA5 || 185) : (croquisPrintLabelOpts.boxHeightA4 || 345);
+  var defaultSheetHeight = isA5 ? 185 : 345;
+  var requestedSheetHeight = Number(isA5 ? croquisPrintLabelOpts.boxHeightA5 : croquisPrintLabelOpts.boxHeightA4);
+  var svgH = Number.isFinite(requestedSheetHeight)
+    ? Math.round(Math.min(isA5 ? 265 : 420, Math.max(isA5 ? 170 : 250, requestedSheetHeight)))
+    : defaultSheetHeight;
+  var allowedZooms = ["AUTO","14","15","16","17","18","19","20","21"];
+  if (allowedZooms.indexOf(String(croquisPrintZoomLevel)) === -1) croquisPrintZoomLevel = "AUTO";
+  var allowedMapModes = ["GOOGLE_SAT","GOOGLE_HYBRID","CAD"];
+  if (allowedMapModes.indexOf(String(croquisPrintMapMode)) === -1) croquisPrintMapMode = "GOOGLE_SAT";
   var printedMapMarkup = buildPrintedCroquisMap(m, svgW, svgH, croquisPrintMapMode);
-  var activeZoomDisplay = croquisPrintZoomLevel === "AUTO" ? ("خودکار (" + toFa(window._lastComputedPrintZoom || 18) + ")") : ("زوم " + toFa(croquisPrintZoomLevel));
+  var activeZoomDisplay = croquisPrintZoomLevel === "AUTO"
+    ? ("خودکار (" + toFa(window._lastComputedPrintZoom || 18) + ")")
+    : ("زوم " + toFa(croquisPrintZoomLevel));
 
   var legendPills = "";
   var focusLayerOpts = '<option value="AUTO_ALL"' + ((!window.croquisPrintFocusLayerId || window.croquisPrintFocusLayerId === "AUTO_ALL") ? " selected" : "") + '>🎯 همه لایه‌های مرئی</option>';
   for (var mi = 0; mi < m.layers.length; mi++) {
-    var ly = m.layers[mi];
+    var ly = m.layers[mi] || {};
     if (!ly.visible) continue;
-    var gL = computeUtmGeometry(ly.points, ly.geomType);
+    var gL = computeUtmGeometry(ly.points || [], ly.geomType);
+    var safeLyName = safeHtmlText(ly.name || "لایه بدون نام");
+    var safeLyId = safeHtmlText(ly.id || "");
+    var safeLyColor = safeHexColor(ly.color, "#15803d");
     legendPills += '<span style="display:inline-block;padding:' + (isA5 ? '1px 5px' : '2px 7px') + ';border-radius:4px;border:1px solid #ccc;background:#f8fafc;font-size:' + (isA5 ? '6.9pt' : '8.4pt') + ';margin:' + (isA5 ? '1px 2px' : '2px 4px') + ';">' +
-      '<span style="display:inline-block;width:8px;height:8px;background:' + ly.color + ';border-radius:2px;margin-left:3px;"></span>' +
-      '<b>' + ly.name + '</b>: ' + (ly.geomType === "POLYGON" ? (toFa(Math.round(gL.area)) + ' م.م (' + toFa(gL.ha.toFixed(2)) + ' هـ)') : (toFa(Math.round(gL.perim)) + ' م')) +
+      '<span style="display:inline-block;width:8px;height:8px;background:' + safeLyColor + ';border-radius:2px;margin-left:3px;"></span>' +
+      '<b>' + safeLyName + '</b>: ' + (ly.geomType === "POLYGON" ? (safeHtmlText(toFa(Math.round(gL.area))) + ' م.م (' + safeHtmlText(toFa(gL.ha.toFixed(2))) + ' هـ)') : (safeHtmlText(toFa(Math.round(gL.perim))) + ' م')) +
     '</span>';
-    focusLayerOpts += '<option value="' + ly.id + '"' + (window.croquisPrintFocusLayerId === ly.id ? " selected" : "") + '>🎯 تمرکز کادر روی: ' + ly.name + '</option>';
+    focusLayerOpts += '<option value="' + safeLyId + '"' + (window.croquisPrintFocusLayerId === ly.id ? " selected" : "") + '>🎯 تمرکز کادر روی: ' + safeLyName + '</option>';
   }
 
   var zoomOptsHtml =
@@ -3056,9 +3069,12 @@ function printUtmSketchSheet() {
     '<option value="15"' + (croquisPrintZoomLevel === "15" ? " selected" : "") + '>زوم ۱۵ (دید روستا و دشت)</option>' +
     '<option value="14"' + (croquisPrintZoomLevel === "14" ? " selected" : "") + '>زوم ۱۴ (دید پهنه وسیع)</option>';
 
-  var curRadial = croquisPrintLabelOpts.labelRadialOffset || 22;
-  var curPad = croquisPrintLabelOpts.cropPaddingFactor || 0.56;
-  var cMode = croquisPrintLabelOpts.coordDisplayMode || "OUTER_CODE";
+  var curRadialRaw = Number(croquisPrintLabelOpts.labelRadialOffset);
+  var curRadial = Number.isFinite(curRadialRaw) ? Math.round(Math.min(55, Math.max(10, curRadialRaw))) : 22;
+  var curPadRaw = Number(croquisPrintLabelOpts.cropPaddingFactor);
+  var curPad = Number.isFinite(curPadRaw) ? Math.min(0.82, Math.max(0.30, curPadRaw)) : 0.56;
+  var allowedCoordModes = ["OUTER_CODE","OUTER_CALLOUT_XY","OUTER_WITH_SUBLAYERS","NONE"];
+  var cMode = allowedCoordModes.indexOf(croquisPrintLabelOpts.coordDisplayMode) !== -1 ? croquisPrintLabelOpts.coordDisplayMode : "OUTER_CODE";
 
   // پنل تعاملی تنظیم کادر برش نقشه گوگل‌ارث (Interactive Crop Area) و فاصله برچسب‌ها از پولیگون (بدون چاپ در کاغذ)
   var mapModeControls =
@@ -3122,18 +3138,18 @@ function printUtmSketchSheet() {
   var isA5Sheet = currentPaperSize === "A5";
   var sheet1Content =
     '<div style="text-align:center;font-weight:900;font-size:' + (isA5Sheet ? '9.6pt' : '11.5pt') + ';margin-bottom:' + (isA5Sheet ? '1.2mm' : '2mm') + ';color:#14532d;">' +
-      m.title + ' (سیستم مختصات UTM - Zone ' + toFa(m.utmZone) + ' | ' + activeZoomDisplay + ')' +
+      safeHtmlText(m.title) + ' (سیستم مختصات UTM - Zone ' + safeHtmlText(toFa(m.utmZone)) + ' | ' + safeHtmlText(activeZoomDisplay) + ')' +
     '</div>' +
     '<div style="border:1.5px solid #000;padding:' + (isA5Sheet ? '1.4mm 2.5mm' : '2mm 4mm') + ';border-radius:5px;font-size:' + (isA5Sheet ? '7.6pt' : '9pt') + ';margin-bottom:' + (isA5Sheet ? '1.5mm' : '2.2mm') + ';display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px;background:#f8fafc;">' +
-      '<span><b>متقاضی:</b> ' + c.name + '</span>' +
-      '<span><b>کد ملی/شناسه:</b> ' + toFa(c.nid) + '</span>' +
-      '<span><b>کلاسه پرونده:</b> ' + toFa(c.code) + '</span>' +
-      '<span><b>موقعیت اراضی:</b> ' + c.loc + '</span>' +
-      '<span><b>تاریخ کروکی:</b> ' + toFa(m.date || todayShamsi()) + '</span>' +
+      '<span><b>متقاضی:</b> ' + safeHtmlText(c.name) + '</span>' +
+      '<span><b>کد ملی/شناسه:</b> ' + safeHtmlText(toFa(c.nid)) + '</span>' +
+      '<span><b>کلاسه پرونده:</b> ' + safeHtmlText(toFa(c.code)) + '</span>' +
+      '<span><b>موقعیت اراضی:</b> ' + safeHtmlText(c.loc) + '</span>' +
+      '<span><b>تاریخ کروکی:</b> ' + safeHtmlText(toFa(m.date || todayShamsi())) + '</span>' +
     '</div>' +
     '<div id="printed-croquis-map-holder" style="width:100%;text-align:center;margin-bottom:' + (isA5Sheet ? '1.2mm' : '2mm') + ';">' + printedMapMarkup + '</div>' +
     '<div style="font-size:' + (isA5Sheet ? '7.4pt' : '8.5pt') + ';margin-bottom:1mm;"><b>راهنمای لایه‌ها و عوارض جانمایی‌شده:</b><br>' + legendPills + '</div>' +
-    (m.notes ? '<div style="font-size:' + (isA5Sheet ? '7.2pt' : '8.4pt') + ';background:#f1f5f9;padding:1.5mm 2mm;border-radius:4px;border:1px solid #e2e8f0;"><b>توضیحات کارشناس:</b> ' + m.notes + '</div>' : '');
+    (m.notes ? '<div style="font-size:' + (isA5Sheet ? '7.2pt' : '8.4pt') + ';background:#f1f5f9;padding:1.5mm 2mm;border-radius:4px;border:1px solid #e2e8f0;"><b>توضیحات کارشناس:</b> ' + safeHtmlText(m.notes) + '</div>' : '');
 
   // برگه دوم: جداول تفکیک مساحت و مختصات کامل (X, Y, ارتفاع, Zone, Lat/Lng) زمین اصلی و کلیه عوارض
   var layersRows = "";
@@ -3147,7 +3163,7 @@ function printUtmSketchSheet() {
     var g = computeUtmGeometry(l.points, l.geomType);
     var catRole = l.category === "MAIN_PARCEL" ? "محدوده اصلی زمین (عرصه کل)" : "عارضه انتخاب‌شده";
     layersRows += '<tr>' +
-      '<td><span style="display:inline-block;width:9px;height:9px;background:' + l.color + ';margin-left:3px;border-radius:2px;"></span><b>' + l.name + '</b></td>' +
+      '<td><span style="display:inline-block;width:9px;height:9px;background:' + safeHexColor(l.color, "#15803d") + ';margin-left:3px;border-radius:2px;"></span><b>' + l.name + '</b></td>' +
       '<td>' + catRole + ' (' + (l.geomType === "POLYGON" ? "چندضلعی" : (l.geomType === "LINE" ? "خطی" : "نقطه‌ای")) + ')</td>' +
       '<td>' + toFa(l.points.length) + '</td>' +
       '<td><b>' + (l.geomType === "POLYGON" ? (toFa(Math.round(g.area)) + " م.م (" + toFa(g.ha.toFixed(2)) + " هکتار)") : "---") + '</b></td>' +
@@ -3160,13 +3176,13 @@ function printUtmSketchSheet() {
       var elevTxt = (ptObj.elev !== undefined && ptObj.elev !== "" && Number(ptObj.elev) !== 0) ? (toFa(ptObj.elev) + " م") : "۰";
       coordRows += '<tr>' +
         '<td>' + toFa(rowCounter++) + '</td>' +
-        '<td><b>' + l.name + '</b></td>' +
-        '<td>' + (ptObj.label || ("P" + (p + 1))) + '</td>' +
-        '<td dir="ltr">' + toFa(ptObj.x) + '</td>' +
-        '<td dir="ltr">' + toFa(ptObj.y) + '</td>' +
-        '<td dir="ltr">' + elevTxt + '</td>' +
-        '<td>' + toFa(ptObj.zone || defaultZoneNum) + '</td>' +
-        '<td dir="ltr" style="font-size:' + (isA5Sheet ? '6.2pt' : '7.4pt') + ';">' + ptObj.lat.toFixed(5) + ', ' + ptObj.lng.toFixed(5) + '</td>' +
+        '<td><b>' + safeHtmlText(l.name) + '</b></td>' +
+        '<td>' + safeHtmlText(ptObj.label || ("P" + (p + 1))) + '</td>' +
+        '<td dir="ltr">' + safeHtmlText(toFa(ptObj.x)) + '</td>' +
+        '<td dir="ltr">' + safeHtmlText(toFa(ptObj.y)) + '</td>' +
+        '<td dir="ltr">' + safeHtmlText(elevTxt) + '</td>' +
+        '<td>' + safeHtmlText(toFa(ptObj.zone || defaultZoneNum)) + '</td>' +
+        '<td dir="ltr" style="font-size:' + (isA5Sheet ? '6.2pt' : '7.4pt') + ';">' + safeHtmlText(Number(ptObj.lat).toFixed(5)) + ', ' + safeHtmlText(Number(ptObj.lng).toFixed(5)) + '</td>' +
         '<td>' + sideL + '</td>' +
       '</tr>';
     }
@@ -3174,13 +3190,13 @@ function printUtmSketchSheet() {
 
   var sheet2Content =
     '<div style="text-align:center;font-weight:900;font-size:' + (isA5Sheet ? '9.5pt' : '11.5pt') + ';margin-bottom:' + (isA5Sheet ? '1.2mm' : '2mm') + ';color:#14532d;">' +
-      'جداول تفکیک مساحت و مختصات UTM / جغرافیایی عرصه و عوارض (' + m.title + ')' +
+      'جداول تفکیک مساحت و مختصات UTM / جغرافیایی عرصه و عوارض (' + safeHtmlText(m.title) + ')' +
     '</div>' +
     '<div style="border:1.5px solid #000;padding:' + (isA5Sheet ? '1.4mm 2.5mm' : '2mm 4mm') + ';border-radius:5px;font-size:' + (isA5Sheet ? '7.5pt' : '8.8pt') + ';margin-bottom:' + (isA5Sheet ? '1.5mm' : '2.2mm') + ';display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px;background:#f8fafc;">' +
-      '<span><b>متقاضی:</b> ' + c.name + '</span>' +
-      '<span><b>کد ملی:</b> ' + toFa(c.nid) + '</span>' +
-      '<span><b>کلاسه پرونده:</b> ' + toFa(c.code) + '</span>' +
-      '<span><b>موقعیت:</b> ' + c.loc + '</span>' +
+      '<span><b>متقاضی:</b> ' + safeHtmlText(c.name) + '</span>' +
+      '<span><b>کد ملی:</b> ' + safeHtmlText(toFa(c.nid)) + '</span>' +
+      '<span><b>کلاسه پرونده:</b> ' + safeHtmlText(toFa(c.code)) + '</span>' +
+      '<span><b>موقعیت:</b> ' + safeHtmlText(c.loc) + '</span>' +
       '<span><b>پیوست:</b> شیت نقشه (برگه ۱)</span>' +
     '</div>' +
     '<div style="font-size:' + (isA5Sheet ? '7.6pt' : '8.8pt') + ';font-weight:bold;margin-bottom:1mm;color:#1e3a8a;">الف) جدول لایه‌ها و تفکیک مساحت زمین اصلی و مابقی عوارض انتخاب‌شده:</div>' +
