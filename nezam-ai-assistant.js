@@ -1593,6 +1593,29 @@ async function aiReadDocumentImagePro() {
   syncOcrUploadControlsUI();
 }
 
+// ثبت مقدار UTM از مسیرهای برنامه‌ای و اجرای همان رویداد ورودی تایپ دستی
+// تا جدول نقاط، هندسه و نمایش مختصات بلافاصله همگام شوند.
+function setUtmFieldValueAndSync(field, value) {
+  if (!field) return;
+  field.value = value == null ? '' : String(value);
+
+  try {
+    var inputEvent;
+    if (typeof Event === 'function') {
+      inputEvent = new Event('input', { bubbles: true });
+    } else {
+      inputEvent = document.createEvent('Event');
+      inputEvent.initEvent('input', true, true);
+    }
+    field.dispatchEvent(inputEvent);
+  } catch (error) {
+    // مسیر جایگزین در مرورگرهایی که dispatchEvent را پشتیبانی نمی‌کنند
+    if (typeof window.syncCaseTextareaToPointsTable === 'function') {
+      window.syncCaseTextareaToPointsTable();
+    }
+  }
+}
+
 // تابع کمکی درج مشخصات استخراج‌شده در پرونده (با تضمین فرمت چپ‌به‌راست X,Y,Z,39 برای نقاط UTM)
 function applyOcrDataToCase(d, rawTextEl) {
   var normalizedUtm = formatUtmCoordinatesLTR(d.utmCoordinates || '', 39);
@@ -1644,7 +1667,7 @@ function applyOcrDataToCase(d, rawTextEl) {
     utmField.style.textAlign = 'left';
     utmField.style.fontFamily = 'Consolas, Monaco, monospace';
     // درج با اعداد انگلیسی و از چپ به راست بدون تبدیل به ارقام فارسی
-    utmField.value = normalizedUtm;
+    setUtmFieldValueAndSync(utmField, normalizedUtm);
   }
 
   if (d.mainGroup && document.getElementById('c-main-group')) {
@@ -1678,7 +1701,7 @@ function aiExtractFromRawText() {
     utmField.style.direction = 'ltr';
     utmField.style.textAlign = 'left';
     utmField.style.fontFamily = 'Consolas, Monaco, monospace';
-    utmField.value = data.utm;
+    setUtmFieldValueAndSync(utmField, data.utm);
   }
 
   if (document.getElementById('c-main-group')) {
