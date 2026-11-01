@@ -778,20 +778,29 @@ function renderGuardModalApplicantList() {
   for (var i = 0; i < casesDB.length; i++) {
     var c = casesDB[i];
     if (grpFilter !== "ALL" && c.mainGroup !== grpFilter) continue;
-    var hay = toEn(c.code + " " + c.name + " " + c.nid + " " + c.mobile + " " + c.project + " " + c.loc + " " + (c.repName || "")).toLowerCase();
+    var hay = toEn([c.code, c.name, c.nid, c.mobile, c.project, c.loc, c.repName || ""].join(" ")).toLowerCase();
     if (q && hay.indexOf(q) === -1) continue;
 
     var grpMeta = APPLICANT_MAIN_GROUPS[c.mainGroup] || APPLICANT_MAIN_GROUPS.LIVESTOCK_POULTRY_FISHERIES;
     html += '<tr>' +
-      '<td class="fw-bold">' + toFa(c.code) + '</td>' +
-      '<td><b>' + c.name + '</b><br><small class="text-muted">کدملی/شناسه: ' + toFa(c.nid) + ' | همراه: ' + toFa(c.mobile || "---") + '</small></td>' +
-      '<td><span class="badge ' + grpMeta.badgeClass + '">' + grpMeta.shortTitle + '</span><br><small>' + c.project + '</small></td>' +
-      '<td><button type="button" class="btn btn-sm btn-success fw-bold" onclick="confirmSelectApplicantFromGuard(\'' + c.id + '\')">✅ انتخاب و ادامه</button></td>' +
+      '<td class="fw-bold">' + escapeHtmlCore(toFa(c.code)) + '</td>' +
+      '<td><b>' + escapeHtmlCore(c.name) + '</b><br><small class="text-muted">کدملی/شناسه: ' + escapeHtmlCore(toFa(c.nid)) + ' | همراه: ' + escapeHtmlCore(toFa(c.mobile || "---")) + '</small></td>' +
+      '<td><span class="badge ' + grpMeta.badgeClass + '">' + escapeHtmlCore(grpMeta.shortTitle) + '</span><br><small>' + escapeHtmlCore(c.project) + '</small></td>' +
+      '<td><button type="button" class="btn btn-sm btn-success fw-bold" data-guard-case-id="' + escapeHtmlCore(c.id) + '">✅ انتخاب و ادامه</button></td>' +
     '</tr>';
   }
   tbody.innerHTML = html || '<tr><td colspan="4" class="text-center py-3 text-muted">متقاضی با این مشخصات یافت نشد. لطفاً روی دکمه «ثبت متقاضی جدید» کلیک کنید.</td></tr>';
+  if (!tbody.dataset.secureActionsBound) {
+    tbody.dataset.secureActionsBound = "1";
+    tbody.addEventListener("click", function (event) {
+      var btn = event.target.closest("button[data-guard-case-id]");
+      if (!btn || !tbody.contains(btn)) return;
+      var id = btn.getAttribute("data-guard-case-id");
+      var exists = casesDB.some(function (item) { return item && String(item.id) === id; });
+      if (exists) confirmSelectApplicantFromGuard(id);
+    });
+  }
 }
-
 function confirmSelectApplicantFromGuard(caseId) {
   selectActiveCase(caseId);
   closeMandatoryApplicantModal();
@@ -821,7 +830,7 @@ function updateActiveApplicantBarUI() {
       statusBadge.textContent = "⛔ بدون متقاضی فعال (عملیات قفل)";
     }
     if (infoSummary) {
-      infoSummary.innerHTML = '<span class="text-danger fw-bold">هیچ متقاضی انتخاب نشده است! پیش از هرگونه عملیات، متقاضی را انتخاب یا ثبت نمایید.</span>';
+      infoSummary.textContent = "هیچ متقاضی انتخاب نشده است! پیش از هرگونه عملیات، متقاضی را انتخاب یا ثبت نمایید.";
     }
     if (lockBanner) lockBanner.style.display = "block";
   } else {
@@ -829,24 +838,20 @@ function updateActiveApplicantBarUI() {
     var entityLbl = c.entityType === "LEGAL" ? "شخص حقوقی" : (c.entityType === "ORG" ? "سازمان/نهاد" : "شخص حقیقی");
     if (statusBadge) {
       statusBadge.className = "badge bg-success fs-6";
-      statusBadge.textContent = "👤 پرونده فعال: " + c.name;
+      statusBadge.textContent = "👤 پرونده فعال: " + String(c.name || "");
     }
     if (infoSummary) {
       infoSummary.innerHTML =
-        '<span class="badge ' + grpMeta.badgeClass + ' me-1">' + grpMeta.shortTitle + '</span>' +
+        '<span class="badge ' + grpMeta.badgeClass + ' me-1">' + escapeHtmlCore(grpMeta.shortTitle) + '</span>' +
         '<span class="badge bg-secondary me-1">' + entityLbl + '</span>' +
-        '<span class="badge bg-light text-dark border me-1">کلاسه: ' + toFa(c.code) + '</span>' +
-        '<span class="badge bg-light text-dark border me-1">کدملی/شناسه: ' + toFa(c.nid) + '</span>' +
-        '<span class="badge bg-success-subtle text-success border border-success me-1">' + c.project + ' (' + toFa(c.cap) + ')</span>' +
-        '<span class="badge bg-light text-secondary border">📍 ' + c.loc + '</span>';
+        '<span class="badge bg-light text-dark border me-1">کلاسه: ' + escapeHtmlCore(toFa(c.code)) + '</span>' +
+        '<span class="badge bg-light text-dark border me-1">کدملی/شناسه: ' + escapeHtmlCore(toFa(c.nid)) + '</span>' +
+        '<span class="badge bg-success-subtle text-success border border-success me-1">' + escapeHtmlCore(c.project) + ' (' + escapeHtmlCore(toFa(c.cap)) + ')</span>' +
+        '<span class="badge bg-light text-secondary border">📍 ' + escapeHtmlCore(c.loc) + '</span>';
     }
     if (lockBanner) lockBanner.style.display = "none";
   }
 }
-
-/* =========================================================================
-   ۴. ناوبری واحد بین تب‌های اصلی و زیرتب‌ها (همراه با کنترل متقاضی فعال)
-   ========================================================================= */
 function switchMainPane(paneId) {
   if (paneId === "pane-compose") paneId = "pane-cases";
   if (paneId === "pane-preview") paneId = "pane-print";
@@ -931,14 +936,14 @@ function populateGlobalCaseSelector() {
   for (var i = 0; i < casesDB.length; i++) {
     var c = casesDB[i];
     var grpMeta = APPLICANT_MAIN_GROUPS[c.mainGroup] || APPLICANT_MAIN_GROUPS.LIVESTOCK_POULTRY_FISHERIES;
-    html += '<option value="' + c.id + '" ' + (c.id === activeCaseId ? "selected" : "") + '>' +
-      '[' + grpMeta.shortTitle + '] ' + toFa(c.code) + ' — ' + c.name + ' (کدملی/شناسه: ' + toFa(c.nid) + ' | ' + c.cap + ')' +
+    html += '<option value="' + escapeHtmlCore(c.id) + '" ' + (c.id === activeCaseId ? "selected" : "") + '>' +
+      '[' + escapeHtmlCore(grpMeta.shortTitle) + '] ' + escapeHtmlCore(toFa(c.code)) + ' — ' + escapeHtmlCore(c.name) +
+      ' (کدملی/شناسه: ' + escapeHtmlCore(toFa(c.nid)) + ' | ' + escapeHtmlCore(c.cap) + ')' +
     '</option>';
   }
   sel.innerHTML = html;
   updateActiveApplicantBarUI();
 }
-
 function selectActiveCase(caseId) {
   if (!caseId) {
     clearActiveApplicantSelection();
@@ -966,14 +971,15 @@ function populateActivityDropdownByGroup(selectedGroup, selectedActKey) {
   if (!actSel) return;
   var html = "";
   for (var k in ACT_SPECS) {
-    var sp = ACT_SPECS[k];
+    if (!Object.prototype.hasOwnProperty.call(ACT_SPECS, k)) continue;
+    var sp = ACT_SPECS[k] || {};
     if (!selectedGroup || sp.mainGroup === selectedGroup) {
-      html += '<option value="' + k + '" ' + (k === selectedActKey ? "selected" : "") + '>' + sp.title + ' (واحد: ' + sp.unit + ')</option>';
+      html += '<option value="' + escapeHtmlCore(k) + '" ' + (k === selectedActKey ? "selected" : "") + '>' +
+        escapeHtmlCore(sp.title) + ' (واحد: ' + escapeHtmlCore(sp.unit) + ')</option>';
     }
   }
   actSel.innerHTML = html;
 }
-
 function onMainGroupChangedInForm() {
   var grp = document.getElementById("c-main-group").value;
   populateActivityDropdownByGroup(grp, "");
