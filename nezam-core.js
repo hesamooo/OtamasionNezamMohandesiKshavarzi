@@ -1715,8 +1715,8 @@ function refreshAllViews() {
       for (var k in inq) if (inq[k] === "OK") ok++;
       dHtml += "<tr class='" + (c.id === activeCaseId ? "table-success" : "") + "'>" +
         "<td class='fw-bold'>" + toFa(c.code) + "</td>" +
-        "<td><b>" + c.name + "</b><small class='text-muted'>" + toFa(c.nid) + "</small></td>" +
-        "<td><span class='badge " + grpMeta.badgeClass + " mb-1'>" + grpMeta.shortTitle + "</span><small>" + c.project + " (" + toFa(c.cap) + ")</small></td>" +
+        "<td><b>" + c.name + "</b><br><small class='text-muted'>" + toFa(c.nid) + "</small></td>" +
+        "<td><span class='badge " + grpMeta.badgeClass + " mb-1'>" + grpMeta.shortTitle + "</span><br><small>" + c.project + " (" + toFa(c.cap) + ")</small></td>" +
         "<td class='text-success fw-bold'>" + c.loc + "</td>" +
         "<td><span class='badge bg-success'>" + toFa(ok) + " از ۷ موافقت</span></td>" +
         "<td><div class='d-flex gap-1'>" +
