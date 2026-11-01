@@ -106,6 +106,56 @@ try {
   if (savedPaper === "A4" || savedPaper === "A5") currentPaperSize = savedPaper;
 } catch (e) {}
 
+/* لایه امنیتی محتوای HTML نامه‌ها و ورودی‌های سفارشی */
+function safeHtmlText(value) {
+  return typeof window.escapeHtmlCore === "function"
+    ? window.escapeHtmlCore(value)
+    : String(value == null ? "" : value).replace(/[&<>"']/g, function (ch) {
+        return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch];
+      });
+}
+function safeHexColor(value, fallback) {
+  var color = String(value || "");
+  return /^#[0-9a-f]{3}(?:[0-9a-f]{3})?$/i.test(color) ? color : (fallback || "#1b4332");
+}
+function sanitizeOfficeRichHtml(input) {
+  var parsed = new DOMParser().parseFromString(String(input || ""), "text/html");
+  var allowed = new Set(["A","B","STRONG","I","EM","U","S","P","BR","DIV","SPAN","UL","OL","LI","TABLE","THEAD","TBODY","TFOOT","TR","TD","TH","BLOCKQUOTE","H1","H2","H3","H4","H5","H6","HR","SMALL","SUB","SUP"]);
+  var blocked = new Set(["SCRIPT","STYLE","IFRAME","OBJECT","EMBED","SVG","MATH","FORM","INPUT","BUTTON","VIDEO","AUDIO","LINK","META","BASE","IMG"]);
+  var root = document.createElement("div");
+  function copyNode(node, parent) {
+    if (node.nodeType === 3) { parent.appendChild(document.createTextNode(node.nodeValue || "")); return; }
+    if (node.nodeType !== 1) return;
+    var tag = node.tagName.toUpperCase();
+    if (blocked.has(tag)) return;
+    if (!allowed.has(tag)) {
+      Array.prototype.forEach.call(node.childNodes, function (child) { copyNode(child, parent); });
+      return;
+    }
+    var clean = document.createElement(tag.toLowerCase());
+    if (tag === "TD" || tag === "TH") {
+      ["colspan","rowspan"].forEach(function (attr) {
+        var n = parseInt(node.getAttribute(attr), 10);
+        if (Number.isFinite(n) && n >= 1 && n <= 20) clean.setAttribute(attr, String(n));
+      });
+      var align = String(node.getAttribute("align") || "").toLowerCase();
+      if (["left","right","center"].indexOf(align) !== -1) clean.setAttribute("align", align);
+    }
+    if (tag === "A") {
+      var href = node.getAttribute("href") || "";
+      if (/^(https?:|mailto:)/i.test(href)) {
+        clean.setAttribute("href", href);
+        clean.setAttribute("rel", "noopener noreferrer");
+        clean.setAttribute("target", "_blank");
+      }
+    }
+    Array.prototype.forEach.call(node.childNodes, function (child) { copyNode(child, clean); });
+    parent.appendChild(clean);
+  }
+  Array.prototype.forEach.call(parsed.body.childNodes, function (node) { copyNode(node, root); });
+  return root.innerHTML;
+}
+
 function applyDynamicPrintPageSizeCSS(size) {
   var s = (size === "A5") ? "A5" : "A4";
   var mmDims = (s === "A5") ? "148mm 210mm" : "210mm 297mm";
@@ -267,9 +317,20 @@ function renderTemplateButtonsInLettersPane() {
   if (!holder) return;
   var html = "";
   for (var k in tplCfg) {
-    html += '<button type="button" class="btn btn-sm ' + (k === currentTemplateKey ? 'btn-success' : 'btn-outline-success') + ' fw-bold" onclick="selectInquiryTemplate(\'' + k + '\')">' + tplCfg[k].btnTitle + '</button>';
+    if (!Object.prototype.hasOwnProperty.call(tplCfg, k)) continue;
+    var item = tplCfg[k] || {};
+    html += '<button type="button" class="btn btn-sm ' + (k === currentTemplateKey ? 'btn-success' : 'btn-outline-success') + ' fw-bold" data-template-key="' + safeHtmlText(k) + '">' + safeHtmlText(item.btnTitle) + '</button>';
   }
   holder.innerHTML = html;
+  if (!holder.dataset.secureTemplateActionsBound) {
+    holder.dataset.secureTemplateActionsBound = "1";
+    holder.addEventListener("click", function (event) {
+      var btn = event.target.closest("button[data-template-key]");
+      if (!btn || !holder.contains(btn)) return;
+      var key = btn.getAttribute("data-template-key");
+      if (Object.prototype.hasOwnProperty.call(tplCfg, key)) selectInquiryTemplate(key);
+    });
+  }
 }
 
 function selectInquiryTemplate(key) {
@@ -307,6 +368,7 @@ function syncRichEditorToTextarea() {
   var editor = document.getElementById("l-body-rich");
   var ta = document.getElementById("l-body");
   if (editor && ta) {
+    editor.innerHTML = sanitizeOfficeRichHtml(editor.innerHTML);
     ta.value = editor.innerText || editor.textContent;
   }
 }
@@ -316,7 +378,7 @@ function syncTextareaToRichEditor() {
   var editor = document.getElementById("l-body-rich");
   var ta = document.getElementById("l-body");
   if (editor && ta) {
-    editor.innerHTML = ta.value.replace(/\n/g, "<br>");
+    editor.innerHTML = sanitizeOfficeRichHtml(ta.value.replace(/\n/g, "<br>"));
   }
 }
 window.syncTextareaToRichEditor = syncTextareaToRichEditor;
@@ -332,7 +394,7 @@ function saveLetterToSecretariat(goToPrint, forcedPaperSize) {
   var d = window.getInquiryDataObject();
   var rec = document.getElementById("l-recipient").value.trim() || "مدیریت محترم ...";
   syncRichEditorToTextarea();
-  var body = (document.getElementById("l-body-rich") ? document.getElementById("l-body-rich").innerHTML : (document.getElementById("l-body") ? document.getElementById("l-body").value : "")).trim();
+  var body = sanitizeOfficeRichHtml((document.getElementById("l-body-rich") ? document.getElementById("l-body-rich").innerHTML : (document.getElementById("l-body") ? document.getElementById("l-body").value : "")).trim());
   var dir = document.getElementById("l-direction").value || "OUT";
   var chosenSize = forcedPaperSize || (document.getElementById("l-paper-size") || {}).value || currentPaperSize || "A4";
   var incUtm = document.getElementById("l-include-utm") ? document.getElementById("l-include-utm").checked : true;
@@ -777,7 +839,7 @@ function renderSinglePreviewSheet(letterObj, forcedPaperSize) {
   setPaperSize(pSize, true);
   var isNat = (l.recipient || "").indexOf("منابع طبیعی") !== -1;
   var incUtm = l.includeUtm !== false;
-  stage.innerHTML = buildSingleA4HTML(l.recipient, l.body, l.number, l.date, l.attach || "ندارد", l.utm, isNat, false, pSize, incUtm);
+  stage.innerHTML = buildSingleA4HTML(l.recipient, sanitizeOfficeRichHtml(l.body), l.number, l.date, l.attach || "ندارد", l.utm, isNat, true, pSize, incUtm);
   updatePrintUtmBtnState(incUtm);
   setTimeout(autoFitPaperContent, 50);
 }
