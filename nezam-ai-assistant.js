@@ -890,7 +890,16 @@ async function fetchDirectGeminiWithFallback(apiKey, payload, preferredModel) {
 // مدیریت کلید اختصاصی کاربر در حافظه محلی
 function getStoredGeminiApiKey() {
   try {
-    return (localStorage.getItem('nezam_gemini_api_key') || '').trim();
+    // کلید فقط در نشست جاری مرورگر نگهداری می‌شود؛ مهاجرت یک‌باره از حافظه دائمی قدیمی.
+    var sessionKey = (window.sessionStorage.getItem('nezam_gemini_api_key') || '').trim();
+    if (sessionKey) return sessionKey;
+    var legacyKey = (window.localStorage.getItem('nezam_gemini_api_key') || '').trim();
+    if (legacyKey) {
+      window.sessionStorage.setItem('nezam_gemini_api_key', legacyKey);
+      window.localStorage.removeItem('nezam_gemini_api_key');
+      return legacyKey;
+    }
+    return '';
   } catch (e) {
     return '';
   }
@@ -898,12 +907,14 @@ function getStoredGeminiApiKey() {
 
 function setStoredGeminiApiKey(key) {
   try {
-    if (key && key.trim()) {
-      localStorage.setItem('nezam_gemini_api_key', key.trim());
-    } else {
-      localStorage.removeItem('nezam_gemini_api_key');
-    }
-  } catch (e) {}
+    var cleanKey = String(key || '').trim();
+    if (cleanKey) window.sessionStorage.setItem('nezam_gemini_api_key', cleanKey);
+    else window.sessionStorage.removeItem('nezam_gemini_api_key');
+    // پاک‌کردن نسخه دائمی قدیمی از localStorage
+    window.localStorage.removeItem('nezam_gemini_api_key');
+  } catch (e) {
+    console.warn('Gemini key could not be stored in session storage:', e);
+  }
 }
 
 window.toggleGeminiKeyVisibility = function () {
@@ -1063,17 +1074,18 @@ async function checkAiServerStatus() {
   var pill = document.getElementById('gemini-key-status-pill');
 
   if (userKey) {
-    aiOnlineStatus.isOnline = true;
+    // وجود کلید به معنی معتبر بودن آن نیست؛ وضعیت سبز فقط پس از یک درخواست واقعی Gemini.
+    aiOnlineStatus.isOnline = false;
     aiOnlineStatus.userKeyActive = true;
     if (pill) {
-      pill.className = 'badge bg-success p-2';
-      pill.innerHTML = '🟢 کلید اختصاصی فعال است (' + escapeHtml(currentModel) + ')';
+      pill.className = 'badge bg-secondary p-2';
+      pill.innerHTML = '⏳ در حال اعتبارسنجی واقعی کلید Gemini...';
     }
-    updateAiBadgeStatus(true);
-    discoverAccountModelsFromGoogle(userKey).then(function (models) {
-      if (models && models.length > 0) {
-        updateAiBadgeStatus(true);
-      }
+    updateAiBadgeStatus(false);
+    window.testCustomGeminiKey().catch(function (testError) {
+      console.warn('Automatic Gemini key validation failed:', testError);
+      aiOnlineStatus.isOnline = false;
+      updateAiBadgeStatus(false);
     });
     return;
   }
