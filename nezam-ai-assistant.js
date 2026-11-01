@@ -578,9 +578,9 @@ async function aiReadDocumentImagePro() {
 
   // اگر فایل نقشه‌برداری (KML, KMZ, GPX, DXF/DWG) قبلاً پردازش شده باشد
   if (aiPendingImageBase64 === 'GIS_PARSED_READY' && aiPendingParsedGisData) {
-    applyOcrDataToCase(aiPendingParsedGisData, rawTextEl);
+    var gisApplied = applyOcrDataToCase(aiPendingParsedGisData, rawTextEl);
     if (typeof showToastMsg === 'function') {
-      showToastMsg('✅ نقاط UTM با فرمت چپ‌به‌راست (X,Y,Z,39) در پرونده بارگذاری شد.');
+      showToastMsg(gisApplied.pointCount ? '✅ ' + gisApplied.pointCount + ' نقطه در جدول UTM پرونده درج شد.' : '⚠️ فایل پردازش شد اما نقطه قابل‌قبولی برای جدول شناسایی نشد.');
     }
     return;
   }
@@ -646,10 +646,10 @@ async function aiReadDocumentImagePro() {
         }).filter(Boolean).join('\n');
         var parsed = parseAiJsonResponse(rawJson);
         aiOnlineStatus.model = directOcrResult.usedModel || selectedModel;
-        applyOcrDataToCase(parsed, rawTextEl);
+        var ocrApplied = applyOcrDataToCase(parsed, rawTextEl);
         updateAiBadgeStatus(true);
         if (typeof showToastMsg === 'function') {
-          showToastMsg('✅ مشخصات سند و نقاط UTM (X,Y,Z,39) با مدل ' + aiOnlineStatus.model + ' استخراج شد.');
+          showToastMsg(ocrApplied.pointCount ? '✅ ' + ocrApplied.pointCount + ' نقطه از سند با ' + aiOnlineStatus.model + ' در جدول UTM درج شد.' : '⚠️ سند خوانده شد اما مختصات قابل‌قبول در جدول درج نشد.');
         }
         if (btn) btn.innerHTML = originalBtnText;
         syncOcrUploadControlsUI();
@@ -683,10 +683,10 @@ async function aiReadDocumentImagePro() {
       if (res.ok) {
         var result = await res.json();
         if (result && result.success && result.data) {
-          applyOcrDataToCase(result.data, rawTextEl);
+          var serverApplied = applyOcrDataToCase(result.data, rawTextEl);
           updateAiBadgeStatus(true);
           if (typeof showToastMsg === 'function') {
-            showToastMsg('✅ مشخصات سند و نقاط UTM (X,Y,Z,39) با موفقیت استخراج شد.');
+            showToastMsg(serverApplied.pointCount ? '✅ ' + serverApplied.pointCount + ' نقطه از سند در جدول UTM درج شد.' : '⚠️ سند خوانده شد اما مختصات قابل‌قبول در جدول درج نشد.');
           }
           if (btn) btn.innerHTML = originalBtnText;
           syncOcrUploadControlsUI();
