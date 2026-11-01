@@ -3175,7 +3175,7 @@ function printUtmSketchSheet() {
     var g = computeUtmGeometry(l.points, l.geomType);
     var catRole = l.category === "MAIN_PARCEL" ? "محدوده اصلی زمین (عرصه کل)" : "عارضه انتخاب‌شده";
     layersRows += '<tr>' +
-      '<td><span style="display:inline-block;width:9px;height:9px;background:' + safeHexColor(l.color, "#15803d") + ';margin-left:3px;border-radius:2px;"></span><b>' + l.name + '</b></td>' +
+      '<td><span style="display:inline-block;width:9px;height:9px;background:' + safeHexColor(l.color, "#15803d") + ';margin-left:3px;border-radius:2px;"></span><b>' + safeHtmlText(l.name) + '</b></td>' +
       '<td>' + catRole + ' (' + (l.geomType === "POLYGON" ? "چندضلعی" : (l.geomType === "LINE" ? "خطی" : "نقطه‌ای")) + ')</td>' +
       '<td>' + toFa(l.points.length) + '</td>' +
       '<td><b>' + (l.geomType === "POLYGON" ? (toFa(Math.round(g.area)) + " م.م (" + toFa(g.ha.toFixed(2)) + " هکتار)") : "---") + '</b></td>' +
