@@ -50,14 +50,25 @@ test('Gemini model fallback preserves valid saved models and replaces the retire
   const match = ai.match(/function getStoredGeminiModel\(\)\s*\{[\s\S]*?\n\}/);
   assert.ok(match, 'getStoredGeminiModel must exist');
 
-  const readModel = (saved) => new Function('localStorage', 'return (' + match[0] + ')')(
-    { getItem: () => saved }
-  );
+  const getterFactory = new Function('localStorage', 'return (' + match[0] + ')');
+  const readModel = (saved) => getterFactory({ getItem: () => saved })();
 
   assert.equal(readModel(''), 'gemini-3.8-flash');
   assert.equal(readModel('gemini-2.0-flash'), 'gemini-3.8-flash');
   assert.equal(readModel('models/gemini-3.6-flash'), 'gemini-3.6-flash');
   assert.equal(readModel('gemini-2.5-flash'), 'gemini-2.5-flash');
+});
+
+test('database writes report storage failures instead of swallowing them', () => {
+  const core = read('nezam-core.js');
+  const start = core.indexOf('function saveAllDB() {');
+  const end = core.indexOf('\n}\n', start);
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+  const saveFunction = core.slice(start, end + 2);
+  assert.match(saveFunction, /failedKeys\.push/);
+  assert.match(saveFunction, /showToastMsg/);
+  assert.match(saveFunction, /return failedKeys\.length === 0/);
 });
 
 test('OCR fallback does not invent an area or a location', () => {
