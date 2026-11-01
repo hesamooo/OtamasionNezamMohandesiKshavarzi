@@ -369,9 +369,9 @@
       if (key === 'entityType' && ['INDIVIDUAL','LEGAL','ORG'].indexOf(str) < 0) return;
       if (key === 'mainGroup' && ['GREENHOUSE_MUSHROOM','LIVESTOCK_POULTRY_FISHERIES','CLINIC_PHARMACY'].indexOf(str) < 0) return;
       if (key === 'caseStatus' && ['ACTIVE','IN_PROGRESS','APPROVED','ARCHIVED'].indexOf(str) < 0) return;
-      if (key === 'nid' && normalizeText(str).replace(/\\D/g, '').length > 11) return;
+      if (key === 'nid' && normalizeText(str).replace(/\D/g, '').length > 11) return;
       if (key === 'mobile' && normalizeText(str).replace(/\\D/g, '').length > 15) return;
-      if (key === 'utm' && !/^[0-9۰-۹٠-٩.,،;\\sXYZxyz=:+-]*$/.test(str)) return;
+      if (key === 'utm' && !/^[0-9۰-۹٠-٩.,،;\sXYZxyz=:+-]*$/.test(str)) return;
       clean[key] = str;
     });
     return clean;
@@ -549,7 +549,7 @@
         throw new Error('محتوای فایل این مدرک در مرورگر موجود نیست.');
       }
       var mime = (dataUrl.match(/^data:([^;]+);base64,/) || [])[1] || 'application/octet-stream';
-      if (!/^application\\/pdf$|^image\\/(jpeg|png|webp)$/.test(mime)) {
+      if (!/^application\/pdf$|^image\/(jpeg|png|webp)$/.test(mime)) {
         throw new Error('خواندن هوشمند این نوع فایل پشتیبانی نمی‌شود.');
       }
       var documentPrompt = [
