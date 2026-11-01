@@ -931,9 +931,9 @@ window.saveCustomGeminiKey = async function () {
     alert('لطفاً ابتدا کلید اختصاصی Gemini API خود را در کادر وارد نمایید.');
     return;
   }
-  setStoredGeminiApiKey(key);
+  // کلید فقط پس از تست موفق ذخیره می‌شود؛ کلید اشتباه در نشست باقی نمی‌ماند.
   if (typeof showToastMsg === 'function') {
-    showToastMsg('⏳ در حال استعلام مدل‌های فعال حساب شما از سرور گوگل...');
+    showToastMsg('⏳ در حال اعتبارسنجی کلید Gemini؛ فقط پس از تست موفق در نشست جاری ذخیره می‌شود...');
   }
   await testCustomGeminiKey();
 };
@@ -1066,10 +1066,7 @@ async function checkAiServerStatus() {
   var currentModel = getStoredGeminiModel();
   aiOnlineStatus.model = currentModel;
 
-  var inp = document.getElementById('gemini-custom-api-key');
-  if (inp && userKey && !inp.value) {
-    inp.value = userKey;
-  }
+  // کلید نشست در کادر فرم بازنمایی نمی‌شود تا بی‌دلیل در DOM قابل مشاهده نباشد.
 
   var pill = document.getElementById('gemini-key-status-pill');
 
