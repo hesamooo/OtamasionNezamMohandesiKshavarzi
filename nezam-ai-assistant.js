@@ -19,9 +19,9 @@ if (typeof WScript !== 'undefined') {
 
 // فهرست اولیه مدل‌ها (به محض اتصال کلید، با لیست واقعی سرور گوگل به‌روزرسانی می‌شود)
 var GEMINI_AVAILABLE_MODELS = [
-  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (پیشنهادی - سریع و دقیق)' },
-  { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (تحلیل پیشرفته اسناد و قوانین)' },
-  { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash (پایدار و چندرسانه‌ای)' }
+  { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash (پیشنهادی)' },
+  { id: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash (پایدار)' },
+  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (سازگاری)' }
 ];
 
 var aiOnlineStatus = {
@@ -57,13 +57,14 @@ function toEnglishDigits(str) {
 // مدیریت مدل انتخابی کاربر در حافظه محلی
 function getStoredGeminiModel() {
   try {
-    var saved = (localStorage.getItem('nezam_gemini_model') || '').trim();
-    if (!saved || saved === 'gemini-3.8-flash' || saved.indexOf('1.5-flash-8b') !== -1) {
-      return 'gemini-2.5-flash';
+    var saved = (localStorage.getItem('nezam_gemini_model') || '').trim().replace(/^models\//, '');
+    // مدل‌های خاموش‌شده یا مقدار خالی به مدل پایدار جدید منتقل می‌شوند.
+    if (!saved || saved === 'gemini-2.0-flash' || saved.indexOf('1.5-flash-8b') !== -1) {
+      return 'gemini-3.8-flash';
     }
-    return saved.replace(/^models\//, '');
+    return saved;
   } catch (e) {
-    return 'gemini-2.5-flash';
+    return 'gemini-3.8-flash';
   }
 }
 
@@ -91,7 +92,7 @@ function getModelDisplayLabel(modelId) {
 // تغییر مدل توسط کاربر از طریق منوی کشویی
 window.changeGeminiModel = function (modelId) {
   var sel = document.getElementById('gemini-model-select');
-  var chosen = modelId || (sel ? sel.value : 'gemini-2.5-flash');
+  var chosen = modelId || (sel ? sel.value : 'gemini-3.8-flash');
   setStoredGeminiModel(chosen);
   updateAiBadgeStatus(aiOnlineStatus.isOnline);
   syncOcrUploadControlsUI();
@@ -666,7 +667,7 @@ function translateGeminiErrorToPersian(errMsg, status) {
 
   if (status === 429 || /RESOURCE_EXHAUSTED|quota|rate limit/i.test(msg)) {
     return (
-      'سهمیه رایگان لحظه‌ای (Quota / Rate Limit) برای این مدل پر شده است. لطفاً از منوی کشویی یک مدل دیگر (مثلاً <code>gemini-2.5-flash</code> یا <code>gemini-2.0-flash</code>) را انتخاب نمایید.' +
+      'سهمیه این مدل موقتاً پر شده است. از فهرست مدل‌ها یک مدل فعال دیگر مانند <code>gemini-3.6-flash</code> یا <code>gemini-2.5-flash</code> را انتخاب کنید.' +
       '<div class="mt-1 small text-muted" dir="ltr">Google Response: ' + escapeHtml(msg) + '</div>'
     );
   }
@@ -732,18 +733,18 @@ async function discoverAccountModelsFromGoogle(apiKey) {
           if (discovered.length > 0) {
             discovered.sort(function (a, b) {
               function getScore(id) {
-                if (id === 'gemini-2.5-flash') return 100;
-                if (id.indexOf('gemini-2.5-flash') === 0 && id.indexOf('lite') === -1) return 95;
-                if (id === 'gemini-2.5-pro') return 90;
-                if (id.indexOf('gemini-2.5-pro') === 0) return 85;
+                if (id === 'gemini-3.8-flash') return 120;
+                if (id.indexOf('gemini-3.8-flash') === 0) return 118;
+                if (id === 'gemini-3.6-flash') return 112;
+                if (id.indexOf('gemini-3.6-flash') === 0) return 110;
+                if (id.indexOf('gemini-3') === 0) return 100;
+                if (id === 'gemini-2.5-flash') return 88;
+                if (id.indexOf('gemini-2.5-flash') === 0) return 86;
+                if (id === 'gemini-2.5-pro') return 84;
                 if (id.indexOf('gemini-2.5') === 0) return 80;
-                if (id === 'gemini-2.0-flash') return 75;
-                if (id.indexOf('gemini-2.0-flash') === 0) return 70;
-                if (id.indexOf('gemini-3') === 0) return 68;
-                if (id.indexOf('gemini-1.5-pro') === 0) return 60;
-                if (id.indexOf('gemini-1.5-flash') === 0) return 55;
                 if (id.indexOf('gemini-') === 0) return 50;
                 return 10;
+              }
               }
               return getScore(b.id) - getScore(a.id);
             });
@@ -767,7 +768,7 @@ async function discoverAccountModelsFromGoogle(apiKey) {
 // ارسال درخواست به یک مدل مشخص در هر دو نسخه v1beta و v1
 async function callGeminiModelEndpoint(apiKey, modelName, payload) {
   var cleanKey = (apiKey || '').trim();
-  var cleanModel = (modelName || 'gemini-2.5-flash').replace(/^models\//, '');
+  var cleanModel = (modelName || 'gemini-3.8-flash').replace(/^models\//, '');
 
   var apiVersions = ['v1beta', 'v1'];
   var lastStatus = 0;
@@ -848,7 +849,7 @@ async function fetchDirectGeminiWithFallback(apiKey, payload, preferredModel) {
     await discoverAccountModelsFromGoogle(apiKey);
   }
 
-  var primaryModel = (preferredModel || getStoredGeminiModel() || 'gemini-2.5-flash').replace(/^models\//, '');
+  var primaryModel = (preferredModel || getStoredGeminiModel() || 'gemini-3.8-flash').replace(/^models\//, '');
   var candidateModels = [primaryModel];
 
   for (var i = 0; i < GEMINI_AVAILABLE_MODELS.length; i++) {
@@ -1106,7 +1107,7 @@ async function checkAiServerStatus() {
     if (res.ok) {
       var data = await res.json();
       aiOnlineStatus.isOnline = Boolean(data.online && (data.hasApiKey || data.hasServerKey));
-      aiOnlineStatus.model = getStoredGeminiModel() || data.model || 'gemini-2.5-flash';
+      aiOnlineStatus.model = getStoredGeminiModel() || data.model || 'gemini-3.8-flash';
       aiOnlineStatus.searchGrounding = Boolean(data.searchGrounding);
       aiOnlineStatus.checked = true;
 
@@ -1696,10 +1697,11 @@ async function aiSendChatMessage() {
           systemInstruction: {
             parts: [
               {
-                text: 'شما مشاور و کارشناس رسمی نظام مهندسی کشاورزی ۶۳۶ شهرستان خفر استان فارس هستید. پاسخ‌های دقیق، مستند به آخرین ضوابط جهاد کشاورزی و نظام مهندسی، محترمانه و به زبان فارسی ارائه دهید.',
+                text: 'شما مشاور و کارشناس رسمی نظام مهندسی کشاورزی ۶۳۶ شهرستان خفر استان فارس هستید. پاسخ دقیق و فارسی بدهید. درباره قوانین و ضوابط جاری از جستجوی وب و منابع معتبر استفاده کنید؛ اگر منبع معتبر در دسترس نیست، عدم قطعیت را روشن اعلام کنید و حدنصاب، فاصله یا الزام قانونی را حدس نزنید.',
               },
             ],
           },
+          tools: [{ googleSearch: {} }],
         },
         selectedModel
       );
@@ -1708,12 +1710,28 @@ async function aiSendChatMessage() {
         var directData = directChatResult.data;
         var activeChatModel = directChatResult.usedModel || selectedModel;
         var candidate = directData.candidates && directData.candidates[0];
-        var candidateText =
-          candidate &&
-          candidate.content &&
-          candidate.content.parts &&
-          candidate.content.parts[0] &&
-          candidate.content.parts[0].text;
+        var candidateParts = candidate && candidate.content && Array.isArray(candidate.content.parts)
+          ? candidate.content.parts : [];
+        var candidateText = candidateParts.map(function (part) {
+          return part && typeof part.text === 'string' ? part.text : '';
+        }).filter(Boolean).join('\n');
+        var directGroundingChunks = candidate && candidate.groundingMetadata &&
+          Array.isArray(candidate.groundingMetadata.groundingChunks)
+          ? candidate.groundingMetadata.groundingChunks : [];
+        var directSourcesHtml = '';
+        if (directGroundingChunks.length) {
+          var directSourceLinks = directGroundingChunks.map(function (chunk) {
+            if (!chunk || !chunk.web || !chunk.web.uri) return '';
+            var title = chunk.web.title || chunk.web.uri;
+            return '<a href="' + escapeHtml(chunk.web.uri) +
+              '" target="_blank" rel="noopener noreferrer" class="badge bg-light text-primary border me-1 my-1">' +
+              '🔗 ' + escapeHtml(title) + '</a>';
+          }).filter(Boolean);
+          if (directSourceLinks.length) {
+            directSourcesHtml = '<div class="mt-2 pt-2 border-top small text-muted"><b>منابع جستجوی وب:</b> ' +
+              directSourceLinks.join(' ') + '</div>';
+          }
+        }
 
         if (candidateText) {
           aiOnlineStatus.model = activeChatModel;
@@ -1729,9 +1747,11 @@ async function aiSendChatMessage() {
           botLoadingDiv.innerHTML =
             '<div class="d-flex justify-content-between align-items-center mb-1">' +
             '<b class="text-success">🤖 کارشناس هوشمند مرکز ۶۳۶ (' + escapeHtml(activeChatModel) + '):</b>' +
-            '<span class="badge bg-success-subtle text-success border border-success-subtle" style="font-size:10px;">🟢 کلید اختصاصی</span>' +
+            '<span class="badge ' + (directGroundingChunks.length ? 'bg-success-subtle text-success' : 'bg-light text-secondary') +
+            ' border" style="font-size:10px;">' + (directGroundingChunks.length ? '🔎 جستجوی وب و منبع' : 'پاسخ بدون منبع برخط') + '</span>' +
             '</div>' +
-            directFmtText;
+            directFmtText +
+            directSourcesHtml;
 
           history.scrollTop = history.scrollHeight;
           updateAiBadgeStatus(true);
@@ -1759,6 +1779,7 @@ async function aiSendChatMessage() {
           history: aiChatHistoryBuffer,
           apiKey: userKey,
           model: selectedModel,
+          useSearch: true,
         }),
       });
 
@@ -1802,7 +1823,10 @@ async function aiSendChatMessage() {
           botLoadingDiv.innerHTML =
             '<div class="d-flex justify-content-between align-items-center mb-1">' +
             '<b class="text-success">🤖 کارشناس هوشمند مرکز ۶۳۶ (' + escapeHtml(modelUsed) + '):</b>' +
-            '<span class="badge bg-success-subtle text-success border border-success-subtle" style="font-size:10px;">🌐 متصل به وب</span>' +
+            '<span class="badge ' + (data.groundingChunks && data.groundingChunks.length ? 'bg-success-subtle text-success' : (data.fallback ? 'bg-warning-subtle text-warning' : 'bg-light text-secondary')) +
+            ' border" style="font-size:10px;">' +
+            (data.groundingChunks && data.groundingChunks.length ? '🔎 منابع جستجوی وب' : (data.fallback ? 'پاسخ پشتیبان محلی' : 'بدون منبع برخط')) +
+            '</span>' +
             '</div>' +
             formattedText +
             sourcesHtml;
