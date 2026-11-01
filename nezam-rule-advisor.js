@@ -223,11 +223,11 @@
     try {
       var spec = current.spec;
       var query = [
-        spec.title,
-        spec.unit,
-        'ظرفیت مجاز حداقل مساحت زمین سطح زمین زیربنا مسقف محوطه',
-        'سرانه مصرف آب میزان آب روزانه ضوابط فنی شرایط صدور مجوز'
-      ].join(' ');
+        spec.title + ' ' + spec.unit + ' شرایط صدور مجوز ضوابط فنی',
+        spec.title + ' حداقل مساحت زمین عرصه و زیربنا',
+        spec.title + ' سرانه مصرف آب نیاز آبی روزانه',
+        spec.title + ' سطح مسقف محوطه بهاربند ابعاد و مساحت'
+      ];
       var retrieval = await window.Nezaam636Knowledge.buildContext(query, 10500);
       if (version !== requestVersion || signature !== currentSignature()) return;
       if (!retrieval || !retrieval.context || !retrieval.sources || !retrieval.sources.length) {
