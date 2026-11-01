@@ -590,7 +590,7 @@
     panel.id = 'nezam636-kv-panel';
     panel.setAttribute('aria-label', 'مخزن دانش قوانین و دستورالعمل‌ها');
     panel.innerHTML =
-      '<div class="kv-head"><div><b>📚 مخزن دانش دفتر ۶۳۶</b><small id="nezam636-kv-stats">در حال آماده‌سازی مخزن محلی...</small></div><button type="button" id="nezam636-kv-close">بستن ✕</button></div>' +
+      '<div class="kv-head"><div><b>📚 مخزن دانش دفتر ۶۳۶</b><small id="nezam636-kv-stats">در حال آماده‌سازی مخزن متصل به Google Drive...</small></div><button type="button" id="nezam636-kv-close">بستن ✕</button></div>' +
       '<div class="kv-body">' +
       '<div class="alert alert-info small">فایل اصلی پس از افزودن به پوشه اختصاصی «کتابخانه دانش مرکز ۶۳۶ خفر» در Google Drive ارسال می‌شود. متن و فهرست جستجو نیز در پشتیبان اصلی اتوماسیون ذخیره می‌شود تا روی دستگاه دیگر بازیابی شود. TXT/CSV/HTML و DOCX محلی خوانده می‌شوند؛ برای PDF و تصویر، خواندن با Gemini فقط پس از تأیید تو انجام می‌شود. فایل قدیمی DOC در Drive بایگانی می‌شود اما برای استخراج متن باید به DOCX یا PDF تبدیل شود.</div>' +
       '<div class="kv-form">' +
