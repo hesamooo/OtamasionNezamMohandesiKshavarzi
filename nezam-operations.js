@@ -514,7 +514,11 @@
     if (!prompt) return;
     if (typeof window.switchMainPane === 'function') window.switchMainPane('pane-ai');
     var toggle = byId('ai-case-context-toggle');
-    if (toggle && (action === 'review' || action === 'letter' || action === 'regulations')) toggle.checked = true;
+    var contextNeeded = action === 'review' || action === 'letter' || action === 'regulations';
+    if (toggle && contextNeeded && !toggle.checked) {
+      var approvedShare = confirm('برای این اقدام، خلاصه پرونده فعال (بدون کدملی و تلفن) به سرویس Gemini ارسال شود؟');
+      if (approvedShare) toggle.checked = true;
+    }
     var input = byId('ai-chat-input');
     if (input) {
       input.value = prompt;
