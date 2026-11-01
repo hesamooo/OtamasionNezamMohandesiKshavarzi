@@ -308,7 +308,7 @@ function calculateUtmPolygonAreaSqm(pointsList) {
   return Math.round(Math.abs(area) / 2.0);
 }
 
-// نرمال‌ساز مختصات: ابتدا برچسب‌های صریح X/Y و Lat/Lon، سپس الگوهای عددی و JSON
+// نرمال‌ساز مقاوم مختصات UTM و جغرافیایی (ورودی متن، JSON، آرایه و آبجکت)
 function formatUtmCoordinatesLTR(rawInput, defaultZone) {
   var zoneDefault=parseInt(String(defaultZone||39).replace(/[^0-9]/g,''),10)||39;
   var output=[],seen={};
@@ -410,6 +410,865 @@ function normalizeAiCoordinateData(data,fallbackText){
   else if(geoPayload&&typeof geoPayload==='object')geoText=JSON.stringify(geoPayload);
   else if(lat!==undefined&&lon!==undefined)geoText=String(lat)+', '+String(lon);
   return{utm:output.join('\n'),geographicText:geoText};
+}
+
+// نمایش وضعیت فایل غیرتصویری (PDF, KML, KMZ, GPX, CAD) در کادر پیش‌نمایش
+function parseAiJsonResponse(responseText){
+  var source=String(responseText||'').trim();
+  var cleaned=source.replace(/^\s*```(?:json)?\s*/i,'').replace(/\s*```\s*$/i,'').trim();
+  try{return JSON.parse(cleaned);}catch(e){}
+  var first=cleaned.indexOf('{'),last=cleaned.lastIndexOf('}');
+  if(first>=0&&last>first){try{return JSON.parse(cleaned.slice(first,last+1));}catch(e2){}}
+  return{fullSummary:source,rawText:source};
+}
+
+/* ==========================================================================
+   موتورهای خوانش مستقیم فایل‌های نقشه‌برداری: KML, KMZ, GPX, AutoCAD DXF/DWG
+   ========================================================================== */
+
+// ۱. استخراج فایل KML از داخل آرشیو فشرده KMZ (بدون نیاز به کتابخانه خارجی)
+async function extractKmlTextFromKmzBuffer(arrayBuffer) {
+  var bytes = new Uint8Array(arrayBuffer);
+  var view = new DataView(arrayBuffer);
+  var offset = 0;
+
+  while (offset + 30 < bytes.length) {
+    var sig = view.getUint32(offset, true);
+    if (sig !== 0x04034b50) break; // Local File Header signature
+
+    var compression = view.getUint16(offset + 8, true);
+    var compressedSize = view.getUint32(offset + 18, true);
+    var fileNameLen = view.getUint16(offset + 26, true);
+    var extraLen = view.getUint16(offset + 28, true);
+
+    var nameBytes = bytes.subarray(offset + 30, offset + 30 + fileNameLen);
+    var fileName = new TextDecoder('utf-8').decode(nameBytes);
+    var dataStart = offset + 30 + fileNameLen + extraLen;
+    var compressedData = bytes.subarray(dataStart, dataStart + compressedSize);
+
+    if (/\.kml$/i.test(fileName)) {
+      if (compression === 0) {
+        return new TextDecoder('utf-8').decode(compressedData);
+      } else if (compression === 8 && typeof DecompressionStream !== 'undefined') {
+        var ds = new DecompressionStream('deflate-raw');
+        var writer = ds.writable.getWriter();
+        writer.write(compressedData);
+        writer.close();
+        var decompressedResp = new Response(ds.readable);
+        return await decompressedResp.text();
+      }
+    }
+    offset = dataStart + compressedSize;
+  }
+  throw new Error('فایل KML معتبری در بسته KMZ یافت نشد.');
+}
+
+// ۲. تجزیه فایل KML (گوگل ارث) و تبدیل به نقاط X,Y,Z,Zone
+function parseKmlContentToUtm(kmlText) {
+  var parser = new DOMParser();
+  var xmlDoc = parser.parseFromString(kmlText, 'text/xml');
+  var points = [];
+  var docName = '';
+  var docDesc = '';
+
+  var nameNodes = xmlDoc.getElementsByTagName('name');
+  if (nameNodes.length > 0 && nameNodes[0].textContent) {
+    docName = nameNodes[0].textContent.trim();
+  }
+  var descNodes = xmlDoc.getElementsByTagName('description');
+  if (descNodes.length > 0 && descNodes[0].textContent) {
+    docDesc = descNodes[0].textContent.trim();
+  }
+
+  var coordNodes = xmlDoc.getElementsByTagName('coordinates');
+  for (var i = 0; i < coordNodes.length; i++) {
+    var rawCoords = (coordNodes[i].textContent || '').trim();
+    if (!rawCoords) continue;
+    var tuples = rawCoords.split(/\s+/);
+    for (var t = 0; t < tuples.length; t++) {
+      var parts = tuples[t].split(',');
+      if (parts.length >= 2) {
+        var lon = parseFloat(parts[0]);
+        var lat = parseFloat(parts[1]);
+        var elev = parts.length >= 3 ? parseFloat(parts[2]) : 0;
+        if (!isNaN(lat) && !isNaN(lon)) {
+          var utm = wgs84LatLonToUtm(lat, lon, elev);
+          if (utm) points.push(utm);
+        }
+      }
+    }
+  }
+
+  var utmString = formatUtmCoordinatesLTR(points, 39);
+  var areaSqm = calculateUtmPolygonAreaSqm(points);
+
+  return {
+    utmCoordinates: utmString,
+    pointCount: utmString ? utmString.split('\n').length : 0,
+    landArea: areaSqm > 0 ? String(areaSqm) : '',
+    planTitle: docName,
+    fullSummary: 'استخراج از فایل KML/KMZ گوگل ارث' + (docName ? ' (' + docName + ')' : '') + (docDesc ? ' - ' + docDesc : '')
+  };
+}
+
+// ۳. تجزیه فایل GPX (دستگاه‌های GPS دستی گارمین و غیره) و تبدیل به X,Y,Z,Zone
+function parseGpxContentToUtm(gpxText) {
+  var parser = new DOMParser();
+  var xmlDoc = parser.parseFromString(gpxText, 'text/xml');
+  var points = [];
+  var trackName = '';
+
+  var nameEl = xmlDoc.getElementsByTagName('name')[0];
+  if (nameEl && nameEl.textContent) trackName = nameEl.textContent.trim();
+
+  var tagTypes = ['wpt', 'rtept', 'trkpt'];
+  for (var tt = 0; tt < tagTypes.length; tt++) {
+    var nodes = xmlDoc.getElementsByTagName(tagTypes[tt]);
+    for (var i = 0; i < nodes.length; i++) {
+      var node = nodes[i];
+      var lat = parseFloat(node.getAttribute('lat'));
+      var lon = parseFloat(node.getAttribute('lon'));
+      var eleNode = node.getElementsByTagName('ele')[0];
+      var elev = eleNode && eleNode.textContent ? parseFloat(eleNode.textContent) : 0;
+
+      if (!isNaN(lat) && !isNaN(lon)) {
+        var utm = wgs84LatLonToUtm(lat, lon, elev);
+        if (utm) points.push(utm);
+      }
+    }
+  }
+
+  var utmString = formatUtmCoordinatesLTR(points, 39);
+  var areaSqm = calculateUtmPolygonAreaSqm(points);
+
+  return {
+    utmCoordinates: utmString,
+    pointCount: utmString ? utmString.split('\n').length : 0,
+    landArea: areaSqm > 0 ? String(areaSqm) : '',
+    planTitle: trackName,
+    fullSummary: 'استخراج مستقیم از فایل GPX دستگاه GPS' + (trackName ? ' (' + trackName + ')' : '')
+  };
+}
+
+// ۴. تجزیه فایل اتوکد DXF و DWG و استخراج رئوس (X,Y,Z,39)
+function parseAutoCadContentToUtm(rawTextOrBuffer, ext) {
+  var points = [];
+  var textContent = typeof rawTextOrBuffer === 'string'
+    ? rawTextOrBuffer
+    : new TextDecoder('utf-8', { fatal: false }).decode(new Uint8Array(rawTextOrBuffer));
+
+  if (ext === 'dxf' || textContent.indexOf('SECTION') !== -1 || textContent.indexOf('ENTITIES') !== -1) {
+    var lines = textContent.split(/\r?\n/);
+    var inEntities = textContent.indexOf('ENTITIES') === -1; // اگر سکشن‌بندی نداشت، کل فایل را بررسی کن
+    var curX = null;
+    var curY = null;
+    var curZ = 0;
+    var layerElevation = 0;
+
+    for (var i = 0; i + 1 < lines.length; i += 2) {
+      var code = parseInt(lines[i].trim(), 10);
+      var val = lines[i + 1].trim();
+
+      if (code === 2 && val === 'ENTITIES') {
+        inEntities = true;
+        continue;
+      }
+      if (code === 0 && val === 'ENDSEC' && inEntities) {
+        break;
+      }
+      if (!inEntities) continue;
+
+      if (code === 0) {
+        layerElevation = 0;
+      } else if (code === 38) {
+        var elv = parseFloat(val);
+        if (!isNaN(elv)) layerElevation = elv;
+      } else if (code === 10) {
+        curX = parseFloat(val);
+      } else if (code === 20 && curX !== null) {
+        curY = parseFloat(val);
+        // بررسی اینکه آیا خط بعدی کد 30 (ارتفاع Z رأس) است یا خیر
+        if (i + 3 < lines.length && parseInt(lines[i + 2].trim(), 10) === 30) {
+          curZ = parseFloat(lines[i + 3].trim()) || layerElevation || 0;
+          i += 2;
+        } else {
+          curZ = layerElevation || 0;
+        }
+
+        if (!isNaN(curX) && !isNaN(curY)) {
+          // اگر مختصات در محدوده UTM یا Lat/Lon باشد
+          var conv = wgs84LatLonToUtm(curY, curX, curZ, 39);
+          if (conv && conv.x >= 100000 && conv.x <= 900000 && conv.y >= 2000000 && conv.y <= 5000000) {
+            points.push(conv);
+          }
+        }
+        curX = null;
+        curY = null;
+      }
+    }
+  }
+
+  // اگر فایل DWG باینری بود یا در کدهای گروهی DXF نقاطی با فرمت متنی وجود داشت
+  if (points.length === 0 && rawTextOrBuffer instanceof ArrayBuffer) {
+    // اسکن باینری IEEE-754 (8-byte double) برای یافتن زوج‌های مختصات UTM زون 39 فارس/خفر
+    var dv = new DataView(rawTextOrBuffer);
+    for (var b = 0; b + 24 <= dv.byteLength; b += 1) {
+      var bx = dv.getFloat64(b, true);
+      var by = dv.getFloat64(b + 8, true);
+      // محدوده UTM استان فارس و خفر: X بین 500,000 تا 800,000 و Y بین 3,000,000 تا 3,450,000
+      if (
+        bx >= 500000 && bx <= 800000 &&
+        by >= 3000000 && by <= 3450000 &&
+        Math.abs(bx - Math.round(bx * 10000) / 10000) < 0.01
+      ) {
+        var bz = dv.getFloat64(b + 16, true);
+        var validZ = (!isNaN(bz) && bz >= 0 && bz <= 4500) ? Math.round(bz * 100) / 100 : 0;
+        points.push({
+          x: Math.round(bx * 100) / 100,
+          y: Math.round(by * 100) / 100,
+          z: validZ,
+          zone: 39
+        });
+        b += 15;
+        if (points.length >= 200) break;
+      }
+    }
+  }
+
+  var utmString = formatUtmCoordinatesLTR(points, 39);
+  var areaSqm = calculateUtmPolygonAreaSqm(points);
+
+  return {
+    utmCoordinates: utmString,
+    pointCount: utmString ? utmString.split('\n').length : 0,
+    landArea: areaSqm > 0 ? String(areaSqm) : '',
+    fullSummary: 'استخراج مهندسی از فایل نقشه اتوکد (' + ext.toUpperCase() + ')'
+  };
+}
+
+// ترجمه دقیق خطاهای سرور گوگل به راهنمای فارسی
+function translateGeminiErrorToPersian(errMsg, status) {
+  var msg = String(errMsg || '');
+
+  if (status === 403 || /User location is not supported|location is not supported|PERMISSION_DENIED/i.test(msg)) {
+    return (
+      'محدودیت جغرافیایی یا دسترسی گوگل: لطفاً سرویس <b>DNS شکن (Shecan)</b> یا تغییر آی‌پی خود را بررسی نمایید.' +
+      '<div class="mt-1 small text-muted" dir="ltr">Google Response: ' + escapeHtml(msg) + '</div>'
+    );
+  }
+
+  if (status === 400 && /API_KEY_INVALID|key not valid/i.test(msg)) {
+    return (
+      'کلید وارد شده معتبر نیست. لطفاً مطمئن شوید کلید را به طور کامل و بدون فاصله کپی کرده‌اید.' +
+      '<div class="mt-1 small text-muted" dir="ltr">Google Response: ' + escapeHtml(msg) + '</div>'
+    );
+  }
+
+  if (status === 429 || /RESOURCE_EXHAUSTED|quota|rate limit/i.test(msg)) {
+    return (
+      'سهمیه رایگان لحظه‌ای (Quota / Rate Limit) برای این مدل پر شده است. لطفاً از منوی کشویی یک مدل دیگر (مثلاً <code>gemini-2.5-flash</code> یا <code>gemini-2.0-flash</code>) را انتخاب نمایید.' +
+      '<div class="mt-1 small text-muted" dir="ltr">Google Response: ' + escapeHtml(msg) + '</div>'
+    );
+  }
+
+  if (/Failed to fetch|NetworkError|Load failed/i.test(msg)) {
+    return (
+      'عدم برقراری ارتباط شبکه با سرور گوگل. لطفاً اتصال اینترنت و DNS شکن/VPN خود را بررسی فرمایید.' +
+      '<div class="mt-1 small text-muted" dir="ltr">Network Error: ' + escapeHtml(msg) + '</div>'
+    );
+  }
+
+  return 'خطای دریافتی از سرور گوگل: <div class="mt-1 small" dir="ltr"><code>' + escapeHtml(msg) + '</code></div>';
+}
+
+// استعلام زنده لیست مدل‌های فعال حساب کاربر از سرور گوگل (ModelService.ListModels)
+async function discoverAccountModelsFromGoogle(apiKey) {
+  var cleanKey = (apiKey || '').trim();
+  if (!cleanKey) return [];
+
+  var endpoints = [
+    'https://generativelanguage.googleapis.com/v1beta/models?pageSize=100&key=' + encodeURIComponent(cleanKey),
+    'https://generativelanguage.googleapis.com/v1/models?pageSize=100&key=' + encodeURIComponent(cleanKey)
+  ];
+
+  for (var e = 0; e < endpoints.length; e++) {
+    try {
+      var resp = await fetch(endpoints[e], {
+        method: 'GET',
+        headers: { 'x-goog-api-key': cleanKey }
+      });
+
+      if (!resp.ok) {
+        resp = await fetch(endpoints[e], { method: 'GET' });
+      }
+
+      if (resp.ok) {
+        var data = await resp.json();
+        if (data && Array.isArray(data.models) && data.models.length > 0) {
+          var discovered = [];
+          for (var i = 0; i < data.models.length; i++) {
+            var m = data.models[i];
+            var methods = m.supportedGenerationMethods || [];
+            var rawName = m.name || '';
+            var shortId = rawName.replace(/^models\//, '');
+
+            if (
+              methods.indexOf('generateContent') !== -1 &&
+              shortId.indexOf('embedding') === -1 &&
+              shortId.indexOf('aqa') === -1 &&
+              shortId.indexOf('imagen') === -1 &&
+              shortId.indexOf('veo') === -1 &&
+              shortId.indexOf('tts') === -1 &&
+              shortId.indexOf('audio') === -1
+            ) {
+              var niceTitle = m.displayName ? (m.displayName + ' [' + shortId + ']') : shortId;
+              discovered.push({
+                id: shortId,
+                label: niceTitle
+              });
+            }
+          }
+
+          if (discovered.length > 0) {
+            discovered.sort(function (a, b) {
+              function getScore(id) {
+                if (id === 'gemini-2.5-flash') return 100;
+                if (id.indexOf('gemini-2.5-flash') === 0 && id.indexOf('lite') === -1) return 95;
+                if (id === 'gemini-2.5-pro') return 90;
+                if (id.indexOf('gemini-2.5-pro') === 0) return 85;
+                if (id.indexOf('gemini-2.5') === 0) return 80;
+                if (id === 'gemini-2.0-flash') return 75;
+                if (id.indexOf('gemini-2.0-flash') === 0) return 70;
+                if (id.indexOf('gemini-3') === 0) return 68;
+                if (id.indexOf('gemini-1.5-pro') === 0) return 60;
+                if (id.indexOf('gemini-1.5-flash') === 0) return 55;
+                if (id.indexOf('gemini-') === 0) return 50;
+                return 10;
+              }
+              return getScore(b.id) - getScore(a.id);
+            });
+
+            GEMINI_AVAILABLE_MODELS = discovered;
+            var selEl = document.getElementById('gemini-model-select');
+            if (selEl) {
+              populateModelSelectOptions(selEl, GEMINI_AVAILABLE_MODELS, getStoredGeminiModel());
+            }
+            return discovered;
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('ListModels attempt failed for ' + endpoints[e], err);
+    }
+  }
+  return [];
+}
+
+// ارسال درخواست به یک مدل مشخص در هر دو نسخه v1beta و v1
+async function callGeminiModelEndpoint(apiKey, modelName, payload) {
+  var cleanKey = (apiKey || '').trim();
+  var cleanModel = (modelName || 'gemini-2.5-flash').replace(/^models\//, '');
+
+  var apiVersions = ['v1beta', 'v1'];
+  var lastStatus = 0;
+  var lastErrMsg = '';
+
+  for (var v = 0; v < apiVersions.length; v++) {
+    var ver = apiVersions[v];
+    var baseUrl =
+      'https://generativelanguage.googleapis.com/' +
+      ver +
+      '/models/' +
+      encodeURIComponent(cleanModel) +
+      ':generateContent';
+
+    var requestPayload = payload;
+    if (ver === 'v1' && payload && (payload.systemInstruction || (payload.generationConfig && payload.generationConfig.responseMimeType))) {
+      requestPayload = JSON.parse(JSON.stringify(payload));
+      if (requestPayload.systemInstruction) {
+        var sysText = requestPayload.systemInstruction.parts?.[0]?.text || '';
+        if (sysText && requestPayload.contents && requestPayload.contents.length > 0) {
+          requestPayload.contents[0].parts.unshift({ text: sysText + '\n\n' });
+        }
+        delete requestPayload.systemInstruction;
+      }
+      if (requestPayload.generationConfig && requestPayload.generationConfig.responseMimeType) {
+        delete requestPayload.generationConfig.responseMimeType;
+      }
+    }
+
+    try {
+      var resp = await fetch(baseUrl + '?key=' + encodeURIComponent(cleanKey), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': cleanKey,
+        },
+        body: JSON.stringify(requestPayload),
+      });
+
+      if (resp.ok) {
+        return { ok: true, data: await resp.json(), status: 200, usedVersion: ver };
+      }
+
+      var errData = await resp.json().catch(function () { return {}; });
+      var rawMsg = (errData && errData.error && errData.error.message) ? errData.error.message : ('HTTP ' + resp.status);
+      lastStatus = resp.status;
+      lastErrMsg = rawMsg;
+
+      if (resp.status !== 404 && !/not found/i.test(rawMsg)) {
+        return { ok: false, status: resp.status, errorMessage: rawMsg };
+      }
+    } catch (netErr) {
+      try {
+        var respSimple = await fetch(baseUrl + '?key=' + encodeURIComponent(cleanKey), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestPayload),
+        });
+        if (respSimple.ok) {
+          return { ok: true, data: await respSimple.json(), status: 200, usedVersion: ver };
+        }
+        var errDataS = await respSimple.json().catch(function () { return {}; });
+        lastStatus = respSimple.status;
+        lastErrMsg = (errDataS && errDataS.error && errDataS.error.message) ? errDataS.error.message : ('HTTP ' + respSimple.status);
+      } catch (innerErr) {
+        lastStatus = 0;
+        lastErrMsg = innerErr.message || String(innerErr);
+      }
+    }
+  }
+
+  return { ok: false, status: lastStatus, errorMessage: lastErrMsg };
+}
+
+// ارسال هوشمند درخواست به گوگل با Fallback خودکار
+async function fetchDirectGeminiWithFallback(apiKey, payload, preferredModel) {
+  if (GEMINI_AVAILABLE_MODELS.length <= 3) {
+    await discoverAccountModelsFromGoogle(apiKey);
+  }
+
+  var primaryModel = (preferredModel || getStoredGeminiModel() || 'gemini-2.5-flash').replace(/^models\//, '');
+  var candidateModels = [primaryModel];
+
+  for (var i = 0; i < GEMINI_AVAILABLE_MODELS.length; i++) {
+    var mId = GEMINI_AVAILABLE_MODELS[i].id;
+    if (candidateModels.indexOf(mId) === -1) {
+      candidateModels.push(mId);
+    }
+  }
+
+  var primaryError = null;
+
+  for (var idx = 0; idx < candidateModels.length; idx++) {
+    var modelToTry = candidateModels[idx];
+    var res = await callGeminiModelEndpoint(apiKey, modelToTry, payload);
+
+    if (res.ok) {
+      return {
+        ok: true,
+        data: res.data,
+        usedModel: modelToTry,
+      };
+    }
+
+    if (idx === 0) {
+      primaryError = new Error(translateGeminiErrorToPersian(res.errorMessage, res.status));
+    }
+
+    if (
+      (res.status === 400 && /API_KEY_INVALID|key not valid/i.test(res.errorMessage)) ||
+      (res.status === 403 && /location is not supported/i.test(res.errorMessage))
+    ) {
+      break;
+    }
+  }
+
+  throw primaryError || new Error('هیچ‌یک از مدل‌های Gemini پاسخگو نبودند.');
+}
+
+// مدیریت کلید اختصاصی کاربر در حافظه محلی
+function getStoredGeminiApiKey() {
+  try {
+    return (localStorage.getItem('nezam_gemini_api_key') || '').trim();
+  } catch (e) {
+    return '';
+  }
+}
+
+function setStoredGeminiApiKey(key) {
+  try {
+    if (key && key.trim()) {
+      localStorage.setItem('nezam_gemini_api_key', key.trim());
+    } else {
+      localStorage.removeItem('nezam_gemini_api_key');
+    }
+  } catch (e) {}
+}
+
+window.toggleGeminiKeyVisibility = function () {
+  var inp = document.getElementById('gemini-custom-api-key');
+  if (!inp) return;
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+};
+
+window.saveCustomGeminiKey = async function () {
+  var inp = document.getElementById('gemini-custom-api-key');
+  if (!inp) return;
+  var key = inp.value.trim();
+  if (!key) {
+    alert('لطفاً ابتدا کلید اختصاصی Gemini API خود را در کادر وارد نمایید.');
+    return;
+  }
+  setStoredGeminiApiKey(key);
+  if (typeof showToastMsg === 'function') {
+    showToastMsg('⏳ در حال استعلام مدل‌های فعال حساب شما از سرور گوگل...');
+  }
+  await testCustomGeminiKey();
+};
+
+window.clearCustomGeminiKey = function () {
+  if (!confirm('آیا از حذف کلید ذخیره‌شده Gemini API اطمینان دارید؟')) return;
+  setStoredGeminiApiKey('');
+  var inp = document.getElementById('gemini-custom-api-key');
+  if (inp) inp.value = '';
+  var fb = document.getElementById('gemini-key-feedback');
+  if (fb) fb.style.display = 'none';
+  checkAiServerStatus();
+  if (typeof showToastMsg === 'function') {
+    showToastMsg('کلید Gemini پاک شد.');
+  }
+};
+
+window.testCustomGeminiKey = async function () {
+  ensureGeminiModelSelectorUI();
+  var key = getStoredGeminiApiKey();
+  var inp = document.getElementById('gemini-custom-api-key');
+  if (inp && inp.value.trim()) {
+    key = inp.value.trim();
+  }
+
+  var fb = document.getElementById('gemini-key-feedback');
+  var pill = document.getElementById('gemini-key-status-pill');
+
+  if (!key) {
+    if (fb) {
+      fb.className = 'small mt-2 alert alert-warning py-1 px-2';
+      fb.style.display = 'block';
+      fb.innerHTML = '⚠️ هنوز کلیدی وارد نشده است. لطفاً کلید دریافتی از Google AI Studio را درج نمایید.';
+    }
+    return false;
+  }
+
+  if (fb) {
+    fb.className = 'small mt-2 alert alert-info py-1 px-2';
+    fb.style.display = 'block';
+    fb.innerHTML = '⏳ در حال فراخوانی <code>ModelService.ListModels</code> و دریافت لیست مدل‌های مجاز کلید شما...';
+  }
+
+  var directErrorMsg = '';
+
+  try {
+    var discoveredList = await discoverAccountModelsFromGoogle(key);
+
+    var selEl = document.getElementById('gemini-model-select');
+    var selectedModel = (selEl && selEl.value) ? selEl.value : getStoredGeminiModel();
+
+    if (fb) {
+      fb.innerHTML = '⏳ در حال تست ارسال پیام با مدل <code>' + escapeHtml(selectedModel) + '</code>...';
+    }
+
+    var testResult = await fetchDirectGeminiWithFallback(
+      key,
+      {
+        contents: [{ parts: [{ text: 'سلام' }] }],
+        generationConfig: { maxOutputTokens: 5 },
+      },
+      selectedModel
+    );
+
+    if (testResult && testResult.ok) {
+      setStoredGeminiApiKey(key);
+      var activeModel = testResult.usedModel || selectedModel;
+      setStoredGeminiModel(activeModel);
+      if (selEl) selEl.value = activeModel;
+
+      var countText = discoveredList.length > 0 ? (' و ' + discoveredList.length + ' مدل رسمی در منو بارگذاری شد') : '';
+
+      if (fb) {
+        fb.className = 'small mt-2 alert alert-success py-2 px-3 fw-bold';
+        fb.style.display = 'block';
+        fb.innerHTML =
+          '✅ اتصال به Google Gemini API با موفقیت برقرار شد! (مدل فعال: <code>' +
+          escapeHtml(activeModel) +
+          '</code>' +
+          countText +
+          ').';
+      }
+      if (pill) {
+        pill.className = 'badge bg-success p-2';
+        pill.innerHTML = '🟢 متصل (' + escapeHtml(activeModel) + ')';
+      }
+      aiOnlineStatus.isOnline = true;
+      aiOnlineStatus.userKeyActive = true;
+      aiOnlineStatus.model = activeModel;
+      updateAiBadgeStatus(true);
+      syncOcrUploadControlsUI();
+      return true;
+    }
+  } catch (directErr) {
+    directErrorMsg = directErr.message || String(directErr);
+    console.warn('Direct Google API test error:', directErr);
+  }
+
+  if (fb) {
+    fb.className = 'small mt-2 alert alert-danger py-2 px-3';
+    fb.style.display = 'block';
+    fb.innerHTML = '❌ <b>عدم برقراری ارتباط با Gemini API:</b><br>' + (directErrorMsg || 'ارتباط با سرور گوگل برقرار نشد.');
+  }
+  if (pill) {
+    pill.className = 'badge bg-danger p-2';
+    pill.innerHTML = '🔴 خطا در اتصال کلید';
+  }
+  aiOnlineStatus.isOnline = false;
+  updateAiBadgeStatus(false);
+  return false;
+};
+
+window.addEventListener('DOMContentLoaded', function () {
+  ensureGeminiModelSelectorUI();
+  checkAiServerStatus();
+});
+
+// بررسی مداوم برای اطمینان از وجود منوی انتخاب مدل و تنظیم فرمت‌های آپلود در تب‌های پویا
+setInterval(function () {
+  if (!document.getElementById('gemini-model-select')) {
+    ensureGeminiModelSelectorUI();
+  }
+  syncOcrUploadControlsUI();
+}, 2000);
+
+// بررسی خودکار در دسترس بودن سرور آنلاین و کلید جمینای
+async function checkAiServerStatus() {
+  ensureGeminiModelSelectorUI();
+  var userKey = getStoredGeminiApiKey();
+  var currentModel = getStoredGeminiModel();
+  aiOnlineStatus.model = currentModel;
+
+  var inp = document.getElementById('gemini-custom-api-key');
+  if (inp && userKey && !inp.value) {
+    inp.value = userKey;
+  }
+
+  var pill = document.getElementById('gemini-key-status-pill');
+
+  if (userKey) {
+    aiOnlineStatus.isOnline = true;
+    aiOnlineStatus.userKeyActive = true;
+    if (pill) {
+      pill.className = 'badge bg-success p-2';
+      pill.innerHTML = '🟢 کلید اختصاصی فعال است (' + escapeHtml(currentModel) + ')';
+    }
+    updateAiBadgeStatus(true);
+    discoverAccountModelsFromGoogle(userKey).then(function (models) {
+      if (models && models.length > 0) {
+        updateAiBadgeStatus(true);
+      }
+    });
+    return;
+  }
+
+  if (isStaticHostEnvironment()) {
+    aiOnlineStatus.isOnline = false;
+    if (pill) {
+      pill.className = 'badge bg-warning text-dark p-2';
+      pill.innerHTML = '🟡 کلید تنظیم نشده';
+    }
+    updateAiBadgeStatus(false);
+    return;
+  }
+
+  try {
+    var controller = new AbortController();
+    var timeoutId = setTimeout(function () {
+      controller.abort();
+    }, 3000);
+
+    var headers = { 'x-gemini-model': currentModel };
+    if (userKey) headers['x-gemini-api-key'] = userKey;
+
+    var res = await fetch('/api/ai/status', {
+      signal: controller.signal,
+      headers: headers,
+    });
+    clearTimeout(timeoutId);
+
+    if (res.ok) {
+      var data = await res.json();
+      aiOnlineStatus.isOnline = Boolean(data.online && (data.hasApiKey || data.hasServerKey));
+      aiOnlineStatus.model = getStoredGeminiModel() || data.model || 'gemini-2.5-flash';
+      aiOnlineStatus.searchGrounding = Boolean(data.searchGrounding);
+      aiOnlineStatus.checked = true;
+
+      var selEl = document.getElementById('gemini-model-select');
+      if (selEl) selEl.value = aiOnlineStatus.model;
+
+      if (pill) {
+        if (userKey) {
+          pill.className = 'badge bg-success p-2';
+          pill.innerHTML = '🟢 کلید اختصاصی متصل است (' + escapeHtml(aiOnlineStatus.model) + ')';
+        } else if (data.hasServerKey) {
+          pill.className = 'badge bg-primary p-2';
+          pill.innerHTML = '🌐 متصل از طریق سرور مرکز (' + escapeHtml(aiOnlineStatus.model) + ')';
+        } else {
+          pill.className = 'badge bg-warning text-dark p-2';
+          pill.innerHTML = '🟡 کلید تنظیم نشده (آماده درج)';
+        }
+      }
+      updateAiBadgeStatus(aiOnlineStatus.isOnline);
+    } else {
+      aiOnlineStatus.isOnline = false;
+      updateAiBadgeStatus(false);
+    }
+  } catch (e) {
+    aiOnlineStatus.isOnline = false;
+    updateAiBadgeStatus(false);
+  }
+}
+
+function updateAiBadgeStatus(online) {
+  var badge = document.getElementById('ai-connection-badge');
+  var statusDesc = document.getElementById('ai-online-status-desc');
+  var modeTag = document.getElementById('ai-chat-mode-tag');
+
+  var hasCustomKey = Boolean(getStoredGeminiApiKey());
+  var activeModel = aiOnlineStatus.model || getStoredGeminiModel();
+
+  if (badge) {
+    if (online) {
+      badge.className = 'badge bg-success px-3 py-2 shadow-sm';
+      badge.innerHTML = hasCustomKey
+        ? '🟢 هوش مصنوعی آنلاین متصل (' + escapeHtml(activeModel) + ')'
+        : '🌐 هوش مصنوعی آنلاین متصل (سرور مرکز ۶۳۶ - ' + escapeHtml(activeModel) + ')';
+    } else {
+      badge.className = 'badge bg-warning text-dark px-3 py-2 shadow-sm';
+      badge.innerHTML = '🟡 موتور هوشمند آفلاین فعال (آماده بدون نیاز به اینترنت)';
+    }
+  }
+
+  if (statusDesc) {
+    if (online) {
+      statusDesc.className = 'alert alert-success small mb-3 border-success';
+      statusDesc.innerHTML =
+        '✨ <b>هوش مصنوعی پیشرفته آنلاین متصل است:</b> مدل <code>' +
+        escapeHtml(getModelDisplayLabel(activeModel)) +
+        '</code> ' +
+        (hasCustomKey ? 'با <b>کلید اختصاصی شما</b> ' : 'از طریق سرور مرکز ۶۳۶ ') +
+        'فعال است. پشتیبانی کامل از خوانش تصویر، <b>PDF، KML/KMZ، GPX و اتوکد (DXF/DWG)</b> با استخراج چپ‌به‌راست مختصات <code>X,Y,Z,Zone</code>.';
+    } else {
+      statusDesc.className = 'alert alert-info small mb-3';
+      statusDesc.innerHTML =
+        '💡 <b>موتور هوشمند محلی (آفلاین):</b> استخراج نقاط از فایل‌های KML، KMZ، GPX، DXF و متن به صورت ۱۰۰٪ آفلاین با فرمت چپ‌به‌راست <code>X,Y,Z,39</code> فعال است. برای تحلیل تصویری و PDF، کلید Gemini API را وارد نمایید.';
+    }
+  }
+
+  if (modeTag) {
+    modeTag.className = online ? 'badge bg-success' : 'badge bg-secondary';
+    modeTag.innerText = online
+      ? (hasCustomKey ? 'آنلاین (' + activeModel + ')' : 'آنلاین (سرور مرکز)')
+      : 'پاسخگوی آفلاین';
+  }
+}
+
+// پایگاه دانش قوانین محلی مرکز ۶۳۶ (پشتیبان آفلاین)
+var AI_KNOWLEDGE_BASE = [
+  {
+    keywords: ['گلخانه', 'صیفی', 'سبزی', 'سازه', 'اسپانیایی'],
+    answer:
+      'احداث گلخانه سبزی و صیفی در شهرستان خفر:\n• حداقل زمین مورد نیاز: ۳۰۰۰ متر مربع (سازه مفید حداقل ۱۰۰۰ متر مربع)\n• استعلام‌های الزامی: امور آب (تأمین ۵۰۰۰ لیتر آب در شبانه‌روز در هکتار)، شرکت گاز یا نفت، جهاد کشاورزی و محیط زیست.',
+  },
+  {
+    keywords: ['قارچ', 'کمپوست'],
+    answer:
+      'پرورش قارچ خوراکی دکمه‌ای:\n• حداقل ظرفیت مجاز صدور پروانه: ۵۰ تن در سال\n• نیاز آبی: ۵۰۰ لیتر در شبانه‌روز\n• مدارک مورد نیاز: سند مالکیت یا اجاره‌نامه رسمی، کروکی UTM عرصه، آزمایش آب و تأییدیه نظام مهندسی.',
+  },
+  {
+    keywords: ['گوسفند', 'بره', 'پرواری', 'داشتی'],
+    answer:
+      'دامپروری گوسفند و بره در خفر:\n• حداقل ظرفیت پرواربندی: ۱۰۰ رأس | حداقل مساحت زمین: ۱۲۰۰ متر مربع\n• گوسفند داشتی: حداقل ۵۰ رأس | زمین مورد نیاز: ۱۰۰۰ متر مربع\n• فواصل قانونی: رعایت حداقل حریم ۵۰۰ متری از مرز روستا و مراکز مسکونی طبق دستورالعمل نظام دامپروری.',
+  },
+  {
+    keywords: ['گاو', 'شیری', 'گوساله'],
+    answer:
+      'گاوداری شیری و پرواری:\n• حداقل ظرفیت گوساله پرواری: ۵۰ رأس\n• حداقل ظرفیت گاو شیری: ۲۰ رأس مولد\n• الزامات: رعایت حریم راه، تأمین آب شرب استاندارد، حریم زیست‌محیطی و اخذ استعلام دامپزشکی.',
+  },
+  {
+    keywords: ['مرغ', 'مرغداری', 'طیور', 'گوشتی', 'تخمگذار'],
+    answer:
+      'مرغداری گوشتی و تخم‌گذار:\n• حداقل ظرفیت گوشتی: ۲۰,۰۰۰ قطعه در دوره\n• حداقل مساحت عرصه: ۵۰۰۰ متر مربع\n• فواصل بهداشتی: حداقل ۱۰۰۰ متر از مرغداری‌های هم‌نوع و ۲۰۰۰ متر از کانون‌های جمعیتی و مزارع مرغ مادر.',
+  },
+  {
+    keywords: ['داروخانه', 'گیاهپزشکی', 'سموم', 'کلینیک'],
+    answer:
+      'تأسیس داروخانه و کلینیک گیاهپزشکی در خفر:\n• شرایط متقاضی: کارشناس یا کارشناس ارشد گیاهپزشکی عضو سازمان نظام مهندسی با رتبه معتبر\n• چک‌لیست: فرم ۱۸ بندی بازرسی، سند یا اجاره‌نامه با کاربری تجاری/خدماتی، تهویه استاندارد، کپسول آتش‌نشانی و انبار ایمن سموم.',
+  },
+  {
+    keywords: ['کروکی', 'utm', 'جی پی اس', 'ابعاد', 'زون'],
+    answer:
+      'ضوابط کروکی UTM مرکز ۶۳۶ خفر:\n• زون غالب شهرستان خفر: Zone 39R در نیمکره شمالی (بیضوی WGS84)\n• فرمت استاندارد نقاط: X,Y,Z,Zone (مثال چپ‌به‌راست: 645120,3198450,1150,39)\n• شیت چاپی کروکی به صورت خودکار در ۲ برگ تفکیک می‌شود.',
+  },
+];
+
+// موتور آفلاین استخراج اطلاعات با عبارات باقاعده (همراه با فرمت X,Y,Z,Zone چپ‌به‌راست)
+function localOfflineExtractFields(rawText) {
+  var clean = toEnglishDigits(rawText);
+  var result = {
+    name: '',
+    nid: '',
+    mobile: '',
+    loc: 'فارس/ خفر/ مرکزی',
+    land: '1000',
+    count: 1000,
+    mainGroup: 'GREENHOUSE_MUSHROOM',
+    actType: 'greenhouse_veg',
+    utm: '',
+  };
+
+  var nidMatch = clean.match(/(?:کد\s*ملی|ملی|شناسه)[:\s]*(\d{10,11})/) || clean.match(/\b(\d{10})\b/);
+  if (nidMatch) result.nid = nidMatch[1];
+
+  var phoneMatch = clean.match(/(09\d{9})/);
+  if (phoneMatch) result.mobile = phoneMatch[1];
+
+  var nameMatch = rawText.match(/(?:متقاضی|نام\s*و\s*نام\s*خانوادگی|نام|آقای|خانم|شرکت)[:\s]*([^\n،,\d]{3,35})/);
+  if (nameMatch) result.name = nameMatch[1].trim();
+
+  var landMatch = clean.match(/(?:مساحت|عرصه|متراژ|زمین)[:\s]*([0-9.,]+)/);
+  if (landMatch) result.land = landMatch[1].replace(/,/g, '');
+
+  if (/دام|گوسفند|بز|گاو|طیور|مرغ|شیلات|ماهی/.test(rawText)) {
+    result.mainGroup = 'LIVESTOCK_POULTRY_FISHERIES';
+    if (/گوسفند|بز/.test(rawText)) result.actType = 'sheep_high';
+    else if (/گاو|گوساله/.test(rawText)) result.actType = 'cattle_dairy';
+    else if (/مرغ|طیور/.test(rawText)) result.actType = 'broiler';
+    else if (/ماهی|شیلات/.test(rawText)) result.actType = 'fish_cold';
+  } else if (/کلینیک|داروخانه|گیاهپزشکی|سموم/.test(rawText)) {
+    result.mainGroup = 'CLINIC_PHARMACY';
+    result.actType = /داروخانه/.test(rawText) ? 'pharmacy_center' : 'clinic_center';
+  } else {
+    result.mainGroup = 'GREENHOUSE_MUSHROOM';
+    if (/قارچ/.test(rawText)) result.actType = 'mushroom_button';
+    else if (/گل|زینتی/.test(rawText)) result.actType = 'greenhouse_flower';
+    else result.actType = 'greenhouse_veg';
+  }
+
+  // استخراج و نرمال‌سازی مختصات UTM با فرمت چپ‌به‌راست: X,Y,Z,Zone (پیش‌فرض 39)
+  var formattedUtm = formatUtmCoordinatesLTR(clean, 39);
+  if (formattedUtm) {
+    result.utm = formattedUtm;
+  }
+
+  return result;
 }
 
 // نمایش وضعیت فایل غیرتصویری (PDF, KML, KMZ, GPX, CAD) در کادر پیش‌نمایش
