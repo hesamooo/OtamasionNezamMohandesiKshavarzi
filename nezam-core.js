@@ -1596,7 +1596,7 @@ function renderActiveCaseDocsChecklist() {
 
   if (!c) {
     tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger py-3 fw-bold">ابتدا یک متقاضی را انتخاب نمایید.</td></tr>';
-    banner.innerHTML = "";
+    banner.textContent = "";
     return;
   }
 
@@ -1606,39 +1606,73 @@ function renderActiveCaseDocsChecklist() {
   var sp = ACT_SPECS[c.actType] || ACT_SPECS.sheep_high;
   var reqDocs = DOC_CHECKLISTS[sp.docGroup || "LIVESTOCK"] || DOC_CHECKLISTS.LIVESTOCK;
 
+  if (!tbody.dataset.secureDocActionsBound) {
+    tbody.dataset.secureDocActionsBound = "1";
+    tbody.addEventListener("change", function (event) {
+      var input = event.target.closest('input[data-doc-action="upload"]');
+      if (!input || !tbody.contains(input)) return;
+      var code = input.getAttribute("data-doc-code");
+      var title = input.getAttribute("data-doc-title");
+      if (!code || !title) return;
+      var current = getActiveCase();
+      if (!current) return;
+      var currentSpec = ACT_SPECS[current.actType] || ACT_SPECS.sheep_high;
+      var allowedDocs = DOC_CHECKLISTS[currentSpec.docGroup || "LIVESTOCK"] || DOC_CHECKLISTS.LIVESTOCK;
+      if (!allowedDocs.some(function (doc) { return doc && String(doc.code) === code; })) return;
+      uploadCaseDocFile(event, code, title);
+    });
+    tbody.addEventListener("click", function (event) {
+      var btn = event.target.closest("button[data-doc-action]");
+      if (!btn || !tbody.contains(btn)) return;
+      var code = btn.getAttribute("data-doc-code");
+      var action = btn.getAttribute("data-doc-action");
+      var current = getActiveCase();
+      if (!current || !code) return;
+      var currentSpec = ACT_SPECS[current.actType] || ACT_SPECS.sheep_high;
+      var allowedDocs = DOC_CHECKLISTS[currentSpec.docGroup || "LIVESTOCK"] || DOC_CHECKLISTS.LIVESTOCK;
+      if (!allowedDocs.some(function (doc) { return doc && String(doc.code) === code; })) return;
+      if (action === "download") downloadCaseDocFile(code);
+      else if (action === "remove" && confirm("آیا از حذف فایل این مدرک اطمینان دارید؟")) removeCaseDocFile(code);
+    });
+  }
+
   getUploadedDocsForCase(c.id, function(upMap) {
+    // جلوگیری از نمایش اطلاعات پرونده قبلی در صورت تغییر متقاضی هنگام خواندن IndexedDB
+    if (!getActiveCase() || String(getActiveCase().id) !== String(c.id)) return;
     var missing = [];
     var rows = "";
     var doneCount = 0;
 
     for (var i = 0; i < reqDocs.length; i++) {
-      var d = reqDocs[i];
+      var d = reqDocs[i] || {};
+      var safeCode = escapeHtmlCore(d.code);
+      var safeTitle = escapeHtmlCore(d.title);
       var up = upMap[d.code];
       if (up) doneCount++; else missing.push(d.title);
 
       rows += '<tr class="' + (up ? 'table-success' : '') + '">' +
-        '<td class="text-center fw-bold">' + toFa(i + 1) + '</td>' +
-        '<td><b>' + d.title + '</b>' + (d.legalRef ? '<br><small class="text-primary">⚖️ مستند قانونی: ' + d.legalRef + '</small>' : '') + '</td>' +
-        '<td>' + (up ? '<span class="badge bg-success">✅ تحویل و بارگذاری شد (' + toFa(up.uploadDate) + ')</span><br><small>' + up.fileName + '</small>' : '<span class="badge bg-danger">❌ مدرک ناقص (تحویل نشده)</span>') + '</td>' +
+        '<td class="text-center fw-bold">' + escapeHtmlCore(toFa(i + 1)) + '</td>' +
+        '<td><b>' + safeTitle + '</b>' + (d.legalRef ? '<br><small class="text-primary">⚖️ مستند قانونی: ' + escapeHtmlCore(d.legalRef) + '</small>' : '') + '</td>' +
+        '<td>' + (up ? '<span class="badge bg-success">✅ تحویل و بارگذاری شد (' + escapeHtmlCore(toFa(up.uploadDate)) + ')</span><br><small>' + escapeHtmlCore(up.fileName) + '</small>' : '<span class="badge bg-danger">❌ مدرک ناقص (تحویل نشده)</span>') + '</td>' +
         '<td><div class="d-flex gap-1">' +
-          '<label class="btn btn-sm btn-primary fw-bold m-0" style="cursor:pointer;">📤 بارگذاری فایل<input type="file" onchange="uploadCaseDocFile(event,\'' + d.code + '\',\'' + d.title + '\')" hidden></label>' +
-          (up ? '<button class="btn btn-sm btn-success fw-bold" onclick="downloadCaseDocFile(\'' + d.code + '\')">👁️ مشاهده</button><button class="btn btn-sm btn-outline-danger" onclick="removeCaseDocFile(\'' + d.code + '\')">🗑️</button>' : '') +
+          '<label class="btn btn-sm btn-primary fw-bold m-0" style="cursor:pointer;">📤 بارگذاری فایل<input type="file" data-doc-action="upload" data-doc-code="' + safeCode + '" data-doc-title="' + safeTitle + '" hidden></label>' +
+          (up ? '<button type="button" class="btn btn-sm btn-success fw-bold" data-doc-action="download" data-doc-code="' + safeCode + '">👁️ مشاهده</button><button type="button" class="btn btn-sm btn-outline-danger" data-doc-action="remove" data-doc-code="' + safeCode + '">🗑️</button>' : '') +
         '</div></td></tr>';
     }
-    tbody.innerHTML = rows;
+    tbody.innerHTML = rows || '<tr><td colspan="4" class="text-center py-3 text-muted">چک‌لیست مدرک برای این فعالیت تعریف نشده است.</td></tr>';
 
     if (missing.length === 0) {
       banner.className = "alert alert-success fw-bold mb-3";
-      banner.innerHTML = "🎉 پرونده «" + c.name + "» کامل است و تمامی " + toFa(reqDocs.length) + " مدرک قانونی بارگذاری شده‌اند.";
+      banner.textContent = "🎉 پرونده «" + String(c.name || "") + "» کامل است و تمامی " + toFa(reqDocs.length) + " مدرک قانونی بارگذاری شده‌اند.";
     } else {
       var badges = "";
       for (var m = 0; m < missing.length; m++) {
-        badges += '<span class="badge bg-danger me-1 mb-1 p-2">❗ ' + toFa(m + 1) + '. ' + missing[m] + '</span>';
+        badges += '<span class="badge bg-danger me-1 mb-1 p-2">❗ ' + escapeHtmlCore(toFa(m + 1)) + '. ' + escapeHtmlCore(missing[m]) + '</span>';
       }
       banner.className = "p-3 rounded-3 border border-2 border-danger bg-danger-subtle mb-3";
       banner.innerHTML =
         '<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">' +
-          '<b class="text-danger">⚠️ اعلام هوشمند نقص مدارک پرونده «' + c.name + '»: (' + toFa(doneCount) + ' از ' + toFa(reqDocs.length) + ' مدرک کامل — ' + toFa(missing.length) + ' مدرک ناقص)</b>' +
+          '<b class="text-danger">⚠️ اعلام هوشمند نقص مدارک پرونده «' + escapeHtmlCore(c.name) + '»: (' + escapeHtmlCore(toFa(doneCount)) + ' از ' + escapeHtmlCore(toFa(reqDocs.length)) + ' مدرک کامل — ' + escapeHtmlCore(toFa(missing.length)) + ' مدرک ناقص)</b>' +
           '<button type="button" class="btn btn-sm btn-danger fw-bold" onclick="issueDeficiencyLetterForActiveCase()">🖨️ چاپ نامه ابلاغ نواقص روی سربرگ ۶۳۶</button>' +
         '</div>' +
         '<div>' + badges + '</div>';
