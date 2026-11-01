@@ -745,7 +745,6 @@ async function discoverAccountModelsFromGoogle(apiKey) {
                 if (id.indexOf('gemini-') === 0) return 50;
                 return 10;
               }
-              }
               return getScore(b.id) - getScore(a.id);
             });
 
