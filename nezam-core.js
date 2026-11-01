@@ -1523,7 +1523,6 @@ function uploadCaseDocFile(event, docCode, docTitle) {
   var active = requireActiveCase("بارگذاری فایل مدرک در پرونده");
   if (!active) { input.value = ""; return; }
 
-  // از بارگذاری HTML، SVG، اسکریپت و فایل اجرایی جلوگیری شود.
   var extensionMatch = String(file.name || "").toLowerCase().match(/\.([a-z0-9]+)$/);
   var extension = extensionMatch ? extensionMatch[1] : "";
   var allowedTypes = {
@@ -1546,55 +1545,80 @@ function uploadCaseDocFile(event, docCode, docTitle) {
     return;
   }
 
-  var reader = new FileReader();
-  reader.onerror = function () {
-    alert("خواندن فایل ناموفق بود. فایل را دوباره انتخاب کنید.");
+  // بررسی امضای ابتدایی فایل؛ پسوند به‌تنهایی قابل جعل است.
+  var signatureReader = new FileReader();
+  signatureReader.onerror = function () {
+    alert("بررسی نوع واقعی فایل ناموفق بود.");
     input.value = "";
   };
-  reader.onload = function(e) {
-    // از ثبت ناقص فایل در صورت تغییر پرونده یا خطای خواندن جلوگیری می‌شود.
-    if (!e.target || typeof e.target.result !== "string" || e.target.result.indexOf("data:") !== 0) {
-      alert("محتوای فایل معتبر نیست.");
+  signatureReader.onload = function(signatureEvent) {
+    var bytes = new Uint8Array(signatureEvent.target.result || new ArrayBuffer(0));
+    var validSignature = false;
+    if (extension === "pdf") {
+      validSignature = bytes.length >= 5 && bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46 && bytes[4] === 0x2d;
+    } else if (extension === "jpg" || extension === "jpeg") {
+      validSignature = bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+    } else if (extension === "png") {
+      validSignature = bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47 && bytes[4] === 0x0d && bytes[5] === 0x0a && bytes[6] === 0x1a && bytes[7] === 0x0a;
+    } else if (extension === "webp") {
+      validSignature = bytes.length >= 12 && bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 && bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50;
+    }
+    if (!validSignature) {
+      alert("محتوای واقعی فایل با پسوند انتخاب‌شده مطابقت ندارد.");
       input.value = "";
       return;
     }
-    openFilesDB(function(db) {
-      if (!db) {
-        alert("مخزن امن فایل‌های مرورگر در دسترس نیست.");
+
+    var reader = new FileReader();
+    reader.onerror = function () {
+      alert("خواندن فایل ناموفق بود. فایل را دوباره انتخاب کنید.");
+      input.value = "";
+    };
+    reader.onload = function(e) {
+      if (!e.target || typeof e.target.result !== "string" || e.target.result.indexOf("data:") !== 0) {
+        alert("محتوای فایل معتبر نیست.");
         input.value = "";
         return;
       }
-      try {
-        var tx = db.transaction(["docs"], "readwrite");
-        tx.objectStore("docs").put({
-          key: active.id + "__" + docCode,
-          caseId: active.id,
-          docCode: docCode,
-          docTitle: docTitle,
-          fileName: String(file.name || "document." + extension).replace(/[\\/:*?"<>|\u0000-\u001f]/g, "_").slice(0, 140),
-          uploadDate: todayShamsi(),
-          dataUrl: e.target.result,
-          rawBlob: file
-        });
-        tx.oncomplete = function() {
-          logCaseAction(active, "بارگذاری مدرک «" + docTitle + "» (" + file.name + ")");
-          saveAllDB();
-          renderActiveCaseDocsChecklist();
-          showToastMsg("فایل «" + docTitle + "» در پرونده «" + active.name + "» ذخیره شد.");
+      openFilesDB(function(db) {
+        if (!db) {
+          alert("مخزن فایل‌های مرورگر در دسترس نیست.");
           input.value = "";
-        };
-        tx.onerror = function() {
-          alert("ذخیره فایل در مرورگر ناموفق بود. فضای ذخیره‌سازی را بررسی کنید.");
+          return;
+        }
+        try {
+          var tx = db.transaction(["docs"], "readwrite");
+          tx.objectStore("docs").put({
+            key: active.id + "__" + docCode,
+            caseId: active.id,
+            docCode: docCode,
+            docTitle: docTitle,
+            fileName: String(file.name || "document." + extension).replace(/[\\/:*?"<>|\u0000-\u001f]/g, "_").slice(0, 140),
+            uploadDate: todayShamsi(),
+            dataUrl: e.target.result,
+            rawBlob: file
+          });
+          tx.oncomplete = function() {
+            logCaseAction(active, "بارگذاری مدرک «" + docTitle + "» (" + file.name + ")");
+            saveAllDB();
+            renderActiveCaseDocsChecklist();
+            showToastMsg("فایل «" + docTitle + "» در پرونده «" + active.name + "» ذخیره شد.");
+            input.value = "";
+          };
+          tx.onerror = function() {
+            alert("ذخیره فایل در مرورگر ناموفق بود. فضای ذخیره‌سازی را بررسی کنید.");
+            input.value = "";
+          };
+        } catch (storageError) {
+          console.error("Document storage failed:", storageError);
+          alert("ذخیره فایل انجام نشد؛ احتمالاً فضای کافی در مرورگر وجود ندارد.");
           input.value = "";
-        };
-      } catch (storageError) {
-        console.error("Document storage failed:", storageError);
-        alert("ذخیره فایل انجام نشد؛ احتمالاً فضای کافی در مرورگر وجود ندارد.");
-        input.value = "";
-      }
-    });
+        }
+      });
+    };
+    reader.readAsDataURL(file);
   };
-  reader.readAsDataURL(file);
+  signatureReader.readAsArrayBuffer(file.slice(0, 12));
 }
 
 function downloadCaseDocFile(docCode) {
