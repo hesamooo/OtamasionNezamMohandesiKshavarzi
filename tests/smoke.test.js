@@ -140,6 +140,8 @@ test('standalone Windows export keeps script order and matches the BAT filename'
   assert.match(builder, /bundledCount !== bundledNames\.length/);
   assert.match(builder, /Nezam636_Windows_Offline\.html/);
   assert.match(bat, /Nezam636_Windows_Offline\.html/);
+  assert.match(builder, /activeCaseId:\s*typeof activeCaseId/);
+  assert.match(builder, /snap\.activeCaseId/);
 });
 
 test('page does not request font files that are absent from the repository', () => {
