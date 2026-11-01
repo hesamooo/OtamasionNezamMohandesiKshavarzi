@@ -308,151 +308,129 @@ function calculateUtmPolygonAreaSqm(pointsList) {
   return Math.round(Math.abs(area) / 2.0);
 }
 
-// استانداردسازی و فرمت‌بندی هرگونه متن مختصات UTM به فرمت چپ‌به‌راست: X,Y,Z,Zone
+// نرمال‌ساز مقاوم مختصات UTM و جغرافیایی (ورودی متن، JSON، آرایه و آبجکت)
 function formatUtmCoordinatesLTR(rawInput, defaultZone) {
-  var zoneDefault = defaultZone || 39;
-  if (!rawInput) return '';
-
-  // اگر آرایه‌ای از آبجکت‌های {x,y,z,zone} باشد
-  if (Array.isArray(rawInput)) {
-    var arrLines = [];
-    var prevKey = '';
-    for (var i = 0; i < rawInput.length; i++) {
-      var pt = rawInput[i];
-      if (!pt || isNaN(pt.x) || isNaN(pt.y)) continue;
-      var xVal = Math.round(parseFloat(pt.x) * 100) / 100;
-      var yVal = Math.round(parseFloat(pt.y) * 100) / 100;
-      var zVal = (pt.z !== undefined && pt.z !== null && !isNaN(parseFloat(pt.z)))
-        ? Math.round(parseFloat(pt.z) * 100) / 100
-        : 0;
-      var znVal = pt.zone ? String(pt.zone).replace(/[^\d]/g, '') || zoneDefault : zoneDefault;
-
-      var dedupKey = xVal.toFixed(2) + '_' + yVal.toFixed(2);
-      if (dedupKey === prevKey) continue;
-      prevKey = dedupKey;
-
-      arrLines.push(xVal + ',' + yVal + ',' + zVal + ',' + znVal);
-    }
-    // حذف نقطه آخر در صورتی که دقیقاً منطبق بر نقطه شروع پلی‌گون بسته باشد
-    if (arrLines.length > 3 && arrLines[0].split(',').slice(0, 2).join(',') === arrLines[arrLines.length - 1].split(',').slice(0, 2).join(',')) {
-      arrLines.pop();
-    }
-    return arrLines.join('\n');
+  var zoneDefault=parseInt(String(defaultZone||39).replace(/[^0-9]/g,''),10)||39;
+  var output=[],seen={};
+  function num(v){if(v===null||v===undefined||v==='')return NaN;var s=toEnglishDigits(String(v)).replace(/[٫]/g,'.').replace(/[−–—]/g,'-').trim();var n=Number(s);return isFinite(n)?n:NaN;}
+  function addUtm(x,y,elev,zone){
+    x=num(x);y=num(y);if(isNaN(x)||isNaN(y))return false;
+    if(x>=2000000&&x<=5000000&&y>=100000&&y<=900000){var sw=x;x=y;y=sw;}
+    if(x<100000||x>900000||y<2000000||y>5000000)return false;
+    var z=num(elev);if(isNaN(z)||z< -500||z>10000)z=0;
+    var zn=parseInt(String(zone===undefined||zone===null||zone===''?zoneDefault:zone).replace(/[^0-9]/g,''),10);
+    if(!zn||zn<1||zn>60)zn=zoneDefault;
+    x=Math.round(x*100)/100;y=Math.round(y*100)/100;z=Math.round(z*100)/100;
+    var key=x.toFixed(2)+'_'+y.toFixed(2);if(seen[key])return true;
+    seen[key]=true;output.push(x+','+y+','+z+','+zn);return true;
   }
-
-  // اگر رشته متنی باشد
-  var cleanStr = toEnglishDigits(String(rawInput))
-    .replace(/[\u200E\u200F\u202A-\u202E]/g, '')
-    .replace(/;/g, '\n');
-
-  // تشخیص زون کلی در صورت ذکر شدن در متن (مثلاً Zone 39 یا 39R یا 40)
-  var detectedZone = zoneDefault;
-  var zoneMatch = cleanStr.match(/(?:zone|زون)\s*[:=]?\s*(38|39|40|41)/i) || cleanStr.match(/\b(38|39|40)\s*[RNrn]\b/);
-  if (zoneMatch) {
-    detectedZone = parseInt(zoneMatch[1], 10);
+  function addGeo(lat,lon,elev,zone,globalAllowed){
+    lat=num(lat);lon=num(lon);if(isNaN(lat)||isNaN(lon)||Math.abs(lat)>90||Math.abs(lon)>180)return false;
+    if(!globalAllowed){var local=(lat>=20&&lat<=42&&lon>=44&&lon<=64)||(lon>=20&&lon<=42&&lat>=44&&lat<=64);if(!local)return false;}
+    if(lat>=44&&lat<=64&&lon>=20&&lon<=42){var sw=lat;lat=lon;lon=sw;}
+    var forced=parseInt(String(zone||'').replace(/[^0-9]/g,''),10)||undefined;
+    var converted=wgs84LatLonToUtm(lat,lon,elev,forced);
+    return converted?addUtm(converted.x,converted.y,converted.z,converted.zone||zoneDefault):false;
   }
-
-  var rawLines = cleanStr.split(/\r?\n/);
-  var formattedLines = [];
-
-  for (var l = 0; l < rawLines.length; l++) {
-    var line = rawLines[l].trim();
-    if (!line) continue;
-
-    // حذف شماره‌گذاری ابتدای خط مثل "1:" یا "P1-"
-    line = line.replace(/^(?:p|pt|point|نقطه|ردیف)?\s*\d+\s*[-:.)]\s*/i, '');
-
-    // استخراج تمام اعداد (صحیح یا اعشاری) در خط
-    var nums = line.match(/\d+(?:\.\d+)?/g);
-    if (!nums || nums.length < 2) continue;
-
-    var x = null;
-    var y = null;
-    var z = 0;
-    var zn = detectedZone;
-
-    var n0 = parseFloat(nums[0]);
-    var n1 = parseFloat(nums[1]);
-
-    // حالت ۱: مختصات UTM استاندارد (X شش رقمی، Y هفت رقمی)
-    if (n0 >= 100000 && n0 <= 900000 && n1 >= 2000000 && n1 <= 5000000) {
-      x = n0;
-      y = n1;
-      if (nums.length >= 3) {
-        var n2 = parseFloat(nums[2]);
-        if (nums.length === 3 && (n2 === 38 || n2 === 39 || n2 === 40 || n2 === 41)) {
-          // اگر عدد سوم دقیقاً شماره زون باشد و عدد چهارمی نباشد، ارتفاع 0 و زون n2
-          z = 0;
-          zn = n2;
-        } else {
-          z = n2;
-          if (nums.length >= 4) {
-            var n3 = parseInt(nums[3], 10);
-            if (n3 >= 1 && n3 <= 60) zn = n3;
-          }
-        }
-      }
+  function pick(obj,keys){
+    if(!obj||typeof obj!=='object')return undefined;var names=Object.keys(obj);
+    for(var i=0;i<keys.length;i++)for(var j=0;j<names.length;j++)
+      if(names[j].toLowerCase()===keys[i].toLowerCase()&&obj[names[j]]!==''&&obj[names[j]]!==null&&obj[names[j]]!==undefined)return obj[names[j]];
+    return undefined;
+  }
+  function processTuple(a){
+    if(!a||a.length<2)return false;
+    var x=num(a[0]),y=num(a[1]);if(isNaN(x)||isNaN(y))return false;
+    if(a.length>=4){
+      var c=num(a[2]),d=num(a[3]);
+      var looksLikeSecondPoint=((c>=100000&&c<=900000&&d>=2000000&&d<=5000000)||(d>=100000&&d<=900000&&c>=2000000&&c<=5000000));
+      if(looksLikeSecondPoint){var any=false;for(var q=0;q+1<a.length;q+=2)any=addUtm(a[q],a[q+1],0,zoneDefault)||any;return any;}
     }
-    // حالت ۲: جای X و Y برعکس نوشته شده باشد (اول Y هفت رقمی، بعد X شش رقمی)
-    else if (n1 >= 100000 && n1 <= 900000 && n0 >= 2000000 && n0 <= 5000000) {
-      x = n1;
-      y = n0;
-      if (nums.length >= 3) {
-        var n2b = parseFloat(nums[2]);
-        if (nums.length === 3 && (n2b === 38 || n2b === 39 || n2b === 40 || n2b === 41)) {
-          z = 0;
-          zn = n2b;
-        } else {
-          z = n2b;
-          if (nums.length >= 4) {
-            var n3b = parseInt(nums[3], 10);
-            if (n3b >= 1 && n3b <= 60) zn = n3b;
-          }
-        }
-      }
+    if(addUtm(x,y,a[2],a[3]))return true;
+    if((x>=20&&x<=42&&y>=44&&y<=64)||(y>=20&&y<=42&&x>=44&&x<=64))return addGeo(x,y,a[2],a[3],false);
+    return false;
+  }
+  function processObject(obj,depth){
+    if(!obj||depth>5)return;
+    if(Array.isArray(obj)){
+      if(obj.length>=2&&!Array.isArray(obj[0])&&typeof obj[0]!=='object')processTuple(obj);
+      else for(var i=0;i<obj.length;i++)processObject(obj[i],depth+1);
+      return;
     }
-    // حالت ۳: مختصات جغرافیایی Lat/Lon در خط نوشته شده باشد (مثلاً 28.95, 53.21)
-    else if (n0 >= 20 && n0 <= 42 && n1 >= 44 && n1 <= 64) {
-      var conv1 = wgs84LatLonToUtm(n0, n1, nums[2] ? parseFloat(nums[2]) : 0);
-      if (conv1) {
-        x = conv1.x;
-        y = conv1.y;
-        z = conv1.z;
-        zn = conv1.zone;
+    if(typeof obj!=='object'){if(typeof obj==='string')processText(obj);return;}
+    var x=pick(obj,['x','easting','utmEasting','utm_x','east']),y=pick(obj,['y','northing','utmNorthing','utm_y','north']);
+    var z=pick(obj,['z','elevation','altitude','height','elev']),zone=pick(obj,['zone','utmZone','utm_zone']);
+    if(x!==undefined&&y!==undefined&&addUtm(x,y,z,zone))return;
+    var lat=pick(obj,['latitude','lat']),lon=pick(obj,['longitude','lon','lng','long']);
+    if(lat!==undefined&&lon!==undefined&&addGeo(lat,lon,z,zone,true))return;
+    var nestedKeys=['utmCoordinates','utm_coordinates','utm','utmPoints','utm_points','geographicCoordinates','geographic_coordinates','geoCoordinates','latLon','latLng','coordinates','points','vertices','items','data'];
+    for(var k=0;k<nestedKeys.length;k++){var nested=pick(obj,[nestedKeys[k]]);if(nested!==undefined)processObject(nested,depth+1);}
+  }
+  function processText(text){
+    var clean=toEnglishDigits(String(text||'')).replace(/[\u200E\u200F\u202A-\u202E]/g,'').replace(/[٫]/g,'.').replace(/[−–—]/g,'-').replace(/[؛]/g,';');
+    var rows=clean.split(/[\r\n;]+/);
+    for(var r=0;r<rows.length;r++){
+      var line=rows[r].trim();if(!line)continue;
+      var zm=line.match(/(?:zone|زون)\s*[:=]?\s*(\d{1,2})\s*[RrNnSs]?/i)||line.match(/\b(38|39|40|41)\s*[RrNn]\b/i);
+      var lineZone=zm?parseInt(zm[1],10):zoneDefault;
+      var geoLabel=/latitude|longitude|\blat\b|\blon\b|\blng\b|عرض\s*جغرافیایی|طول\s*جغرافیایی|مختصات\s*جغرافیایی|gps/i.test(line);
+      var tokens=line.match(/-?\d+(?:\.\d+)?/g);if(!tokens||tokens.length<2)continue;
+      // تمام جفت‌های عددی سطر بررسی می‌شوند؛ شماره ردیف و برچسب‌های قبل از مختصات نادیده گرفته می‌شوند.
+      for(var i=0;i<tokens.length-1;i++){
+        var a=num(tokens[i]),b=num(tokens[i+1]);if(isNaN(a)||isNaN(b))continue;
+        var extra=tokens[i+2]!==undefined?num(tokens[i+2]):NaN,next=tokens[i+3]!==undefined?num(tokens[i+3]):NaN;
+        var elev=0,zone=lineZone;
+        if(!isNaN(extra)){if(extra>=1&&extra<=60&&(isNaN(next)||next<1||next>60))zone=extra;else if(extra>=-500&&extra<=10000){elev=extra;if(!isNaN(next)&&next>=1&&next<=60)zone=next;}}
+        var ok=false;
+        if((a>=100000&&a<=900000&&b>=2000000&&b<=5000000)||(b>=100000&&b<=900000&&a>=2000000&&a<=5000000))ok=addUtm(a,b,elev,zone);
+        else if((a>=20&&a<=42&&b>=44&&b<=64)||(b>=20&&b<=42&&a>=44&&a<=64)||(geoLabel&&Math.abs(a)<=90&&Math.abs(b)<=180))ok=addGeo(a,b,elev,geoLabel?lineZone:undefined,geoLabel);
+        if(ok)i++;
       }
-    } else if (n1 >= 20 && n1 <= 42 && n0 >= 44 && n0 <= 64) {
-      var conv2 = wgs84LatLonToUtm(n1, n0, nums[2] ? parseFloat(nums[2]) : 0);
-      if (conv2) {
-        x = conv2.x;
-        y = conv2.y;
-        z = conv2.z;
-        zn = conv2.zone;
-      }
-    }
-
-    if (x !== null && y !== null) {
-      formattedLines.push(x + ',' + y + ',' + z + ',' + zn);
     }
   }
+  if(!rawInput)return '';
+  if(typeof rawInput==='string'){
+    var trimmed=rawInput.trim();
+    if((trimmed.charAt(0)==='['&&trimmed.charAt(trimmed.length-1)===']')||(trimmed.charAt(0)==='{'&&trimmed.charAt(trimmed.length-1)==='}')){
+      try{processObject(JSON.parse(trimmed),0);}catch(e){processText(rawInput);}
+    }else processText(rawInput);
+  }else processObject(rawInput,0);
+  if(output.length>3){var first=output[0].split(','),last=output[output.length-1].split(',');if(first[0]===last[0]&&first[1]===last[1])output.pop();}
+  return output.join('\n');
+}
 
-  // اگر خطوط با regex خط‌به‌خط پیدا نشدند، کل متن را برای جفت‌های (X, Y) اسکن کن
-  if (formattedLines.length === 0) {
-    var globalRegex = /([1-9]\d{5}(?:\.\d+)?)\s*[,،\s\t/-]+\s*([2-4]\d{6}(?:\.\d+)?)(?:\s*[,،\s\t/-]+\s*(\d{1,4}(?:\.\d+)?))?(?:\s*[,،\s\t/-]+\s*(38|39|40|41))?/g;
-    var m;
-    while ((m = globalRegex.exec(cleanStr)) !== null) {
-      var gx = m[1];
-      var gy = m[2];
-      var gz = m[3] !== undefined ? m[3] : '0';
-      var gzn = m[4] !== undefined ? m[4] : String(detectedZone);
-      if (m[4] === undefined && (gz === '38' || gz === '39' || gz === '40')) {
-        gzn = gz;
-        gz = '0';
-      }
-      formattedLines.push(gx + ',' + gy + ',' + gz + ',' + gzn);
-    }
-  }
+// نام‌های جایگزین فیلدهای مدل و تبدیل Lat/Lon به UTM برای جدول مختصات
+function normalizeAiCoordinateData(data,fallbackText){
+  if(typeof data==='string'){try{data=JSON.parse(data);}catch(e){data={fullSummary:data};}}
+  data=data&&typeof data==='object'?data:{};
+  function pick(obj,keys){if(!obj||typeof obj!=='object')return undefined;var names=Object.keys(obj);for(var i=0;i<keys.length;i++)for(var j=0;j<names.length;j++)if(names[j].toLowerCase()===keys[i].toLowerCase()&&obj[names[j]]!==''&&obj[names[j]]!==null&&obj[names[j]]!==undefined)return obj[names[j]];return undefined;}
+  var utmKeys=['utmCoordinates','utm_coordinates','utm','utmPoints','utm_points','projectedCoordinates','projected_coordinates','eastingNorthing'];
+  var genericKeys=['coordinates','points','vertices','locationCoordinates'];
+  var geoKeys=['geographicCoordinates','geographic_coordinates','geoCoordinates','geo_coordinates','latLon','latLng','gpsCoordinates'];
+  var normalized='',candidate;
+  for(var i=0;i<utmKeys.length&&!normalized;i++){candidate=pick(data,[utmKeys[i]]);if(candidate!==undefined)normalized=formatUtmCoordinatesLTR(candidate,39);}
+  for(var j=0;j<genericKeys.length&&!normalized;j++){candidate=pick(data,[genericKeys[j]]);if(candidate!==undefined)normalized=formatUtmCoordinatesLTR(candidate,39);}
+  var geoPayload;for(var g=0;g<geoKeys.length&&!geoPayload;g++)geoPayload=pick(data,[geoKeys[g]]);
+  var lat=pick(data,['latitude','lat']),lon=pick(data,['longitude','lon','lng','long']);
+  if(!normalized&&geoPayload!==undefined)normalized=formatUtmCoordinatesLTR(geoPayload,39);
+  if(!normalized&&lat!==undefined&&lon!==undefined)normalized=formatUtmCoordinatesLTR([{latitude:lat,longitude:lon,elevation:pick(data,['elevation','altitude','height']),zone:pick(data,['zone','utmZone'])}],39);
+  var fallback=fallbackText||pick(data,['fullSummary','description','rawText','text'])||'';
+  if(!normalized&&fallback)normalized=formatUtmCoordinatesLTR(fallback,39);
+  var geoText='';
+  if(typeof geoPayload==='string')geoText=toEnglishDigits(geoPayload).trim();
+  else if(Array.isArray(geoPayload))geoText=geoPayload.map(function(pt){if(Array.isArray(pt))return pt.join(', ');if(pt&&typeof pt==='object'){var a=pick(pt,['latitude','lat']),b=pick(pt,['longitude','lon','lng','long']);return a!==undefined&&b!==undefined?String(a)+', '+String(b):JSON.stringify(pt);}return String(pt);}).join('\n');
+  else if(geoPayload&&typeof geoPayload==='object')geoText=JSON.stringify(geoPayload);
+  else if(lat!==undefined&&lon!==undefined)geoText=String(lat)+', '+String(lon);
+  return{utm:normalized,geographicText:geoText};
+}
 
-  return formattedLines.join('\n');
+function parseAiJsonResponse(responseText){
+  var source=String(responseText||'').trim();
+  var cleaned=source.replace(/^\s*```(?:json)?\s*/i,'').replace(/\s*```\s*$/i,'').trim();
+  try{return JSON.parse(cleaned);}catch(e){}
+  var first=cleaned.indexOf('{'),last=cleaned.lastIndexOf('}');
+  if(first>=0&&last>first){try{return JSON.parse(cleaned.slice(first,last+1));}catch(e2){}}
+  return{fullSummary:source,rawText:source};
 }
 
 /* ==========================================================================
@@ -1500,17 +1478,18 @@ async function aiReadDocumentImagePro() {
           : aiPendingImageBase64;
 
       var prompt =
-        'شما کارشناس نظام مهندسی کشاورزی خفر هستید. مشخصات این سند یا نقشه را به صورت JSON معتبر با کلیدهای زیر استخراج کن:\n' +
-        'applicantName, nationalId, phoneNumber, planTitle, mainGroup (یکی از GREENHOUSE_MUSHROOM یا LIVESTOCK_POULTRY_FISHERIES یا CLINIC_PHARMACY), actType, landArea, capacity, location, utmCoordinates, fullSummary.\n' +
-        'قانون بسیار مهم برای utmCoordinates:\n' +
-        'نقاط مختصات UTM را حتماً با ارقام انگلیسی و از چپ به راست در قالب X,Y,Z,Zone (هر نقطه در یک خط جداگانه) برگردان که در آن:\n' +
-        '- X: طول جغرافیایی متریک ۶ رقمی (Easting)\n' +
-        '- Y: عرض جغرافیایی متریک ۷ رقمی (Northing)\n' +
-        '- Z: ارتفاع از سطح دریا (اگر در سند ارتفاع نوشته نشده بود عدد 0 بگذار)\n' +
-        '- Zone: زون UTM (اگر در سند قید نشده بود عدد 39 بگذار).\n' +
-        'مثال فرمت هر خط utmCoordinates:\n' +
-        '645120.5,3198450.2,1150,39';
-
+        'شما کارشناس رسمی نقشه‌برداری و تشکیل پرونده مرکز خدمات کشاورزی ۶۳۶ خفر هستید. از تصویر یا سند، اطلاعات را به صورت JSON معتبر استخراج کن.\n' +
+        'کلیدها: applicantName, nationalId, phoneNumber, planTitle, mainGroup, actType, landArea, capacity, location, utmCoordinates, geographicCoordinates, latitude, longitude, fullSummary.\n' +
+        'قواعد قطعی مختصات:\n' +
+        '۱) تمام ردیف‌های جدول مختصات و تمام رأس‌های قابل مشاهده را به ترتیب سند استخراج کن؛ هیچ نقطه‌ای را حذف یا جابه‌جا نکن.\n' +
+        '۲) مختصات UTM را در utmCoordinates به شکل رشته متنی، هر نقطه یک خط، قالب X,Y,Z,Zone، ارقام انگلیسی و جداکننده کاما برگردان. X=Easting و Y=Northing است.\n' +
+        '۳) مختصات جغرافیایی را نیز در geographicCoordinates با قالب Latitude,Longitude,Altitude، هر نقطه یک خط برگردان و نقطه اول را در latitude و longitude هم قرار بده.\n' +
+        '۴) اگر سند فقط مختصات جغرافیایی دارد، آن‌ها را حفظ کن و مختصات UTM معادل را نیز در utmCoordinates تبدیل کن؛ زون خفر معمولاً 39 است.\n' +
+        '۵) اگر هر دو نوع مختصات درج شده‌اند، هر دو را عیناً استخراج کن. اگر مختصات وجود ندارد رشته خالی بده و هرگز مختصات را حدس نزن.\n' +
+        '۶) شماره ردیف، کد ملی، شماره نامه، تاریخ، ارتفاع و شماره زون را با X/Y یا Latitude/Longitude اشتباه نگیر.\n' +
+        'نمونه UTM: 702150.25,3208450.50,1285,39\n' +
+        'نمونه جغرافیایی: 28.971200,53.204500,1285\n' +
+        'برای چند نقطه، هر نقطه را در خط جداگانه بنویس.';
       var directOcrResult = await fetchDirectGeminiWithFallback(
         userKey,
         {
@@ -1529,9 +1508,13 @@ async function aiReadDocumentImagePro() {
 
       if (directOcrResult && directOcrResult.ok) {
         var dResult = directOcrResult.data;
-        var rawJson = dResult.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
-        rawJson = rawJson.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
-        var parsed = JSON.parse(rawJson);
+        var responseParts = (dResult.candidates && dResult.candidates[0] &&
+          dResult.candidates[0].content && Array.isArray(dResult.candidates[0].content.parts))
+          ? dResult.candidates[0].content.parts : [];
+        var rawJson = responseParts.map(function (part) {
+          return part && typeof part.text === 'string' ? part.text : '';
+        }).filter(Boolean).join('\n');
+        var parsed = parseAiJsonResponse(rawJson);
         aiOnlineStatus.model = directOcrResult.usedModel || selectedModel;
         applyOcrDataToCase(parsed, rawTextEl);
         updateAiBadgeStatus(true);
@@ -1618,7 +1601,8 @@ function setUtmFieldValueAndSync(field, value) {
 
 // تابع کمکی درج مشخصات استخراج‌شده در پرونده (با تضمین فرمت چپ‌به‌راست X,Y,Z,39 برای نقاط UTM)
 function applyOcrDataToCase(d, rawTextEl) {
-  var normalizedUtm = formatUtmCoordinatesLTR(d.utmCoordinates || '', 39);
+  var coordinateData = normalizeAiCoordinateData(d, rawTextEl ? rawTextEl.value : '');
+  var normalizedUtm = coordinateData.utm;
 
   if (rawTextEl) {
     // افزودن کاراکتر Left-To-Right Mark (\u200E) در ابتدای هر خط UTM برای نمایش صحیح از چپ به راست در کادر فارسی
@@ -1637,6 +1621,7 @@ function applyOcrDataToCase(d, rawTextEl) {
       '📋 موضوع طرح: ' + (d.planTitle || '-') + '\n' +
       '📐 مساحت: ' + (d.landArea || '-') + ' مترمربع\n' +
       '📍 موقعیت: ' + (d.location || '-') + '\n' +
+      (coordinateData.geographicText ? '🌐 مختصات جغرافیایی (Latitude,Longitude):\n' + coordinateData.geographicText + '\n' : '') +
       '🗺️ نقاط مختصات UTM (فرمت چپ‌به‌راست: X,Y,Z,Zone):\n' +
       ltrDisplayUtm +
       '\n' +
@@ -1721,10 +1706,13 @@ function aiExtractFromRawText() {
 function aiRunFullAutopilotPipeline() {
   aiExtractFromRawText();
   setTimeout(function () {
+    if (typeof window.syncCaseTextareaToPointsTable === 'function') {
+      window.syncCaseTextareaToPointsTable();
+    }
     if (typeof saveActiveCaseChanges === 'function') {
       saveActiveCaseChanges(true);
     }
-  }, 200);
+  }, 350);
 }
 
 // چت‌بات آنلاین با پشتیبانی از کلیدهای AQ. و AIza و تمامی مدل‌های Gemini
