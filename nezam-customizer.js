@@ -638,19 +638,18 @@ function buildAllSelectedFeaturesUtmTableHTML(c, utmRaw, isNatRes) {
     if (m && Array.isArray(m.layers)) {
       for (var li = 0; li < m.layers.length; li++) {
         var lyr = m.layers[li];
-        if (lyr && lyr.visible && Array.isArray(lyr.points) && lyr.points.length > 0) {
-          layersToRender.push(lyr);
-        }
+        if (lyr && lyr.visible && Array.isArray(lyr.points) && lyr.points.length > 0) layersToRender.push(lyr);
       }
     }
   }
 
-  // اگر کروکی چندلایه با عوارض فعال وجود دارد، هم زمین اصلی و هم سایر عوارض انتخاب‌شده را درج کن
   if (layersToRender.length > 0) {
     var tableRows = "";
     var globalRowIdx = 1;
     for (var k = 0; k < layersToRender.length; k++) {
       var l = layersToRender[k];
+      var safeLayerName = safeHtmlText(l.name);
+      var safeLayerColor = safeHexColor(l.color, "#15803d");
       var g = computeUtmGeometry(l.points, l.geomType);
       var metricSummary = l.geomType === "POLYGON"
         ? ("مساحت: " + toFa(Math.round(g.area)) + " مترمربع (" + toFa(g.ha.toFixed(2)) + " هکتار)")
@@ -658,22 +657,23 @@ function buildAllSelectedFeaturesUtmTableHTML(c, utmRaw, isNatRes) {
 
       tableRows += '<tr style="background:#eef6f0;font-weight:800;">' +
         '<td colspan="6" style="text-align:right;padding:1.2mm 3mm;">' +
-          '<span style="display:inline-block;width:9px;height:9px;background:' + (l.color || '#15803d') + ';margin-left:5px;border-radius:2px;"></span>' +
-          l.name + ' — <span style="color:#15803d;">' + metricSummary + '</span>' +
+          '<span style="display:inline-block;width:9px;height:9px;background:' + safeLayerColor + ';margin-left:5px;border-radius:2px;"></span>' +
+          safeLayerName + ' — <span style="color:#15803d;">' + safeHtmlText(metricSummary) + '</span>' +
         '</td>' +
       '</tr>';
 
       for (var p = 0; p < l.points.length; p++) {
-        var pt = l.points[p];
+        var pt = l.points[p] || {};
         var ptElev = (pt.elev !== undefined && pt.elev !== "") ? pt.elev : 1285;
         var ptZone = pt.zone || mapDefaultZone || "39R";
+        var ptLabel = safeHtmlText(pt.label || ("P" + (p + 1)));
         tableRows += '<tr>' +
-          '<td>' + toFa(globalRowIdx++) + '</td>' +
-          '<td>' + l.name + ' (' + (pt.label || ("P" + (p + 1))) + ')</td>' +
-          '<td>' + toFa(pt.x) + '</td>' +
-          '<td>' + toFa(pt.y) + '</td>' +
-          '<td>' + toFa(ptElev) + '</td>' +
-          '<td>' + toFa(ptZone) + '</td>' +
+          '<td>' + safeHtmlText(toFa(globalRowIdx++)) + '</td>' +
+          '<td>' + safeLayerName + ' (' + ptLabel + ')</td>' +
+          '<td>' + safeHtmlText(toFa(pt.x)) + '</td>' +
+          '<td>' + safeHtmlText(toFa(pt.y)) + '</td>' +
+          '<td>' + safeHtmlText(toFa(ptElev)) + '</td>' +
+          '<td>' + safeHtmlText(toFa(ptZone)) + '</td>' +
         '</tr>';
       }
     }
@@ -691,15 +691,18 @@ function buildAllSelectedFeaturesUtmTableHTML(c, utmRaw, isNatRes) {
     '</table>';
   }
 
-  // حالت جایگزین در صورت ثبت صرفاً متن خام UTM
-  var lines = (utmRaw || "").trim().split("\n");
+  // در حالت متن خام، فقط مقادیر عددی معتبر به جدول راه پیدا می‌کنند.
+  var lines = String(utmRaw || "").trim().split("\n");
   var rowsHtml = "";
   for (var i = 0; i < lines.length; i++) {
     var p = lines[i].trim().split(/[,،\s\t]+/);
-    if (p[0] && p[1]) {
-      var elevVal = p[2] || "1285";
-      var zoneVal = p[3] || mapDefaultZone || "39R";
-      rowsHtml += "<tr><td>" + toFa(i + 1) + "</td><td>محدوده اصلی زمین (P" + toFa(i + 1) + ")</td><td>" + toFa(p[0]) + "</td><td>" + toFa(p[1]) + "</td><td>" + toFa(elevVal) + "</td><td>" + toFa(zoneVal) + "</td></tr>";
+    var x = Number(toEn(p[0]));
+    var y = Number(toEn(p[1]));
+    if (p[0] && p[1] && Number.isFinite(x) && Number.isFinite(y)) {
+      var elevVal = Number(toEn(p[2] || "1285"));
+      if (!Number.isFinite(elevVal)) elevVal = 1285;
+      var zoneVal = /^\d{1,2}[C-HJ-NP-X]$/i.test(p[3] || "") ? p[3] : mapDefaultZone;
+      rowsHtml += "<tr><td>" + safeHtmlText(toFa(i + 1)) + "</td><td>محدوده اصلی زمین (P" + safeHtmlText(toFa(i + 1)) + ")</td><td>" + safeHtmlText(toFa(x)) + "</td><td>" + safeHtmlText(toFa(y)) + "</td><td>" + safeHtmlText(toFa(elevVal)) + "</td><td>" + safeHtmlText(toFa(zoneVal)) + "</td></tr>";
     }
   }
   if (!rowsHtml) return "";
