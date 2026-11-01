@@ -282,7 +282,8 @@
       requireCaseConsent();
       var selected = findCase(args.case_id);
       if (!selected) throw new Error('پرونده‌ای با این شناسه پیدا نشد.');
-      return { found: true, case: safeCaseSummary(selected, Boolean(args.include_sensitive)) };
+      var contactRequested = /(کد\s*ملی|کدملی|شماره\s*تماس|شماره\s*تلفن|موبایل|تلفن\s*همراه|شماره\s*همراه)/.test(String(state.currentQuestion || ''));
+      return { found: true, case: safeCaseSummary(selected, Boolean(args.include_sensitive && contactRequested)) };
     }
 
     if (name === 'list_open_tasks') {
@@ -337,7 +338,7 @@
       if (!targetCase) throw new Error('شناسه پرونده در سامانه وجود ندارد.');
       if (typeof window.selectActiveCase !== 'function') throw new Error('امکان انتخاب پرونده در حال حاضر موجود نیست.');
       window.selectActiveCase(targetCase.id);
-      return { success: true, selected_case_id: targetCase.id, applicant: String(targetCase.name || '') };
+      return { success: true, selected_case_id: targetCase.id };
     }
 
     if (name === 'propose_followup_task') {
@@ -571,6 +572,20 @@
         '• نامه‌های ثبت‌شده: ' + overview().total_letters + '\n' +
         '• پیگیری‌های باز: ' + overview().open_tasks;
     }
+    if (/(پیدا کن|جستجو کن|پیدا\s*کن|بگرد)/.test(normalized) && /(پرونده|متقاضی)/.test(normalized)) {
+      var searchTerm = normalized
+        .replace(/پرونده|متقاضی|را|رو|پیدا کن|پیدا\s*کن|جستجو کن|بگرد|در سامانه|لطفا|لطفاً/g, ' ')
+        .replace(/\s+/g, ' ').trim();
+      var localMatches = allCases().filter(function (c) {
+        return normalizeText([c.id, c.code, c.name, c.project, c.loc].join(' ')).indexOf(searchTerm) !== -1;
+      }).slice(0, 10);
+      if (searchTerm && localMatches.length) {
+        return 'نتایج جستجوی محلی (' + localMatches.length + ' مورد):\\n' + localMatches.map(function (c) {
+          return '• ' + (c.name || 'بدون نام') + ' | ' + (c.code || c.id) + ' | ' + (c.project || 'موضوع ثبت نشده');
+        }).join('\\n');
+      }
+      if (searchTerm) return 'در داده‌های محلی، پرونده‌ای مطابق «' + searchTerm + '» پیدا نشد.';
+    }
     if (normalized.indexOf('پرونده فعال') !== -1 || normalized.indexOf('متقاضی فعال') !== -1) {
       var c = activeCase();
       if (!c) return 'در حال حاضر پرونده فعالی انتخاب نشده است.';
@@ -609,6 +624,7 @@
     var question = input.value.trim();
     if (!question) return;
     input.value = '';
+    state.currentQuestion = question;
     addMessage('user', escapeHtml(question));
     state.messages += 1;
 
@@ -688,12 +704,12 @@
         } catch (toolError) {
           toolResult = { error: toolError && toolError.message ? toolError.message : String(toolError) };
         }
-        responseParts.push({
-          functionResponse: {
-            name: call.name,
-            response: { result: toolResult }
-          }
-        });
+        var functionResponse = {
+          name: call.name,
+          response: { result: toolResult }
+        };
+        if (call.id) functionResponse.id = call.id;
+        responseParts.push({ functionResponse: functionResponse });
       }
       state.contents.push({ role: 'user', parts: responseParts });
     }
