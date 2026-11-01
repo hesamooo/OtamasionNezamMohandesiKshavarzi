@@ -67,15 +67,19 @@ async function runGeminiGenerateWithFallback(
   const timeoutMs = options.timeoutMs || 12000;
 
   for (const model of modelChain) {
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
     try {
       const callPromise = aiInstance.models.generateContent({
         model,
         contents: options.contents,
         config: options.config,
       });
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error(`Timeout after ${timeoutMs}ms on model ${model}`)), timeoutMs)
-      );
+      const timeoutPromise = new Promise((_, reject) => {
+        timeoutHandle = setTimeout(
+          () => reject(new Error(`Timeout after ${timeoutMs}ms on model ${model}`)),
+          timeoutMs
+        );
+      });
       const resp = (await Promise.race([callPromise, timeoutPromise])) as any;
       return { resp, modelUsed: model };
     } catch (err: any) {
@@ -83,6 +87,8 @@ async function runGeminiGenerateWithFallback(
       const errMsg = String(err?.message || '');
       console.warn(`Model ${model} issue (${errMsg.slice(0, 80)}), trying next fallback...`);
       continue;
+    } finally {
+      if (timeoutHandle) clearTimeout(timeoutHandle);
     }
   }
   throw lastError;
