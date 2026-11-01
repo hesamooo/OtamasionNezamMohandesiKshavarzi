@@ -1482,7 +1482,7 @@ async function aiReadDocumentImagePro() {
   var selectedModel = getStoredGeminiModel();
   var btn = typeof event !== 'undefined' && event ? event.target : null;
   var originalBtnText = btn ? btn.innerHTML : '';
-  if (btn) btn.innerHTML = '⏳ در حال خوانش با ' + selectedModel + '...';
+  if (btn) btn.innerHTML = '⏳ در حال خوانش با ' + escapeHtml(selectedModel) + '...';
 
   if (typeof showToastMsg === 'function') {
     showToastMsg('⏳ در حال خوانش فایل و استخراج مختصات UTM (X,Y,Z,39) با مدل ' + selectedModel + '...');
