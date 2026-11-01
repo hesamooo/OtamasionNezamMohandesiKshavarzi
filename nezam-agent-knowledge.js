@@ -35,12 +35,16 @@
   }
   function normalizeText(value) {
     return String(value || '').toLowerCase()
-      .replace(/ي/g, 'ی').replace(/ك/g, 'ک')
+      .replace(/[\u064b-\u065f\u0670\u0640]/g, '')
+      .replace(/[يى]/g, 'ی').replace(/ك/g, 'ک')
+      .replace(/[\u200c\u200d\u200e\u200f\u202a-\u202e]/g, ' ')
       .replace(/[۰-۹٠-٩]/g, function (d) {
         var p = '۰۱۲۳۴۵۶۷۸۹'.indexOf(d);
         if (p < 0) p = '٠١٢٣٤٥٦٧٨٩'.indexOf(d);
         return String(p);
-      });
+      })
+      .replace(/[^\u0600-\u06ffa-z0-9]+/g, ' ')
+      .replace(/\s+/g, ' ').trim();
   }
   function openDB() {
     if (dbPromise) return dbPromise;
@@ -432,64 +436,188 @@
     }
   }
 
-  function tokenScore(query, text) {
-    var q = normalizeText(query);
-    var t = normalizeText(text);
-    var words = q.match(/[\u0600-\u06ff]{2,}|[a-z0-9]{2,}/g) || [];
-    var stop = new Set(['برای','چیست','چطور','چگونه','میشه','میشود','کنم','کنید','درباره','مورد','لطفا','لطفاً','میخواهم','میخوام','است','هست','این','آن','چه','کدام','ایا','آیا']);
-    var score = 0;
-    var seen = {};
-    words.forEach(function (word) {
-      if (stop.has(word) || seen[word]) return;
-      seen[word] = true;
-      if (t.indexOf(word) >= 0) score += Math.min(5, word.length * 0.25 + 1);
+  var SEARCH_STOPWORDS = new Set([
+    'برای','چیست','چطور','چگونه','میشه','میشود','کنم','کنید','درباره','مورد','لطفا','لطفاً',
+    'میخواهم','میخوام','است','هست','این','آن','چه','کدام','ایا','آیا','از','به','در','با',
+    'را','و','یا','تا','که','های','ها','یک','هم','همه','شود','شد','کرد','کردن','باشد',
+    'میباشد','هستند','بوده','استفاده','کنید','کنند','باید','میتوان','میتواند'
+  ]);
+  var SEARCH_SYNONYMS = {
+    'مدرک':['اسناد','مستندات','مدارک'],
+    'مدارک':['مدرک','اسناد','مستندات'],
+    'مجوز':['پروانه','موافقت اصولی','اجازه'],
+    'پروانه':['مجوز','موافقت'],
+    'زمین':['اراضی','عرصه','مساحت'],
+    'مساحت':['زمین','عرصه','وسعت'],
+    'آب':['نیاز آبی','مصرف آب','منبع آب'],
+    'مصرف':['نیاز آبی','آببها','آب'],
+    'ظرفیت':['تعداد','راس','قطعه','تولید'],
+    'تعداد':['ظرفیت','راس','قطعه'],
+    'حریم':['فاصله','محدوده','نوار حفاظتی'],
+    'فاصله':['حریم','حدفاصل'],
+    'شرایط':['ضوابط','الزامات','معیارها'],
+    'ضوابط':['شرایط','الزامات','مقررات'],
+    'دامداری':['دامپروری','پرورش دام','واحد دامی'],
+    'گلخانه':['سازه گلخانه','کشت گلخانه ای'],
+    'طیور':['مرغداری','پرورش مرغ','واحد پرورش طیور']
+  };
+  function tokenVariants(token) {
+    var variants = [token];
+    var prefixes = ['نمی','می','بی','نا','هم'];
+    var suffixes = ['هایشان','هایش','هایی','ترین','های','تان','مان','شان','ات','ان','ها','تر','ی','ه'];
+    prefixes.forEach(function (prefix) {
+      if (token.indexOf(prefix) === 0 && token.length > prefix.length + 2) variants.push(token.slice(prefix.length));
     });
-    if (q && t.indexOf(q) >= 0) score += 8;
+    var baseList = variants.slice();
+    baseList.forEach(function (base) {
+      suffixes.forEach(function (suffix) {
+        if (base.length > suffix.length + 2 && base.slice(-suffix.length) === suffix) {
+          variants.push(base.slice(0, -suffix.length));
+        }
+      });
+    });
+    return Array.from(new Set(variants.filter(function (v) { return v.length >= 2; })));
+  }
+  function queryTerms(query) {
+    var words = normalizeText(query).match(/[\u0600-\u06ff]{2,}|[a-z0-9]{2,}/g) || [];
+    var seen = {};
+    return words.filter(function (word) {
+      if (SEARCH_STOPWORDS.has(word) || seen[word]) return false;
+      seen[word] = true;
+      return true;
+    }).slice(0, 40);
+  }
+  function queryVariants(query) {
+    var raw = Array.isArray(query) ? query : [query];
+    var result = [];
+    raw.forEach(function (item) {
+      String(item || '').split(/[؟?!؛;\n]+/).forEach(function (part) {
+        part = part.trim();
+        if (part && result.indexOf(part) < 0) result.push(part);
+      });
+    });
+    return result.slice(0, 5);
+  }
+  function tokenMatch(term, tokens) {
+    var variants = tokenVariants(term);
+    var best = 0;
+    for (var i = 0; i < tokens.length; i++) {
+      var token = tokens[i];
+      for (var j = 0; j < variants.length; j++) {
+        var variant = variants[j];
+        if (token === variant) best = Math.max(best, 3);
+        else if (token.indexOf(variant) === 0 || variant.indexOf(token) === 0) best = Math.max(best, 2);
+      }
+    }
+    return best;
+  }
+  function tokenScore(query, text, metadata) {
+    var q = normalizeText(query);
+    var terms = queryTerms(query);
+    if (!terms.length) return 0;
+    var bodyTokens = normalizeText(text).split(' ');
+    var titleTokens = normalizeText(metadata && metadata.name || '').split(' ');
+    var metaTokens = normalizeText([
+      metadata && metadata.category || '',
+      metadata && metadata.issuer || '',
+      metadata && metadata.description || ''
+    ].join(' ')).split(' ');
+    var matched = 0;
+    var score = 0;
+    terms.forEach(function (term) {
+      var bodyMatch = tokenMatch(term, bodyTokens);
+      var titleMatch = tokenMatch(term, titleTokens);
+      var metaMatch = tokenMatch(term, metaTokens);
+      var synonyms = SEARCH_SYNONYMS[term] || [];
+      synonyms.forEach(function (synonym) {
+        queryTerms(synonym).forEach(function (synTerm) {
+          bodyMatch = Math.max(bodyMatch, tokenMatch(synTerm, bodyTokens) * 0.82);
+          titleMatch = Math.max(titleMatch, tokenMatch(synTerm, titleTokens) * 0.82);
+          metaMatch = Math.max(metaMatch, tokenMatch(synTerm, metaTokens) * 0.82);
+        });
+      });
+      if (bodyMatch || titleMatch || metaMatch) matched++;
+      score += bodyMatch * 1.8 + titleMatch * 2.5 + metaMatch * 1.15;
+    });
+    if (!matched) return 0;
+    score += (matched / terms.length) * 4;
+    if (q.length >= 5 && q.length <= 100 && normalizeText(text).indexOf(q) >= 0) score += 6;
     return score;
   }
   async function search(query, limit) {
     var docs = await getAllDocuments();
+    var queries = queryVariants(query);
     var hits = [];
     docs.forEach(function (doc) {
-      if (!doc || doc.status !== 'indexed' || !Array.isArray(doc.chunks)) return;
-      doc.chunks.forEach(function (chunk, index) {
-        var score = tokenScore(query, (doc.name || '') + ' ' + (doc.category || '') + ' ' + (doc.issuer || '') + ' ' + chunk);
-        if (score > 0) {
+      if (!doc || doc.status !== 'indexed') return;
+      var chunks = Array.isArray(doc.chunks) && doc.chunks.length
+        ? doc.chunks
+        : splitIntoChunks(doc.text || '', 1800, 220);
+      chunks.forEach(function (chunk, index) {
+        var score = 0;
+        queries.forEach(function (q) {
+          score = Math.max(score, tokenScore(q, chunk, doc));
+        });
+        if (score >= 1.5) {
           hits.push({
-            score: score,
-            text: chunk,
-            source: doc.name,
-            category: doc.category,
-            issuer: doc.issuer,
-            effectiveDate: doc.effectiveDate,
+            score: Math.round(score * 100) / 100,
+            text: String(chunk || ''),
+            source: doc.name || 'سند بدون عنوان',
+            category: doc.category || 'عمومی',
+            issuer: doc.issuer || '',
+            effectiveDate: doc.effectiveDate || '',
             chunk: index + 1,
-            id: doc.id
+            id: doc.id,
+            description: doc.description || ''
           });
         }
       });
     });
     hits.sort(function (a, b) { return b.score - a.score; });
-    return hits.slice(0, Math.max(1, Math.min(Number(limit) || 5, 12)));
+    var perSource = {};
+    var diversified = [];
+    hits.forEach(function (hit) {
+      var count = perSource[hit.id] || 0;
+      if (count >= 4) return;
+      perSource[hit.id] = count + 1;
+      diversified.push(hit);
+    });
+    return diversified.slice(0, Math.max(1, Math.min(Number(limit) || 8, 20)));
   }
   async function buildContext(query, maxChars) {
-    var hits = await search(query, 8);
-    var max = Math.max(1000, Math.min(Number(maxChars) || 9000, 16000));
+    var hits = await search(query, 12);
+    var max = Math.max(1500, Math.min(Number(maxChars) || 12000, 22000));
     var used = 0;
     var out = [];
+    var sourceMap = {};
+    var sources = [];
     hits.forEach(function (hit) {
       if (used >= max) return;
-      var text = hit.text.slice(0, Math.max(0, max - used));
-      if (!text) return;
-      var label = '[منبع: ' + hit.source + ' | دسته: ' + hit.category +
+      var textPart = hit.text.slice(0, Math.max(0, max - used - 220));
+      if (!textPart) return;
+      if (!sourceMap[hit.id]) {
+        var ref = 'S' + (sources.length + 1);
+        sourceMap[hit.id] = ref;
+        sources.push({
+          ref: ref, id: hit.id, source: hit.source, category: hit.category,
+          issuer: hit.issuer, effectiveDate: hit.effectiveDate, description: hit.description
+        });
+      }
+      var sourceRef = sourceMap[hit.id];
+      var label = '[' + sourceRef + ' | سند: ' + hit.source + ' | دسته: ' + hit.category +
         (hit.issuer ? ' | مرجع: ' + hit.issuer : '') +
-        (hit.effectiveDate ? ' | تاریخ: ' + hit.effectiveDate : '') +
-        ' | بخش بازیابی: ' + hit.chunk + ']';
-      out.push(label + '\n' + text);
-      used += text.length + label.length;
+        (hit.effectiveDate ? ' | تاریخ/شماره: ' + hit.effectiveDate : '') +
+        ' | قطعه: ' + hit.chunk + ']';
+      out.push(label + '\n' + textPart);
+      used += textPart.length + label.length + 12;
     });
-    return { context: out.join('\n\n---\n\n'), hits: hits.map(function (h) {
-      return { source: h.source, category: h.category, issuer: h.issuer, effectiveDate: h.effectiveDate, chunk: h.chunk, score: h.score };
-    }) };
+    return {
+      context: out.join('\n\n---\n\n'),
+      hits: hits.map(function (h) {
+        return { id: h.id, source: h.source, category: h.category, issuer: h.issuer, effectiveDate: h.effectiveDate, chunk: h.chunk, score: h.score };
+      }),
+      sources: sources
+    };
   }
 
   function formatBytes(bytes) {
@@ -510,7 +638,8 @@
     try {
       var docs = await getAllDocuments();
       var indexed = docs.filter(function (d) { return d.status === 'indexed'; }).length;
-      if (stats) stats.textContent = docs.length + ' سند ذخیره‌شده · ' + indexed + ' سند قابل جستجو';
+      var needsAi = docs.filter(function (d) { return d.status === 'needs-ai' || d.status === 'unsupported'; }).length;
+      if (stats) stats.textContent = docs.length + ' سند · ' + indexed + ' قابل جستجو' + (needsAi ? ' · ' + needsAi + ' نیازمند استخراج/تبدیل' : '');
       if (!docs.length) {
         host.innerHTML = '<div class="kv-empty">هنوز سندی اضافه نکرده‌ای. PDF، عکس، Word یا متن قوانین را وارد کن.</div>';
         return;
@@ -551,6 +680,40 @@
     }
   }
 
+  async function runKnowledgeTestSearch() {
+    var input = byId('nezam636-kv-search-q');
+    var host = byId('nezam636-kv-search-results');
+    if (!input || !host) return;
+    var query = input.value.trim();
+    if (!query) {
+      host.innerHTML = '<div class="kv-search-result">عبارت جستجو را بنویس.</div>';
+      return;
+    }
+    host.innerHTML = '<div class="kv-search-result">در حال جستجو در متن اسناد قابل جستجو...</div>';
+    try {
+      var results = await search(query, 8);
+      if (!results.length) {
+        var docs = await getAllDocuments();
+        var indexed = docs.filter(function (d) { return d.status === 'indexed'; }).length;
+        var pending = docs.filter(function (d) { return d.status === 'needs-ai' || d.status === 'unsupported'; });
+        var note = indexed === 0
+          ? 'هیچ سندی هنوز قابل جستجو نیست. ' + (pending.length ? 'از فهرست پایین، PDF/تصویر را با «خواندن با Gemini» استخراج کن و فایل DOC را به DOCX یا PDF تبدیل کن.' : 'ابتدا سند یا متن قابل جستجو به مخزن اضافه کن.')
+          : 'سند قابل جستجو وجود دارد، اما برای این عبارت قطعه مرتبطی پیدا نشد. موضوع را با کلمات کوتاه‌تر، عنوان فعالیت یا شماره ماده امتحان کن.';
+        host.innerHTML = '<div class="kv-search-result">' + esc(note) + '</div>';
+        return;
+      }
+      host.innerHTML = results.map(function (hit, index) {
+        return '<article class="kv-search-result"><b>' + (index + 1) + '. ' + esc(hit.source) + '</b><small>' +
+          esc(hit.category || 'عمومی') + (hit.issuer ? ' · ' + esc(hit.issuer) : '') +
+          (hit.effectiveDate ? ' · ' + esc(hit.effectiveDate) : '') +
+          ' · قطعه ' + esc(hit.chunk) + ' · امتیاز تطبیق ' + esc(hit.score) + '</small><p>' +
+          esc(hit.text.slice(0, 620)) + (hit.text.length > 620 ? '…' : '') + '</p></article>';
+      }).join('');
+    } catch (err) {
+      host.innerHTML = '<div class="kv-search-result">خطا در جستجو: ' + esc(err && err.message ? err.message : err) + '</div>';
+    }
+  }
+
   function addStyles() {
     if (byId('nezam636-kv-style')) return;
     var style = document.createElement('style');
@@ -562,6 +725,12 @@
       '#nezam636-kv-panel .kv-head small{display:block;color:#d9e9dd;margin-top:4px}' +
       '#nezam636-kv-panel .kv-head button{background:#ffffff18;border:1px solid #ffffff55;color:white;border-radius:8px;padding:5px 10px;cursor:pointer}' +
       '#nezam636-kv-panel .kv-body{padding:13px;overflow:auto;flex:1}' +
+      '#nezam636-kv-panel .kv-search{padding:10px;margin:10px 0;border:1px solid #d9e6dc;border-radius:11px;background:#f7faf7}' +
+      '#nezam636-kv-panel .kv-search-row{display:flex;gap:7px;align-items:center}' +
+      '#nezam636-kv-panel .kv-search-row input{flex:1}' +
+      '#nezam636-kv-panel .kv-search-result{padding:9px;margin-top:7px;border:1px solid #e1e9e2;border-radius:9px;background:#fff;line-height:1.8}' +
+      '#nezam636-kv-panel .kv-search-result small{display:block;color:#66786a;margin-bottom:4px}' +
+      '#nezam636-kv-panel .kv-search-result p{margin:4px 0 0;white-space:pre-wrap}' +
       '#nezam636-kv-panel .kv-form{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;padding:11px;border:1px solid #e0e9e1;border-radius:12px;background:#f5f9f5}' +
       '#nezam636-kv-panel label{display:block;font-weight:700;color:#526658;margin-bottom:4px}' +
       '#nezam636-kv-panel input,#nezam636-kv-panel select,#nezam636-kv-panel textarea{width:100%;min-width:0;border:1px solid #c9d8cc;border-radius:8px;padding:8px;background:white;font:12px Tahoma;direction:rtl}' +
@@ -592,7 +761,8 @@
     panel.innerHTML =
       '<div class="kv-head"><div><b>📚 مخزن دانش دفتر ۶۳۶</b><small id="nezam636-kv-stats">در حال آماده‌سازی مخزن متصل به Google Drive...</small></div><button type="button" id="nezam636-kv-close">بستن ✕</button></div>' +
       '<div class="kv-body">' +
-      '<div class="alert alert-info small">فایل اصلی پس از افزودن به پوشه اختصاصی «کتابخانه دانش مرکز ۶۳۶ خفر» در Google Drive ارسال می‌شود. متن و فهرست جستجو نیز در پشتیبان اصلی اتوماسیون ذخیره می‌شود تا روی دستگاه دیگر بازیابی شود. TXT/CSV/HTML و DOCX محلی خوانده می‌شوند؛ برای PDF و تصویر، خواندن با Gemini فقط پس از تأیید تو انجام می‌شود. فایل قدیمی DOC در Drive بایگانی می‌شود اما برای استخراج متن باید به DOCX یا PDF تبدیل شود.</div>' +
+      '<div class="alert alert-info small">این بخش مانند دفترچه منبع‌محور کار می‌کند: هر سند باید «قابل جستجو» باشد؛ PDF و تصویر پس از تأیید، با Gemini استخراج می‌شوند. پاسخ دستیار با قطعه‌های مرتبط از همین اسناد ساخته می‌شود و نام منبع را نشان می‌دهد. فایل اصلی در Google Drive و متن جستجو در پشتیبان اتوماسیون قرار می‌گیرد.</div>' +
+      '<div class="kv-search"><label for="nezam636-kv-search-q">آزمایش جستجوی مخزن؛ همین سؤال را اینجا امتحان کن</label><div class="kv-search-row"><input id="nezam636-kv-search-q" placeholder="مثلاً حداقل مساحت زمین برای دامداری چقدر است؟"><button type="button" class="kv-primary" id="nezam636-kv-search-btn">جستجو در اسناد</button></div><div id="nezam636-kv-search-results" aria-live="polite"></div></div>' +
       '<div class="kv-form">' +
       '<div><label for="nezam636-kv-category">دسته سند</label><select id="nezam636-kv-category"><option>قوانین و مقررات</option><option>بخشنامه و دستورالعمل</option><option>ضوابط صدور مجوز</option><option>کشاورزی و فنی</option><option>نقشه و امور اراضی</option><option>مکاتبات و الگوها</option><option>عمومی</option></select></div>' +
       '<div><label for="nezam636-kv-issuer">مرجع صادرکننده</label><input id="nezam636-kv-issuer" placeholder="مثلاً وزارت جهاد کشاورزی"></div>' +
@@ -609,6 +779,10 @@
     document.body.appendChild(panel);
 
     byId('nezam636-kv-close').addEventListener('click', close);
+    byId('nezam636-kv-search-btn').addEventListener('click', runKnowledgeTestSearch);
+    byId('nezam636-kv-search-q').addEventListener('keydown', function (event) {
+      if (event.key === 'Enter') runKnowledgeTestSearch();
+    });
     byId('nezam636-kv-add').addEventListener('click', async function () {
       var input = byId('nezam636-kv-file');
       var files = input && input.files ? Array.from(input.files) : [];
