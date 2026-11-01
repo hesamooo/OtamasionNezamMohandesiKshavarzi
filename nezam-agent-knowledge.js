@@ -589,7 +589,7 @@
     panel.innerHTML =
       '<div class="kv-head"><div><b>📚 مخزن دانش دفتر ۶۳۶</b><small id="nezam636-kv-stats">در حال آماده‌سازی مخزن محلی...</small></div><button type="button" id="nezam636-kv-close">بستن ✕</button></div>' +
       '<div class="kv-body">' +
-      '<div class="alert alert-info small">فایل اصلی در همین مرورگر و در IndexedDB ذخیره می‌شود. متن TXT/CSV/HTML و DOCX به‌صورت محلی خوانده می‌شود. برای PDF و تصویر، استخراج متن با Gemini فقط با تأیید جداگانه انجام می‌شود. فایل قدیمی DOC را ابتدا به DOCX یا PDF تبدیل کن.</div>' +
+      '<div class="alert alert-info small">فایل اصلی پس از افزودن به پوشه اختصاصی «کتابخانه دانش مرکز ۶۳۶ خفر» در Google Drive ارسال می‌شود. متن و فهرست جستجو نیز در پشتیبان اصلی اتوماسیون ذخیره می‌شود تا روی دستگاه دیگر بازیابی شود. TXT/CSV/HTML و DOCX محلی خوانده می‌شوند؛ برای PDF و تصویر، خواندن با Gemini فقط پس از تأیید تو انجام می‌شود. فایل قدیمی DOC در Drive بایگانی می‌شود اما برای استخراج متن باید به DOCX یا PDF تبدیل شود.</div>' +
       '<div class="kv-form">' +
       '<div><label for="nezam636-kv-category">دسته سند</label><select id="nezam636-kv-category"><option>قوانین و مقررات</option><option>بخشنامه و دستورالعمل</option><option>ضوابط صدور مجوز</option><option>کشاورزی و فنی</option><option>نقشه و امور اراضی</option><option>مکاتبات و الگوها</option><option>عمومی</option></select></div>' +
       '<div><label for="nezam636-kv-issuer">مرجع صادرکننده</label><input id="nezam636-kv-issuer" placeholder="مثلاً وزارت جهاد کشاورزی"></div>' +
@@ -601,7 +601,7 @@
       '</div>' +
       '<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-3"><b>اسناد موجود در کتابخانه</b><div><button type="button" class="kv-primary" id="nezam636-kv-export">خروجی پشتیبان مخزن</button><button type="button" class="kv-primary" id="nezam636-kv-import-btn" style="margin-right:5px">بازیابی پشتیبان</button><input type="file" id="nezam636-kv-import" accept=".json,application/json" hidden></div></div>' +
       '<div id="nezam636-kv-list"></div><pre id="nezam636-kv-reader" hidden></pre>' +
-      '<small class="text-muted d-block mt-2">استخراج هوش مصنوعی ممکن است در اعداد، جدول‌ها یا متن اسکن‌شده خطا داشته باشد؛ متن هر سند را با نسخه اصلی تطبیق بده. این مخزن فعلاً با فضای Google Drive اتوماسیون همگام نیست؛ از خروجی پشتیبان همین بخش استفاده کن.</small>' +
+      '<small class="text-muted d-block mt-2">استخراج هوش مصنوعی ممکن است در اعداد، جدول‌ها یا متن اسکن‌شده خطا داشته باشد؛ متن هر سند را با نسخه اصلی تطبیق بده. بعد از افزودن سند، وضعیت ذخیره Drive و همگام‌سازی شاخص دانش را در فهرست کنترل کن. فایل‌های اصلی در Drive و متن قابل جستجو در پشتیبان اصلی اتوماسیون نگهداری می‌شود.</small>' +
       '</div>';
     document.body.appendChild(panel);
 
