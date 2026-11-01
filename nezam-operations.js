@@ -176,7 +176,7 @@
       createdAtFa: typeof window.todayShamsi === 'function' ? window.todayShamsi() : '',
       storage: collectSafeStorage(),
       indexedDBDocs: Array.isArray(docs) ? docs : [],
-      note: 'کلیدهای API و رمزهای عبور عمداً در فایل پشتیبان قرار نمی‌گیرند.'
+      note: 'کلیدهای API و رمزهای عبور عمداً در فایل پشتیبان قرار نمی‌گیرند. ممکن است برخی پیوست‌های بسیار بزرگ، به‌دلیل محدودیت خروجی فعلی IndexedDB، در بسته قرار نگیرند.'
     };
   }
 
@@ -452,7 +452,7 @@
         '<input type="file" id="nezam-protected-backup-input" accept=".json,application/json" hidden>' +
         '<button type="button" class="btn btn-sm btn-outline-secondary" id="nezam-refresh-health-btn">بررسی مجدد سلامت</button>' +
       '</div>' +
-      '<div class="small text-muted mt-2">نسخه محلی روی همین مرورگر ذخیره می‌شود. فایل پشتیبان را جداگانه روی رایانه یا فضای امن نگهداری کنید. کلید Gemini در پشتیبان قرار نمی‌گیرد.</div>';
+      '<div class="small text-muted mt-2">نسخه محلی روی همین مرورگر ذخیره می‌شود. فایل پشتیبان را جداگانه روی رایانه یا فضای امن نگهداری کنید. کلید Gemini در پشتیبان قرار نمی‌گیرد؛ پیوست‌های خیلی بزرگ ممکن است در خروجی نیایند.</div>';
     taskCard.insertAdjacentElement('afterend', card);
     byId('nezam-create-backup-btn').addEventListener('click', function () { downloadProtectedBackup('پشتیبان دستی'); });
     byId('nezam-restore-vault-btn').addEventListener('click', restoreLatestVaultSnapshot);
