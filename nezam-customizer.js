@@ -2833,8 +2833,8 @@ function buildPrintedCroquisMap(m, svgW, svgH, mode) {
   for (var lIdx = 0; lIdx < m.layers.length; lIdx++) {
     var lyr = m.layers[lIdx] || {};
     if (!lyr.visible || !Array.isArray(lyr.points) || !lyr.points.length) continue;
-    var layerColor = safeHexColor(layerColor, "#15803d");
-    var safeLayerName = safeHtmlText(safeLayerName || "لایه بدون نام");
+    var layerColor = safeHexColor(lyr.color, "#15803d");
+    var safeLayerName = safeHtmlText(lyr.name || "لایه بدون نام");
     var layerStrokeWidth = Number(lyr.strokeWidth);
     if (!Number.isFinite(layerStrokeWidth)) layerStrokeWidth = 2.5;
     layerStrokeWidth = Math.min(10, Math.max(0.5, layerStrokeWidth));
