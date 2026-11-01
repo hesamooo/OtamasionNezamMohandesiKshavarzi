@@ -1694,6 +1694,21 @@ async function aiSendChatMessage() {
   var q = input.value.trim();
   if (!q) return;
 
+  // ارسال خلاصه پرونده به Gemini فقط با رضایت صریح کاربر از طریق چک‌باکس.
+  var promptForModel = q;
+  try {
+    var contextToggle = document.getElementById('ai-case-context-toggle');
+    if (contextToggle && contextToggle.checked && typeof window.buildNezam636AIContext === 'function') {
+      var caseContext = window.buildNezam636AIContext();
+      if (caseContext) {
+        promptForModel += '\\n\\n--- خلاصه پرونده فعال مرکز ۶۳۶ (فقط برای همین درخواست) ---\\n' +
+          caseContext + '\\n--- پایان خلاصه پرونده ---';
+      }
+    }
+  } catch (contextError) {
+    console.warn('Nezam636 AI context could not be prepared:', contextError);
+  }
+
   var userDiv = document.createElement('div');
   userDiv.className = 'p-2 mb-2 rounded bg-primary text-white text-end shadow-sm';
   userDiv.innerHTML = '<b>شما:</b> ' + escapeHtml(q);
@@ -1724,7 +1739,7 @@ async function aiSendChatMessage() {
       }
       directContents.push({
         role: 'user',
-        parts: [{ text: q }],
+        parts: [{ text: promptForModel }],
       });
 
       var directChatResult = await fetchDirectGeminiWithFallback(
@@ -1812,7 +1827,7 @@ async function aiSendChatMessage() {
         method: 'POST',
         headers: headers,
         body: JSON.stringify({
-          message: q,
+          message: promptForModel,
           history: aiChatHistoryBuffer,
           apiKey: userKey,
           model: selectedModel,
