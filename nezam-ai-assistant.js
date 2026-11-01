@@ -1701,8 +1701,8 @@ async function aiSendChatMessage() {
     if (contextToggle && contextToggle.checked && typeof window.buildNezam636AIContext === 'function') {
       var caseContext = window.buildNezam636AIContext();
       if (caseContext) {
-        promptForModel += '\\n\\n--- خلاصه پرونده فعال مرکز ۶۳۶ (فقط برای همین درخواست) ---\\n' +
-          caseContext + '\\n--- پایان خلاصه پرونده ---';
+        promptForModel += '\n\n--- خلاصه پرونده فعال مرکز ۶۳۶ (فقط برای همین درخواست) ---\n' +
+          caseContext + '\n--- پایان خلاصه پرونده ---';
       }
     }
   } catch (contextError) {
