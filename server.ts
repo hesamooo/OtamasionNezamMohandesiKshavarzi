@@ -52,11 +52,19 @@ async function runGeminiGenerateWithFallback(
     contents: any;
     config?: any;
     timeoutMs?: number;
+    preferredModel?: string;
   }
 ) {
-  const modelChain = ['gemini-3.5-flash', 'gemini-3.8-flash', 'gemini-flash-latest'];
+  const requestedModel = String(options.preferredModel || '').trim().replace(/^models\//, '');
+  const safeRequestedModel = /^[a-zA-Z0-9._-]{1,100}$/.test(requestedModel) ? requestedModel : '';
+  const modelChain = Array.from(new Set([
+    safeRequestedModel,
+    'gemini-3.8-flash',
+    'gemini-3.6-flash',
+    'gemini-2.5-flash',
+  ].filter(Boolean)));
   let lastError: any = null;
-  const timeoutMs = options.timeoutMs || 7000;
+  const timeoutMs = options.timeoutMs || 12000;
 
   for (const model of modelChain) {
     try {
@@ -115,7 +123,8 @@ app.post('/api/ai/test-key', async (req: Request, res: Response) => {
     }
     const { resp, modelUsed } = await runGeminiGenerateWithFallback(aiInstance, {
       contents: 'سلام',
-      config: { maxOutputTokens: 10 }
+      config: { maxOutputTokens: 10 },
+      preferredModel: String(req.body.model || req.headers['x-gemini-model'] || ''),
     });
     const echoText = extractResponseText(resp) || 'OK';
     res.json({
@@ -177,22 +186,26 @@ app.post('/api/ai/chat', async (req: Request, res: Response) => {
     });
 
     let replyText = '';
+    let modelUsed = '';
     let groundingChunks: any[] = [];
     let webSearchQueries: any[] = [];
+    const preferredModel = String(req.body.model || req.headers['x-gemini-model'] || '');
 
     const enableSearch = Boolean(req.body.useSearch);
     if (enableSearch) {
       try {
-        const { resp: response } = await runGeminiGenerateWithFallback(aiInstance, {
+        const searchResult = await runGeminiGenerateWithFallback(aiInstance, {
           contents: formattedContents,
           config: {
             systemInstruction: AGRICULTURAL_ENGINEERING_SYSTEM_INSTRUCTION,
             tools: [{ googleSearch: {} }],
-            thinkingConfig: { thinkingBudget: 0 },
           },
-          timeoutMs: 5000,
+          timeoutMs: 15000,
+          preferredModel,
         });
 
+        modelUsed = searchResult.modelUsed;
+        const response = searchResult.resp;
         replyText = extractResponseText(response);
         groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
         webSearchQueries = response.candidates?.[0]?.groundingMetadata?.webSearchQueries || [];
@@ -202,15 +215,16 @@ app.post('/api/ai/chat', async (req: Request, res: Response) => {
     }
 
     if (!replyText) {
-      const { resp: response } = await runGeminiGenerateWithFallback(aiInstance, {
+      const generationResult = await runGeminiGenerateWithFallback(aiInstance, {
         contents: formattedContents,
         config: {
           systemInstruction: AGRICULTURAL_ENGINEERING_SYSTEM_INSTRUCTION,
-          thinkingConfig: { thinkingBudget: 0 },
         },
-        timeoutMs: 12000,
+        timeoutMs: 15000,
+        preferredModel,
       });
-      replyText = extractResponseText(response);
+      modelUsed = generationResult.modelUsed;
+      replyText = extractResponseText(generationResult.resp);
     }
 
     res.json({
@@ -218,6 +232,8 @@ app.post('/api/ai/chat', async (req: Request, res: Response) => {
       text: replyText,
       groundingChunks: groundingChunks,
       webSearchQueries: webSearchQueries,
+      model: modelUsed,
+      fallback: false,
     });
   } catch (error: any) {
     console.error('Error in /api/ai/chat:', error);
@@ -267,9 +283,11 @@ app.post('/api/ai/chat', async (req: Request, res: Response) => {
     if (isQuota) {
       res.json({
         success: true,
-        text: `📌 *[پاسخ بر اساس پایگاه دانش مصوب مرکز ۶۳۶ خفر]*:\n${fallbackText}\n\n💡 *نکته سرور:* در صورت تمایل به افزایش سهمیه کوئری همزمان، می‌توانید کلید اختصاصی پروژه را در بخش Settings > Secrets فعال فرمایید.`,
+        text: `⚠️ *[پاسخ پشتیبان محلی؛ نه استعلام رسمی و نه جایگزین آخرین دستورالعمل‌ها]*\n${fallbackText}\n\nاعداد، ظرفیت‌ها و فاصله‌های ذکرشده ممکن است با آخرین ابلاغیه‌ها تغییر کرده باشند؛ پیش از هر تصمیم یا صدور مجوز، آن‌ها را از مرجع ذی‌صلاح استعلام کنید.`,
         groundingChunks: [],
         webSearchQueries: [],
+        fallback: true,
+        model: 'local-fallback',
       });
       return;
     }
@@ -284,6 +302,7 @@ app.post('/api/ai/chat', async (req: Request, res: Response) => {
 app.post('/api/ai/ocr-extract', async (req: Request, res: Response) => {
   try {
     const { imageBase64, mimeType, rawText } = req.body;
+    const preferredModel = String(req.body.model || req.headers['x-gemini-model'] || '');
 
     if (!imageBase64 && !rawText) {
       res.status(400).json({ error: 'هیچ تصویری یا متنی ارسال نشده است.' });
@@ -343,7 +362,7 @@ app.post('/api/ai/ocr-extract', async (req: Request, res: Response) => {
       text: promptText,
     });
 
-    const { resp: response } = await runGeminiGenerateWithFallback(aiInstance, {
+    const generationResult = await runGeminiGenerateWithFallback(aiInstance, {
       contents: { parts },
       config: {
         responseMimeType: 'application/json',
@@ -364,11 +383,12 @@ app.post('/api/ai/ocr-extract', async (req: Request, res: Response) => {
           },
           required: ['applicantName', 'utmCoordinates'],
         },
-        thinkingConfig: { thinkingBudget: 0 },
       },
-      timeoutMs: 15000,
+      timeoutMs: 20000,
+      preferredModel,
     });
 
+    const response = generationResult.resp;
     const rawJson = extractResponseText(response) || '{}';
     let parsedData = {};
     try {
@@ -381,12 +401,28 @@ app.post('/api/ai/ocr-extract', async (req: Request, res: Response) => {
       success: true,
       data: parsedData,
       rawText: rawJson,
+      model: generationResult.modelUsed,
+      offlineFallback: false,
     });
   } catch (error: any) {
     console.error('Error in /api/ai/ocr-extract:', error);
-    // استخراج محلی به کمک عبارات باقاعده در صورت بروز خطا در مدل ابری
-    const textToParse = String(req.body.rawText || '');
-    const clean = textToParse.replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)));
+
+    // استخراج محلی فقط از متن واقعی کاربر؛ تصویرِ بدون متن نباید به داده ساختگی تبدیل شود.
+    const textToParse = String(req.body.rawText || '').trim();
+    if (!textToParse) {
+      res.status(503).json({
+        success: false,
+        error: 'خوانش ابری سند انجام نشد. متن سند را در کادر متن وارد کنید یا اتصال و کلید Gemini را بررسی نمایید.',
+      });
+      return;
+    }
+
+    const persianDigits = '۰۱۲۳۴۵۶۷۸۹';
+    const arabicDigits = '٠١٢٣٤٥٦٧٨٩';
+    const clean = textToParse.replace(/[۰-۹٠-٩]/g, (d) => {
+      const p = persianDigits.indexOf(d);
+      return String(p >= 0 ? p : arabicDigits.indexOf(d));
+    });
 
     const nidMatch = clean.match(/(?:کد\s*ملی|ملی|شناسه)[:\s]*(\d{10,11})/) || clean.match(/\b(\d{10})\b/);
     const phoneMatch = clean.match(/(09\d{9})/);
@@ -400,17 +436,37 @@ app.post('/api/ai/ocr-extract', async (req: Request, res: Response) => {
       utmLines.push(`${m[1]},${m[2]}`);
     }
 
+    const isLivestock = /دام|گوسفند|بره|گاو|مرغ|طیور|شیلات|ماهی/.test(textToParse);
+    const isClinic = /داروخانه|گیاهپزشکی|کلینیک/.test(textToParse);
+    const isMushroom = /قارچ/.test(textToParse);
+    const isGreenhouse = /گلخانه/.test(textToParse);
+    let actType = '';
+    if (isMushroom) actType = 'mushroom_button';
+    else if (/گوسفند|بره/.test(textToParse)) actType = 'sheep_high';
+    else if (/گاو/.test(textToParse)) actType = 'cattle_dairy';
+    else if (/مرغ|طیور/.test(textToParse)) actType = 'broiler';
+    else if (/داروخانه/.test(textToParse)) actType = 'pharmacy_center';
+    else if (/کلینیک|گیاهپزشکی/.test(textToParse)) actType = 'clinic_center';
+    else if (isGreenhouse) actType = 'greenhouse_veg';
+
     const fallbackData = {
       applicantName: nameMatch ? nameMatch[1].trim() : '',
       nationalId: nidMatch ? nidMatch[1] : '',
       phoneNumber: phoneMatch ? phoneMatch[1] : '',
-      planTitle: textToParse.includes('گلخانه') ? 'احداث گلخانه سبزی و صیفی' : textToParse.includes('دام') ? 'دامپروری' : 'طرح کشاورزی',
-      mainGroup: textToParse.includes('دام') || textToParse.includes('گوسفند') ? 'LIVESTOCK_POULTRY_FISHERIES' : textToParse.includes('داروخانه') ? 'CLINIC_PHARMACY' : 'GREENHOUSE_MUSHROOM',
-      actType: 'greenhouse_veg',
-      landArea: landMatch ? landMatch[1].replace(/,/g, '') : '1000',
-      location: 'فارس، شهرستان خفر، مرکزی',
+      planTitle: isMushroom ? 'پرورش قارچ خوراکی'
+        : isGreenhouse ? 'احداث گلخانه'
+        : isLivestock ? 'طرح دام، طیور یا شیلات'
+        : isClinic ? 'خدمات گیاهپزشکی'
+        : '',
+      mainGroup: isLivestock ? 'LIVESTOCK_POULTRY_FISHERIES'
+        : isClinic ? 'CLINIC_PHARMACY'
+        : (isMushroom || isGreenhouse) ? 'GREENHOUSE_MUSHROOM'
+        : '',
+      actType,
+      landArea: landMatch ? landMatch[1].replace(/,/g, '') : '',
+      location: '',
       utmCoordinates: utmLines.join('\n'),
-      fullSummary: 'استخراج شده توسط موتور هوشمند پشتیبان مرکز ۶۳۶ خفر.',
+      fullSummary: 'این اطلاعات فقط با قواعد محلی از متن واردشده استخراج شده‌اند؛ همه فیلدها و مختصات باید پیش از ثبت نهایی بررسی شوند.',
     };
 
     res.json({
