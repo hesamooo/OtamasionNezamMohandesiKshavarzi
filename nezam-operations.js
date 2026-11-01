@@ -278,6 +278,7 @@
         indexedDBDocs: backup.indexedDBDocs
       });
       tx.objectStore('meta').put({ key: 'lastSnapshotAt', value: now });
+      tx.objectStore('meta').put({ key: 'latestSnapshotInfo', value: { id: String(now), createdAt: now, label: label || 'نسخه پشتیبان خودکار' } });
       tx.oncomplete = function () {
         var readTx = db.transaction(['snapshots'], 'readonly');
         var req = readTx.objectStore('snapshots').getAll();
@@ -377,6 +378,22 @@
     return issues;
   }
 
+  async function getLatestVaultSnapshotInfo() {
+    var db = await openVaultDB();
+    return new Promise(function (resolve, reject) {
+      var tx = db.transaction(['meta'], 'readonly');
+      var req = tx.objectStore('meta').get('latestSnapshotInfo');
+      req.onsuccess = function () {
+        db.close();
+        resolve(req.result ? req.result.value : null);
+      };
+      req.onerror = function () {
+        db.close();
+        reject(req.error || new Error('خواندن اطلاعات نسخه محلی ناموفق بود.'));
+      };
+    });
+  }
+
   async function refreshSafetyPanel() {
     var panel = byId('nezam-safety-panel');
     if (!panel) return;
@@ -404,9 +421,9 @@
     }
     if (vaultStatus) {
       try {
-        var latest = await getLatestVaultSnapshot();
-        vaultStatus.textContent = latest
-          ? 'آخرین پشتیبان محلی: ' + new Date(latest.createdAt).toLocaleString('fa-IR') + ' (' + (latest.label || 'نسخه محلی') + ')'
+        var latestInfo = await getLatestVaultSnapshotInfo();
+        vaultStatus.textContent = latestInfo
+          ? 'آخرین پشتیبان محلی: ' + new Date(latestInfo.createdAt).toLocaleString('fa-IR') + ' (' + (latestInfo.label || 'نسخه محلی') + ')'
           : 'نسخه پشتیبان محلی هنوز ایجاد نشده است';
       } catch (e) { vaultStatus.textContent = 'مخزن پشتیبان محلی در دسترس نیست'; }
     }
