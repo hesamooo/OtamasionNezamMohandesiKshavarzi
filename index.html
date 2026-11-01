@@ -12,22 +12,8 @@
 
   <!-- استایل کامل و ۱۰۰٪ خودکفای آفلاین ویندوز با قالب گرافیکی راهنمای جامع PDF -->
   <style>
-    @font-face {
-      font-family: 'Vazirmatn';
-      src: url('./public/fonts/Vazirmatn-Regular.ttf') format('truetype'),
-           url('/fonts/Vazirmatn-Regular.ttf') format('truetype');
-      font-weight: 400;
-      font-display: swap;
-    }
-    @font-face {
-      font-family: 'Vazirmatn';
-      src: url('./public/fonts/Vazirmatn-Bold.ttf') format('truetype'),
-           url('/fonts/Vazirmatn-Bold.ttf') format('truetype');
-      font-weight: 700;
-      font-display: swap;
-    }
-
-    :root {
+    /* از فونت‌های فارسی موجود در ویندوز استفاده می‌شود؛ فایل فونت خارجی/ناموجود درخواست نمی‌شود. */
+:root {
       --primary: #1b4332;
       --primary-mid: #2d6a4f;
       --sage: #52796f;
@@ -43,7 +29,7 @@
 
     * {
       box-sizing: border-box;
-      font-family: 'Vazirmatn', 'Tahoma', 'Segoe UI', sans-serif;
+      font-family: Tahoma, 'Segoe UI', Arial, sans-serif;
     }
 
     body {
@@ -2972,7 +2958,7 @@
   <div id="smart-mouse-tooltip"></div>
 
   <!-- ماژول‌های اصلی اتوماسیون مرکز خدمات ۶۳۶ خفر -->
-  <script src="./nezam-core.js?v=20261101-storage-guard"></script>
+  <script src="./nezam-core.js?v=20261101-offline-bundle-fix"></script>
   <script src="./nezam-customizer.js?v=20261101-map-save-fix"></script>
   <script src="./nezam-ai-assistant.js?v=20261101-audit-fixes"></script>
 
