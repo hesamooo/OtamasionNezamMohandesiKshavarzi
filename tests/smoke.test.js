@@ -128,6 +128,26 @@ test('server model timeout timers are always cleared after each attempt', () => 
   assert.match(source, /finally\s*\{\s*if\s*\(timeoutHandle\)\s*clearTimeout\(timeoutHandle\)/);
 });
 
+test('interface navigation and dashboard use the compact responsive layout', () => {
+  const html = read('index.html');
+  const navButtons = [...html.matchAll(/<button\b[^>]*id="nav-btn-[^"]+"[^>]*>([\s\S]*?)<\/button>/gi)];
+  assert.equal(navButtons.length, 8);
+  const labels = navButtons.map((m) => m[1].replace(/<[^>]*>/g, '').trim());
+  assert.ok(labels.includes('📊 پیشخوان'));
+  assert.ok(labels.includes('📁 پرونده‌ها'));
+  assert.ok(labels.includes('🗺️ کروکی UTM'));
+  assert.ok(labels.includes('🤖 دستیار هوشمند'));
+
+  const styleMatch = html.match(/<style id="nezam-clean-layout-2026">([\s\S]*?)<\/style>/);
+  assert.ok(styleMatch, 'clean responsive layout stylesheet must exist');
+  const css = styleMatch[1];
+  assert.match(css, /width:194px!important/);
+  assert.match(css, /@media\(max-width:991px\)/);
+  assert.match(css, /@media\(max-width:560px\)/);
+  assert.match(css, /workflow-law-strip>div:last-child\{display:none!important\}/);
+  assert.match(css, /cmd-tile:nth-child\(1\),\.cmd-tile:nth-child\(5\)\{display:none!important\}/);
+});
+
 test('standalone Windows export keeps script order and matches the BAT filename', () => {
   const core = read('nezam-core.js');
   const bat = read('Run_Windows_Offline.bat');
