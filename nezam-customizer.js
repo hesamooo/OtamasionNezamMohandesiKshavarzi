@@ -3742,11 +3742,7 @@ window.setMapDrawingMode = function (mode) {
     if (!confirm("این ابزار هندسه موجود لایه را با ترسیم جدید جایگزین می‌کند. ادامه می‌دهید؟")) return;
   }
 
-  if (mode === "LINE" || mode === "POLYGON") {
-    layer.geomType = mode;
-    var typeEl = document.getElementById("edit-lyr-type");
-    if (typeEl) typeEl.value = mode;
-  }
+  // نوع لایه فقط پس از زدن «اتمام ترسیم» تغییر می‌کند؛ لغو، داده قبلی را دست‌نخورده نگه می‌دارد.
 
   if (croquisViewMode !== "MAP") switchCroquisViewMode("MAP");
   croquisOnlineDrawMode = mode;
@@ -3982,7 +3978,7 @@ window.exportCroquisGeoJSON = function () {
   link.href = URL.createObjectURL(blob);
   link.download = (m.title || "Croquis").replace(/[^\w\u0600-\u06FF-]+/g, "_") + ".geojson";
   link.click();
-  URL.revokeObjectURL(link.href);
+  setTimeout(function () { URL.revokeObjectURL(link.href); }, 1200);
   croquisMapSetToolStatus("خروجی GeoJSON نقشه آماده شد.");
 };
 
