@@ -3,9 +3,23 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import * as ts from 'typescript';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (name) => fs.readFileSync(path.join(root, name), 'utf8');
+
+test('TypeScript server and Vite configuration parse without syntax errors', () => {
+  for (const file of ['server.ts', 'vite.config.ts']) {
+    const source = read(file);
+    const parsed = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+    assert.deepEqual(parsed.parseDiagnostics, [], file + ' contains TypeScript parse errors');
+  }
+});
+
+test('package and TypeScript configuration are valid JSON', () => {
+  assert.doesNotThrow(() => JSON.parse(read('package.json')));
+  assert.doesNotThrow(() => JSON.parse(read('tsconfig.json')));
+});
 
 test('main JavaScript modules have valid syntax', () => {
   for (const file of ['nezam-core.js', 'nezam-customizer.js', 'nezam-ai-assistant.js']) {
