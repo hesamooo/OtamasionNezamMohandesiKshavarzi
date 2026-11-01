@@ -73,16 +73,58 @@ test('Gemini model fallback preserves valid saved models and replaces the retire
   assert.equal(readModel('gemini-2.5-flash'), 'gemini-2.5-flash');
 });
 
-test('database writes report storage failures instead of swallowing them', () => {
+test('database writes continue independently and report localStorage failures', () => {
   const core = read('nezam-core.js');
   const start = core.indexOf('function saveAllDB() {');
   const end = core.indexOf('\n}\n', start);
   assert.notEqual(start, -1);
   assert.notEqual(end, -1);
-  const saveFunction = core.slice(start, end + 2);
-  assert.match(saveFunction, /failedKeys\.push/);
-  assert.match(saveFunction, /showToastMsg/);
-  assert.match(saveFunction, /return failedKeys\.length === 0/);
+  const source = core.slice(start, end + 2);
+  const build = new Function(
+    'localStorage', 'casesDB', 'lettersDB', 'tasksDB', 'DOC_CHECKLISTS',
+    'ACT_SPECS', 'activeCaseId', 'window', 'showToastMsg', 'refreshAllViews',
+    source + '\nreturn saveAllDB;'
+  );
+
+  const makeEnvironment = (failKey) => {
+    const store = {};
+    const warnings = [];
+    let refreshCount = 0;
+    const save = build({
+      setItem(key, value) {
+        if (key === failKey) throw new Error('quota exceeded');
+        store[key] = value;
+      }
+    }, [{ id: 'case-1' }], [{ id: 'letter-1' }], [], {}, {}, 'case-1',
+    { __nezam636LastStorageWarningAt: 0 },
+    (...args) => warnings.push(args),
+    () => { refreshCount++; });
+    return { save, store, warnings, getRefreshCount: () => refreshCount };
+  };
+
+  const success = makeEnvironment('');
+  assert.equal(success.save(), true);
+  assert.equal(Object.keys(success.store).length, 6);
+  assert.equal(success.warnings.length, 0);
+  assert.equal(success.getRefreshCount(), 1);
+
+  const partial = makeEnvironment('nezam636_letters');
+  assert.equal(partial.save(), false);
+  assert.equal(Object.keys(partial.store).length, 5);
+  assert.equal(partial.warnings.length, 1);
+  assert.equal(partial.getRefreshCount(), 1);
+});
+
+
+test('server model timeout timers are always cleared after each attempt', () => {
+  const server = read('server.ts');
+  const start = server.indexOf('async function runGeminiGenerateWithFallback');
+  const end = server.indexOf('\nfunction extractResponseText', start);
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+  const source = server.slice(start, end);
+  assert.match(source, /let timeoutHandle: ReturnType<typeof setTimeout>/);
+  assert.match(source, /finally\s*\{\s*if\s*\(timeoutHandle\)\s*clearTimeout\(timeoutHandle\)/);
 });
 
 test('standalone Windows export keeps script order and matches the BAT filename', () => {
