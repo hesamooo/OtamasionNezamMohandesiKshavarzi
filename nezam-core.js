@@ -1434,42 +1434,57 @@ function renderUnifiedCasesMatrix() {
 
   for (var i = 0; i < casesDB.length; i++) {
     var c = casesDB[i];
-    var hay = (c.code + " " + c.name + " " + c.nid + " " + c.project + " " + c.loc).toLowerCase();
+    var hay = [c.code, c.name, c.nid, c.project, c.loc].join(" ").toLowerCase();
     if (q && hay.indexOf(q) === -1) continue;
 
     var inq = c.inquiries || {};
     var okCount = 0;
     var cells = "";
+    var safeId = escapeHtmlCore(c.id);
     for (var a = 0; a < agencies.length; a++) {
-      var k = agencies[a];
-      var st = inq[k] || "NONE";
+      var agencyKey = agencies[a];
+      var st = inq[agencyKey] || "NONE";
       if (st === "OK") okCount++;
       var meta = INQ_STATUS_STYLE[st] || INQ_STATUS_STYLE.NONE;
-      cells += '<td><button type="button" class="btn btn-sm ' + meta.cls + ' fw-bold py-1 px-2" style="font-size:0.73rem;white-space:nowrap;" onclick="toggleCaseInquiryStatus(\'' + c.id + '\',\'' + k + '\')">' + meta.txt + '</button></td>';
+      cells += '<td><button type="button" class="btn btn-sm ' + meta.cls + ' fw-bold py-1 px-2" style="font-size:0.73rem;white-space:nowrap;" data-case-action="inquiry" data-case-id="' + safeId + '" data-inquiry-key="' + agencyKey + '">' + escapeHtmlCore(meta.txt) + '</button></td>';
     }
 
     var pct = Math.round((okCount / agencies.length) * 100);
     html += '<tr class="' + (c.id === activeCaseId ? 'table-active' : '') + '">' +
-      '<td class="fw-bold">' + toFa(c.code) + '</td>' +
-      '<td class="text-start"><b>' + c.name + '</b><br><small class="text-muted">کدملی: ' + toFa(c.nid) + '</small><br><small class="text-success fw-bold">' + c.loc + '</small></td>' +
-      '<td class="text-start"><b>' + c.project + '</b><br><small class="text-muted">ظرفیت: ' + toFa(c.cap) + ' | ' + toFa(c.land) + ' م.م</small></td>' +
+      '<td class="fw-bold">' + escapeHtmlCore(toFa(c.code)) + '</td>' +
+      '<td class="text-start"><b>' + escapeHtmlCore(c.name) + '</b><br><small class="text-muted">کدملی: ' + escapeHtmlCore(toFa(c.nid)) + '</small><br><small class="text-success fw-bold">' + escapeHtmlCore(c.loc) + '</small></td>' +
+      '<td class="text-start"><b>' + escapeHtmlCore(c.project) + '</b><br><small class="text-muted">ظرفیت: ' + escapeHtmlCore(toFa(c.cap)) + ' | ' + escapeHtmlCore(toFa(c.land)) + ' م.م</small></td>' +
       cells +
-      '<td><span class="badge ' + (pct === 100 ? 'bg-success' : 'bg-primary') + '">' + toFa(pct) + '٪ (' + toFa(okCount) + '/۷)</span></td>' +
-      '<td><small class="fw-bold text-danger">' + toFa(c.expDate || "۱۴۰۵/۰۸/۱۳") + '</small></td>' +
+      '<td><span class="badge ' + (pct === 100 ? 'bg-success' : 'bg-primary') + '">' + escapeHtmlCore(toFa(pct)) + '٪ (' + escapeHtmlCore(toFa(okCount)) + '/۷)</span></td>' +
+      '<td><small class="fw-bold text-danger">' + escapeHtmlCore(toFa(c.expDate || "۱۴۰۵/۰۸/۱۳")) + '</small></td>' +
       '<td><div class="d-flex gap-1 justify-content-center">' +
-        '<button class="btn btn-sm btn-outline-success fw-bold" onclick="selectActiveCase(\'' + c.id + '\'); switchMainPane(\'pane-letters\');" data-tip="صدور نامه استعلام برای این پرونده">📨 صدور نامه</button>' +
-        '<button class="btn btn-sm btn-outline-dark fw-bold" onclick="selectActiveCase(\'' + c.id + '\'); printOfficialForm(\'BINDER_LABEL\');" data-tip="چاپ لیبل عطف زونکن">🏷️ لیبل</button>' +
+        '<button type="button" class="btn btn-sm btn-outline-success fw-bold" data-case-action="letters" data-case-id="' + safeId + '" data-tip="صدور نامه استعلام برای این پرونده">📨 صدور نامه</button>' +
+        '<button type="button" class="btn btn-sm btn-outline-dark fw-bold" data-case-action="binder" data-case-id="' + safeId + '" data-tip="چاپ لیبل عطف زونکن">🏷️ لیبل</button>' +
       '</div></td></tr>';
   }
   tbody.innerHTML = html || '<tr><td colspan="13" class="py-3 text-muted">موردی یافت نشد.</td></tr>';
+
+  if (!tbody.dataset.secureActionsBound) {
+    tbody.dataset.secureActionsBound = "1";
+    tbody.addEventListener("click", function (event) {
+      var btn = event.target.closest("button[data-case-action]");
+      if (!btn || !tbody.contains(btn)) return;
+      var id = btn.getAttribute("data-case-id");
+      var action = btn.getAttribute("data-case-action");
+      var item = casesDB.find(function (record) { return record && String(record.id) === id; });
+      if (!item) return;
+      if (action === "inquiry") {
+        var key = btn.getAttribute("data-inquiry-key");
+        if (agencies.indexOf(key) === -1) return;
+        toggleCaseInquiryStatus(id, key);
+      } else {
+        selectActiveCase(id);
+        if (action === "letters") switchMainPane("pane-letters");
+        else if (action === "binder") printOfficialForm("BINDER_LABEL");
+      }
+    });
+  }
 }
-
-/* بخش قوانین NotebookLM بنا به درخواست کاربر حذف گردید */
-
-/* =========================================================================
-   ۸. بایگانی دیجیتال مدارک هر پرونده در IndexedDB و ساخت پوشه در درایو
-   ========================================================================= */
-var idbInstance = null;
 function openFilesDB(cb) {
   if (idbInstance) return cb(idbInstance);
   if (!window.indexedDB) return cb(null);
@@ -1696,26 +1711,47 @@ function renderSecretariatTable() {
   var html = "";
 
   for (var i = 0; i < lettersDB.length; i++) {
-    var l = lettersDB[i];
+    var l = lettersDB[i] || {};
     if (dir !== "ALL" && l.type !== dir) continue;
-    var hay = (l.number + " " + l.recipient + " " + l.appName + " " + l.appNid + " " + l.body).toLowerCase();
+    var hay = [l.number, l.recipient, l.appName, l.appNid, l.body].join(" ").toLowerCase();
     if (q && hay.indexOf(q) === -1) continue;
 
-    var pSize = l.paperSize || "A4";
+    var pSize = l.paperSize === "A5" ? "A5" : "A4";
+    var letterType = l.type === "OUT" ? "صادره" : "وارده";
+    var safeLetterId = escapeHtmlCore(l.id);
     html += "<tr>" +
-      "<td><b>" + toFa(l.number) + "</b><br><small class='text-muted'>" + toFa(l.date) + "</small></td>" +
-      "<td><span class='badge " + (l.type === "OUT" ? "bg-success" : "bg-primary") + "'>" + (l.type === "OUT" ? "صادره" : "وارده") + "</span><br><span class='badge bg-dark mt-1'>کاغذ " + pSize + "</span></td>" +
-      "<td><b>" + l.recipient + "</b><br><small class='text-success fw-bold'>متقاضی: " + (l.appName || "---") + " (" + toFa(l.cap || "") + ")</small></td>" +
+      "<td><b>" + escapeHtmlCore(toFa(l.number)) + "</b><br><small class='text-muted'>" + escapeHtmlCore(toFa(l.date)) + "</small></td>" +
+      "<td><span class='badge " + (l.type === "OUT" ? "bg-success" : "bg-primary") + "'>" + letterType + "</span><br><span class='badge bg-dark mt-1'>کاغذ " + pSize + "</span></td>" +
+      "<td><b>" + escapeHtmlCore(l.recipient) + "</b><br><small class='text-success fw-bold'>متقاضی: " + escapeHtmlCore(l.appName || "---") + " (" + escapeHtmlCore(toFa(l.cap || "")) + ")</small></td>" +
       "<td><div class='d-flex gap-1 justify-content-center flex-wrap'>" +
-        "<button class='btn btn-sm btn-warning py-0 px-2 fw-bold' onclick='editLetterFromSecretariat(\"" + l.id + "\")' data-tip='ویرایش متن، شماره یا مشخصات این نامه'>✏️</button>" +
-        "<button class='btn btn-sm btn-success py-0 px-2 fw-bold' onclick='previewSavedLetter(\"" + l.id + "\", \"A4\")' data-tip='مشاهده و چاپ روی کاغذ A4'>🖨️ A4</button>" +
-        "<button class='btn btn-sm btn-primary py-0 px-2 fw-bold' onclick='previewSavedLetter(\"" + l.id + "\", \"A5\")' data-tip='مشاهده و چاپ روی کاغذ A5'>🖨️ A5</button>" +
-        "<button class='btn btn-sm btn-outline-danger py-0 px-2' onclick='if(confirm(\"آیا از حذف این نامه از دفتر اندیکاتور اطمینان دارید؟\")){lettersDB.splice(" + i + ",1);saveAllDB();}'>🗑️</button>" +
+        "<button type='button' class='btn btn-sm btn-warning py-0 px-2 fw-bold' data-letter-action='edit' data-letter-id='" + safeLetterId + "' data-tip='ویرایش متن، شماره یا مشخصات این نامه'>✏️</button>" +
+        "<button type='button' class='btn btn-sm btn-success py-0 px-2 fw-bold' data-letter-action='a4' data-letter-id='" + safeLetterId + "' data-tip='مشاهده و چاپ روی کاغذ A4'>🖨️ A4</button>" +
+        "<button type='button' class='btn btn-sm btn-primary py-0 px-2 fw-bold' data-letter-action='a5' data-letter-id='" + safeLetterId + "' data-tip='مشاهده و چاپ روی کاغذ A5'>🖨️ A5</button>" +
+        "<button type='button' class='btn btn-sm btn-outline-danger py-0 px-2' data-letter-action='delete' data-letter-id='" + safeLetterId + "'>🗑️</button>" +
       "</div></td></tr>";
   }
   tbody.innerHTML = html || "<tr><td colspan='4' class='text-center py-3 text-muted'>نامه‌ای یافت نشد.</td></tr>";
-}
 
+  if (!tbody.dataset.secureActionsBound) {
+    tbody.dataset.secureActionsBound = "1";
+    tbody.addEventListener("click", function (event) {
+      var btn = event.target.closest("button[data-letter-action]");
+      if (!btn || !tbody.contains(btn)) return;
+      var id = btn.getAttribute("data-letter-id");
+      var action = btn.getAttribute("data-letter-action");
+      var idx = lettersDB.findIndex(function (letter) { return letter && String(letter.id) === id; });
+      if (idx < 0) return;
+      if (action === "edit") editLetterFromSecretariat(id);
+      else if (action === "a4") previewSavedLetter(id, "A4");
+      else if (action === "a5") previewSavedLetter(id, "A5");
+      else if (action === "delete") {
+        if (!confirm("آیا از حذف این نامه از دفتر اندیکاتور اطمینان دارید؟")) return;
+        lettersDB.splice(idx, 1);
+        saveAllDB();
+      }
+    });
+  }
+}
 function filterLettersTable(dirVal) {
   var sel = document.getElementById("sec-filter-dir");
   if (sel) sel.value = dirVal;
