@@ -1880,6 +1880,60 @@
                   <button type="button" class="btn btn-sm btn-outline-dark py-0" onclick="setLeafletTileMode('GOOGLE_TERRAIN')">⛰️ توپوگرافی و راه‌ها</button>
                 </div>
               </div>
+              <div id="crq-online-map-tools" class="border rounded p-2 mb-2 bg-light">
+                <div class="d-flex flex-wrap align-items-center gap-1 mb-2">
+                  <span class="small fw-bold text-dark me-1">✏️ ابزار ترسیم روی نقشه:</span>
+                  <button type="button" id="crq-draw-point-btn" class="btn btn-sm btn-outline-success" onclick="setMapDrawingMode('POINT')">📍 ثبت نقطه</button>
+                  <button type="button" id="crq-draw-line-btn" class="btn btn-sm btn-outline-primary" onclick="setMapDrawingMode('LINE')">📏 رسم مسیر</button>
+                  <button type="button" id="crq-draw-polygon-btn" class="btn btn-sm btn-outline-success" onclick="setMapDrawingMode('POLYGON')">⬠ رسم محدوده</button>
+                  <button type="button" id="crq-draw-finish-btn" class="btn btn-sm btn-success" onclick="finishMapDrawing()" disabled>✔️ اتمام ترسیم</button>
+                  <button type="button" class="btn btn-sm btn-outline-warning" onclick="undoMapDrawingPoint()">↶ بازگشت یک نقطه</button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" onclick="cancelMapDrawing()">لغو ابزار</button>
+                  <button type="button" id="crq-map-edit-vertices-btn" class="btn btn-sm btn-outline-dark" onclick="setCroquisMapVertexEdit()">✥ ویرایش نقاط: خاموش</button>
+                </div>
+                <div class="d-flex flex-wrap align-items-end gap-2">
+                  <div style="min-width:120px;max-width:160px;">
+                    <label class="small fw-bold" for="crq-map-draw-elev">ارتفاع نقطه (متر)</label>
+                    <input id="crq-map-draw-elev" type="number" step="any" class="form-control form-control-sm font-monospace" value="0" dir="ltr" />
+                  </div>
+                  <div class="d-flex flex-wrap gap-1">
+                    <button type="button" class="btn btn-sm btn-outline-info" onclick="locateOnCroquisMap()">◎ موقعیت‌یابی GPS</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="copyActiveLayerUTM()">📋 کپی مختصات UTM</button>
+                    <button type="button" class="btn btn-sm btn-outline-success" onclick="exportCroquisGeoJSON()">🌐 خروجی GeoJSON</button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="clearActiveMapLayerPoints()">🗑️ پاک‌کردن لایه فعال</button>
+                  </div>
+                </div>
+                <div id="crq-map-draw-status" class="small fw-bold text-primary mt-2">برای شروع، یک لایه را انتخاب کنید و یکی از ابزارهای نقطه، مسیر یا محدوده را بزنید.</div>
+                <div id="crq-map-coordinate-readout" class="small text-muted mt-1 font-monospace" dir="ltr">Lat/Lng: — | UTM X/Y: —</div>
+                <div class="small text-muted mt-1">با هر کلیک، مختصات جغرافیایی به UTM زون نقشه تبدیل و در لایه فعال ذخیره می‌شود. ارتفاع از روی تصویر ماهواره‌ای قابل استخراج نیست؛ مقدار آن را دستی وارد کنید (پیش‌فرض صفر).</div>
+              </div>
+              <div id="crq-online-map-tools" class="border rounded p-2 mb-2 bg-light">
+                <div class="d-flex flex-wrap align-items-center gap-1 mb-2">
+                  <span class="small fw-bold text-dark me-1">✏️ ابزار ترسیم روی نقشه:</span>
+                  <button type="button" id="crq-draw-point-btn" class="btn btn-sm btn-outline-success" onclick="setMapDrawingMode('POINT')">📍 ثبت نقطه</button>
+                  <button type="button" id="crq-draw-line-btn" class="btn btn-sm btn-outline-primary" onclick="setMapDrawingMode('LINE')">📏 رسم مسیر</button>
+                  <button type="button" id="crq-draw-polygon-btn" class="btn btn-sm btn-outline-success" onclick="setMapDrawingMode('POLYGON')">⬠ رسم محدوده</button>
+                  <button type="button" id="crq-draw-finish-btn" class="btn btn-sm btn-success" onclick="finishMapDrawing()" disabled>✔️ اتمام ترسیم</button>
+                  <button type="button" class="btn btn-sm btn-outline-warning" onclick="undoMapDrawingPoint()">↶ بازگشت یک نقطه</button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" onclick="cancelMapDrawing()">لغو ابزار</button>
+                  <button type="button" id="crq-map-edit-vertices-btn" class="btn btn-sm btn-outline-dark" onclick="setCroquisMapVertexEdit()">✥ ویرایش نقاط: خاموش</button>
+                </div>
+                <div class="d-flex flex-wrap align-items-end gap-2">
+                  <div style="min-width:120px;max-width:160px;">
+                    <label class="small fw-bold" for="crq-map-draw-elev">ارتفاع نقطه (متر)</label>
+                    <input id="crq-map-draw-elev" type="number" step="any" class="form-control form-control-sm font-monospace" value="0" dir="ltr" />
+                  </div>
+                  <div class="d-flex flex-wrap gap-1">
+                    <button type="button" class="btn btn-sm btn-outline-info" onclick="locateOnCroquisMap()">◎ موقعیت‌یابی GPS</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="copyActiveLayerUTM()">📋 کپی مختصات UTM</button>
+                    <button type="button" class="btn btn-sm btn-outline-success" onclick="exportCroquisGeoJSON()">🌐 خروجی GeoJSON</button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="clearActiveMapLayerPoints()">🗑️ پاک‌کردن لایه فعال</button>
+                  </div>
+                </div>
+                <div id="crq-map-draw-status" class="small fw-bold text-primary mt-2">برای شروع، یک لایه را انتخاب کنید و یکی از ابزارهای نقطه، مسیر یا محدوده را بزنید.</div>
+                <div id="crq-map-coordinate-readout" class="small text-muted mt-1 font-monospace" dir="ltr">Lat/Lng: — | UTM X/Y: —</div>
+                <div class="small text-muted mt-1">با هر کلیک، مختصات جغرافیایی به UTM زون نقشه تبدیل و در لایه فعال ذخیره می‌شود. ارتفاع از روی تصویر ماهواره‌ای قابل استخراج نیست؛ مقدار آن را دستی وارد کنید (پیش‌فرض صفر).</div>
+              </div>
               <div id="crq-leaflet-map-div" style="width:100%; height: 410px; border-radius:10px; border:2px solid #263849;"></div>
             </div>
 
