@@ -2713,7 +2713,9 @@ function buildPrintedCroquisMap(m, svgW, svgH, mode) {
   var spanLng = Math.max(maxLng - minLng, 0.00018);
 
   // محاسبه هوشمند سطح زوم بهینه بر اساس ضریب حاشیه برش (cropPaddingFactor) و تصحیح مرکاتور عرض جغرافیایی
-  var padFactor = croquisPrintLabelOpts.cropPaddingFactor || 0.56;
+  var padFactor = Number(croquisPrintLabelOpts.cropPaddingFactor);
+  if (!Number.isFinite(padFactor)) padFactor = 0.56;
+  padFactor = Math.min(0.82, Math.max(0.30, padFactor));
   var targetSpanPxW = svgW * padFactor;
   var targetSpanPxH = svgH * padFactor;
   var cosLat = Math.cos(centerLat * Math.PI / 180) || 0.87;
@@ -2776,9 +2778,14 @@ function buildPrintedCroquisMap(m, svgW, svgH, mode) {
   }
 
   var haloStyle = "paint-order:stroke fill; stroke:#0f172a; stroke-width:3.5px; stroke-linecap:round; stroke-linejoin:round;";
-  var radialDist = croquisPrintLabelOpts.labelRadialOffset || 22;
-  var coordMode = croquisPrintLabelOpts.coordDisplayMode || "OUTER_CODE";
-  var fillOp = (croquisPrintLabelOpts.polyFillOpacity !== undefined) ? croquisPrintLabelOpts.polyFillOpacity : 0.05;
+  var radialDist = Number(croquisPrintLabelOpts.labelRadialOffset);
+  if (!Number.isFinite(radialDist)) radialDist = 22;
+  radialDist = Math.min(55, Math.max(10, radialDist));
+  var allowedCoordModes = ["OUTER_CODE","OUTER_CALLOUT_XY","OUTER_WITH_SUBLAYERS","NONE"];
+  var coordMode = allowedCoordModes.indexOf(croquisPrintLabelOpts.coordDisplayMode) !== -1 ? croquisPrintLabelOpts.coordDisplayMode : "OUTER_CODE";
+  var fillOp = Number(croquisPrintLabelOpts.polyFillOpacity);
+  if (!Number.isFinite(fillOp)) fillOp = 0.05;
+  fillOp = Math.min(1, Math.max(0, fillOp));
 
   // تشخیص لایه اصلی زمین (MAIN_PARCEL یا لایه متمرکز انتخابی کاربر) تا مشخصات فقط در بیرون مرز زمین درج شود و داخل پولیگون کاملاً باز و خوانا بماند
   var primaryLayerId = null;
@@ -2824,8 +2831,13 @@ function buildPrintedCroquisMap(m, svgW, svgH, mode) {
   var vectorShapes = "";
   var subCalloutIdx = 0;
   for (var lIdx = 0; lIdx < m.layers.length; lIdx++) {
-    var lyr = m.layers[lIdx];
-    if (!lyr.visible || !lyr.points.length) continue;
+    var lyr = m.layers[lIdx] || {};
+    if (!lyr.visible || !Array.isArray(lyr.points) || !lyr.points.length) continue;
+    var layerColor = safeHexColor(layerColor, "#15803d");
+    var safeLayerName = safeHtmlText(safeLayerName || "لایه بدون نام");
+    var layerStrokeWidth = Number(lyr.strokeWidth);
+    if (!Number.isFinite(layerStrokeWidth)) layerStrokeWidth = 2.5;
+    layerStrokeWidth = Math.min(10, Math.max(0.5, layerStrokeWidth));
     var gLyr = computeUtmGeometry(lyr.points, lyr.geomType);
     var isPrimaryParcel = (!primaryLayerId || lyr.id === primaryLayerId);
 
@@ -2844,8 +2856,8 @@ function buildPrintedCroquisMap(m, svgW, svgH, mode) {
       var cy = sumCy / lyr.points.length;
 
       // چندضلعی با داخل شفاف تا بافت زمین روی گوگل‌ارث ۱۰۰٪ دیده شود
-      vectorShapes += '<polygon points="' + polyPts.join(" ") + '" fill="' + lyr.color + '" fill-opacity="' + fillOp + '" stroke="#ffffff" stroke-width="' + (isPrimaryParcel ? '4.5' : '3.2') + '" stroke-linejoin="round"/>';
-      vectorShapes += '<polygon points="' + polyPts.join(" ") + '" fill="none" stroke="' + lyr.color + '" stroke-width="' + (isPrimaryParcel ? '2.6' : '2.0') + '" stroke-linejoin="round"/>';
+      vectorShapes += '<polygon points="' + polyPts.join(" ") + '" fill="' + layerColor + '" fill-opacity="' + fillOp + '" stroke="#ffffff" stroke-width="' + (isPrimaryParcel ? '4.5' : '3.2') + '" stroke-linejoin="round"/>';
+      vectorShapes += '<polygon points="' + polyPts.join(" ") + '" fill="none" stroke="' + layerColor + '" stroke-width="' + (isPrimaryParcel ? '2.6' : '2.0') + '" stroke-linejoin="round"/>';
 
       // نمایش طول اضلاع و کد رئوس فقط در بیرون مرز زمین اصلی (یا لایه متمرکز) تا هیچ متنی داخل پولیگون زمین را نپوشاند
       for (var p2 = 0; p2 < lyr.points.length; p2++) {
@@ -2857,7 +2869,7 @@ function buildPrintedCroquisMap(m, svgW, svgH, mode) {
         var my = (a.y + b.y) / 2;
 
         // دایره ظریف رأس
-        vectorShapes += '<circle cx="' + a.x + '" cy="' + a.y + '" r="' + (isPrimaryParcel ? '4' : '3') + '" fill="#ffffff" stroke="' + lyr.color + '" stroke-width="2"/>';
+        vectorShapes += '<circle cx="' + a.x + '" cy="' + a.y + '" r="' + (isPrimaryParcel ? '4' : '3') + '" fill="#ffffff" stroke="' + layerColor + '" stroke-width="2"/>';
 
         if (!isPrimaryParcel) continue;
 
@@ -2867,7 +2879,7 @@ function buildPrintedCroquisMap(m, svgW, svgH, mode) {
         var vLen = Math.sqrt(vx * vx + vy * vy) || 1;
         var ux = vx / vLen;
         var uy = vy / vLen;
-        var lbl = lyr.points[p2].label || ("P" + (p2 + 1));
+        var lbl = safeHtmlText(lyr.points[p2].label || ("P" + (p2 + 1)));
 
         if (croquisPrintLabelOpts.showPoints && coordMode !== "NONE") {
           if (coordMode === "OUTER_CALLOUT_XY") {
@@ -2915,8 +2927,8 @@ function buildPrintedCroquisMap(m, svgW, svgH, mode) {
         var callY = (subCalloutIdx % 2 === 0) ? Math.max(18, outerMinY - radialDist - 12) : Math.min(svgH - 16, outerMaxY + radialDist + 16);
         var callX = Math.max(90, Math.min(svgW - 90, Math.round(cx + (subCalloutIdx - 1) * 45)));
         subCalloutIdx++;
-        vectorShapes += '<line x1="' + Math.round(cx) + '" y1="' + Math.round(cy) + '" x2="' + callX + '" y2="' + (callY + (callY < cy ? 4 : -8)) + '" stroke="' + lyr.color + '" stroke-width="1.5" stroke-dasharray="3,2"/>';
-        vectorShapes += '<text x="' + callX + '" y="' + callY + '" fill="#ffffff" font-size="8.5" font-weight="bold" text-anchor="middle" style="' + haloStyle + '">' + lyr.name + '</text>';
+        vectorShapes += '<line x1="' + Math.round(cx) + '" y1="' + Math.round(cy) + '" x2="' + callX + '" y2="' + (callY + (callY < cy ? 4 : -8)) + '" stroke="' + layerColor + '" stroke-width="1.5" stroke-dasharray="3,2"/>';
+        vectorShapes += '<text x="' + callX + '" y="' + callY + '" fill="#ffffff" font-size="8.5" font-weight="bold" text-anchor="middle" style="' + haloStyle + '">' + safeLayerName + '</text>';
       }
 
       // عنوان لایه اصلی: در صورت فعال شدن، در بالای کادر بیرونی پولیگون قرار می‌گیرد تا مرکز زمین را نپوشاند
@@ -2927,7 +2939,7 @@ function buildPrintedCroquisMap(m, svgW, svgH, mode) {
         }
         var titleY = Math.max(20, minScreenY - radialDist - 12);
         vectorShapes += '<text x="' + Math.round(cx) + '" y="' + Math.round(titleY) + '" fill="#fde047" font-size="10.5" font-weight="900" text-anchor="middle" style="' + haloStyle + '">' +
-          lyr.name + ' (' + toFa(Math.round(gLyr.area)) + ' م.م)' +
+          safeLayerName + ' (' + toFa(Math.round(gLyr.area)) + ' م.م)' +
         '</text>';
       }
     } else if (lyr.geomType === "LINE" && lyr.points.length >= 2) {
@@ -2935,26 +2947,26 @@ function buildPrintedCroquisMap(m, svgW, svgH, mode) {
       for (var p3 = 0; p3 < lyr.points.length; p3++) {
         var s3 = toMapScreen(lyr.points[p3]);
         linePts.push(s3.x + "," + s3.y);
-        vectorShapes += '<circle cx="' + s3.x + '" cy="' + s3.y + '" r="3.5" fill="#ffffff" stroke="' + lyr.color + '" stroke-width="2"/>';
+        vectorShapes += '<circle cx="' + s3.x + '" cy="' + s3.y + '" r="3.5" fill="#ffffff" stroke="' + layerColor + '" stroke-width="2"/>';
         if (isPrimaryParcel && croquisPrintLabelOpts.showPoints && coordMode !== "NONE") {
-          var lLbl = lyr.points[p3].label || ("L" + (p3 + 1));
+          var lLbl = safeHtmlText(lyr.points[p3].label || ("L" + (p3 + 1)));
           vectorShapes += '<text x="' + s3.x + '" y="' + (s3.y - radialDist * 0.6) + '" fill="#ffffff" font-size="9.5" font-weight="bold" text-anchor="middle" style="' + haloStyle + '">' + lLbl + '</text>';
         }
       }
       vectorShapes += '<polyline points="' + linePts.join(" ") + '" fill="none" stroke="#ffffff" stroke-width="4.2"/>';
-      vectorShapes += '<polyline points="' + linePts.join(" ") + '" fill="none" stroke="' + lyr.color + '" stroke-width="2.4" stroke-dasharray="6,3"/>';
+      vectorShapes += '<polyline points="' + linePts.join(" ") + '" fill="none" stroke="' + layerColor + '" stroke-width="2.4" stroke-dasharray="6,3"/>';
     } else {
       for (var p4 = 0; p4 < lyr.points.length; p4++) {
         var s4 = toMapScreen(lyr.points[p4]);
-        vectorShapes += '<circle cx="' + s4.x + '" cy="' + s4.y + '" r="5.5" fill="#ffffff" stroke="' + lyr.color + '" stroke-width="3"/>';
+        vectorShapes += '<circle cx="' + s4.x + '" cy="' + s4.y + '" r="5.5" fill="#ffffff" stroke="' + layerColor + '" stroke-width="3"/>';
         if (isPrimaryParcel || coordMode === "OUTER_WITH_SUBLAYERS") {
           // هدایت برچسب نقطه به بیرون مرز بالایی پولیگون اصلی تا داخل زمین را نپوشاند
           var ptOutY = isPrimaryParcel ? (s4.y - radialDist) : Math.max(18, outerMinY - radialDist - 10);
           var ptOutX = s4.x;
           if (!isPrimaryParcel) {
-            vectorShapes += '<line x1="' + s4.x + '" y1="' + s4.y + '" x2="' + ptOutX + '" y2="' + (ptOutY + 4) + '" stroke="' + lyr.color + '" stroke-width="1.4" stroke-dasharray="3,2"/>';
+            vectorShapes += '<line x1="' + s4.x + '" y1="' + s4.y + '" x2="' + ptOutX + '" y2="' + (ptOutY + 4) + '" stroke="' + layerColor + '" stroke-width="1.4" stroke-dasharray="3,2"/>';
           }
-          vectorShapes += '<text x="' + ptOutX + '" y="' + ptOutY + '" fill="#fde047" font-size="9" font-weight="bold" text-anchor="middle" style="' + haloStyle + '">' + (lyr.points[p4].label || lyr.name) + '</text>';
+          vectorShapes += '<text x="' + ptOutX + '" y="' + ptOutY + '" fill="#fde047" font-size="9" font-weight="bold" text-anchor="middle" style="' + haloStyle + '">' + safeHtmlText(lyr.points[p4].label || lyr.name || "نقطه") + '</text>';
         }
       }
     }
