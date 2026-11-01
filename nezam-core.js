@@ -674,15 +674,42 @@ function normalizeAllCasesSchema() {
 normalizeAllCasesSchema();
 
 function saveAllDB() {
-  try {
-    localStorage.setItem("nezam636_unified_cases", JSON.stringify(casesDB));
-    localStorage.setItem("nezam636_letters", JSON.stringify(lettersDB));
-    localStorage.setItem("nezam636_tasks", JSON.stringify(tasksDB));
-    localStorage.setItem("nezam636_doc_checklists_v2", JSON.stringify(DOC_CHECKLISTS));
-    localStorage.setItem("nezam636_act_specs_v3", JSON.stringify(ACT_SPECS));
-    localStorage.setItem("nezam636_active_case_id", activeCaseId || "");
-  } catch (e) {}
+  var storageEntries = [
+    ["nezam636_unified_cases", casesDB],
+    ["nezam636_letters", lettersDB],
+    ["nezam636_tasks", tasksDB],
+    ["nezam636_doc_checklists_v2", DOC_CHECKLISTS],
+    ["nezam636_act_specs_v3", ACT_SPECS],
+    ["nezam636_active_case_id", activeCaseId || ""]
+  ];
+  var failedKeys = [];
+
+  // هر بخش جداگانه ذخیره می‌شود تا خطای یک کلید، ذخیره سایر اطلاعات را متوقف نکند.
+  for (var i = 0; i < storageEntries.length; i++) {
+    try {
+      localStorage.setItem(storageEntries[i][0], JSON.stringify(storageEntries[i][1]));
+    } catch (storageError) {
+      failedKeys.push(storageEntries[i][0]);
+      console.error("Nezam636 storage write failed:", storageEntries[i][0], storageError);
+    }
+  }
+
+  if (failedKeys.length) {
+    var now = Date.now();
+    var lastWarning = Number(window.__nezam636LastStorageWarningAt || 0);
+    if (typeof showToastMsg === "function" && now - lastWarning > 10000) {
+      window.__nezam636LastStorageWarningAt = now;
+      showToastMsg(
+        "⚠️ ذخیره بخشی از اطلاعات در حافظه مرورگر انجام نشد. فضای ذخیره‌سازی را آزاد کنید و فوراً از بخش پشتیبان‌گیری، فایل JSON تهیه کنید.",
+        true
+      );
+    }
+  } else {
+    window.__nezam636LastStorageWarningAt = 0;
+  }
+
   refreshAllViews();
+  return failedKeys.length === 0;
 }
 
 /* =========================================================================
