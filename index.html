@@ -1221,7 +1221,7 @@
         <div id="nav-logo-box" style="width:54px;height:54px;background:#fff;border-radius:50%;padding:3px;border:2px solid #e9c46a;"></div>
         <div>
           <div class="small fw-bold" style="color:#e9c46a;" id="ui-hero-org">سازمان نظام مهندسی کشاورزی و منابع طبیعی استان فارس</div>
-          <h1 class="m-0 fw-bold" style="font-size:1.12rem;" id="ui-hero-office">سامانه اتوماسیون مرکز ۶۳۶ خفر | مدیر مرکز: حسام‌الدین خواجه‌پور تادوانی</h1>
+          <h1 class="m-0 fw-bold" style="font-size:1.12rem;" id="ui-hero-office">اتوماسیون مرکز خدمات کشاورزی ۶۳۶ خفر</h1>
         </div>
       </div>
 
@@ -1229,8 +1229,8 @@
         <div class="px-3 py-1 rounded" style="background:rgba(0,0,0,0.32);border:1px solid rgba(233,196,106,0.4);">
           🕒 <span id="live-clock" class="fw-bold text-warning">--:--:--</span> | <small id="live-date">۱۴۰۵/۰۲/۱۳</small>
         </div>
-        <button type="button" class="btn btn-sm btn-warning fw-bold" onclick="downloadStandaloneWindowsHTML()" data-tip="دانلود کل اتوماسیون در یک فایل HTML مستقل برای اجرا روی هر ویندوز بدون اینترنت">
-          💻 دانلود نسخه تک‌فایلی ویندوز (.html)
+        <button type="button" class="btn btn-sm btn-warning fw-bold nezam-windows-export-btn" aria-label="دانلود نسخه مستقل ویندوز" onclick="downloadStandaloneWindowsHTML()" data-tip="دانلود کل اتوماسیون در یک فایل HTML مستقل برای اجرا روی هر ویندوز بدون اینترنت">
+          💻 نسخه ویندوز
         </button>
       </div>
     </div>
@@ -1268,14 +1268,14 @@
 
   <!-- ۳. منوی اصلی ناوبری بخش‌های اتوماسیون -->
   <nav class="app-navbar no-print" aria-label="منوی بخش‌های اتوماسیون">
-    <button type="button" id="nav-btn-dashboard" class="nav-link active" onclick="switchMainPane('pane-dashboard')">📊 ۱. نقشه راه و پیشخوان فرماندهی</button>
-    <button type="button" id="nav-btn-cases" class="nav-link" onclick="switchMainPane('pane-cases')">📁 ۲. پرونده متقاضیان (۳ گروه تخصصی)</button>
-    <button type="button" id="nav-btn-croquis" class="nav-link" onclick="switchMainPane('pane-croquis')">🗺️ ۳. استودیو نقشه‌کشی و کروکی UTM</button>
-    <button type="button" id="nav-btn-letters" class="nav-link" onclick="switchMainPane('pane-letters')">✉️ ۴. ژنراتور مکاتبات و دبیرخانه (A4/A5)</button>
-    <button type="button" id="nav-btn-print" class="nav-link" onclick="switchMainPane('pane-print')">🖨️ ۵. سربرگ A4 / A5 و فرم‌های نظارتی</button>
-    <button type="button" id="nav-btn-office" class="nav-link" onclick="switchMainPane('pane-office')">💼 ۶. کارتابل پیگیری و پشتیبان JSON</button>
-    <button type="button" id="nav-btn-ai" class="nav-link" onclick="switchMainPane('pane-ai')">🤖 ۷. دستیار هوشمند Gemini و OCR</button>
-    <button type="button" id="nav-btn-guide" class="nav-link" onclick="switchMainPane('pane-guide')">📘 ۸. راهنمای جامع تصویری</button>
+    <button type="button" id="nav-btn-dashboard" class="nav-link active" onclick="switchMainPane('pane-dashboard')">📊 پیشخوان</button>
+    <button type="button" id="nav-btn-cases" class="nav-link" onclick="switchMainPane('pane-cases')">📁 پرونده‌ها</button>
+    <button type="button" id="nav-btn-croquis" class="nav-link" onclick="switchMainPane('pane-croquis')">🗺️ کروکی UTM</button>
+    <button type="button" id="nav-btn-letters" class="nav-link" onclick="switchMainPane('pane-letters')">✉️ دبیرخانه</button>
+    <button type="button" id="nav-btn-print" class="nav-link" onclick="switchMainPane('pane-print')">🖨️ چاپ و فرم‌ها</button>
+    <button type="button" id="nav-btn-office" class="nav-link" onclick="switchMainPane('pane-office')">💼 کارتابل</button>
+    <button type="button" id="nav-btn-ai" class="nav-link" onclick="switchMainPane('pane-ai')">🤖 دستیار هوشمند</button>
+    <button type="button" id="nav-btn-guide" class="nav-link" onclick="switchMainPane('pane-guide')">📘 راهنما</button>
   </nav>
 
   <!-- محتوای اصلی تب‌ها -->
@@ -1321,7 +1321,7 @@
         <div class="col-md-5 mb-2">
           <div class="card-clean h-100 mb-0">
             <div class="d-flex justify-content-between align-items-center mb-2 pb-1 border-bottom">
-              <strong class="text-success">📈 ۳. آمار کلان مرکز ۶۳۶ خفر</strong>
+              <strong class="text-success">📈 آمار مرکز</strong>
               <span class="badge bg-light text-dark border">پایش لحظه‌ای</span>
             </div>
             <div class="row g-2">
@@ -1385,7 +1385,7 @@
         <div class="col-md-7 mb-2">
           <div class="card-clean h-100 mb-0">
             <div class="d-flex justify-content-between align-items-center mb-2 pb-1 border-bottom">
-              <strong class="text-primary">🧭 ۴. منوی عملیات اصلی (نقشه راه فرماندهی)</strong>
+              <strong class="text-primary">🧭 دسترسی سریع</strong>
               <span class="small text-muted">دسترسی مستقیم به ابزارهای تخصصی</span>
             </div>
             <div class="cmd-tile-grid">
@@ -1526,11 +1526,11 @@
       <div class="card-clean">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2 pb-2 border-bottom">
           <div>
-            <strong class="text-success" style="font-size:1rem;">📋 ۲. فهرست سریع: دسترسی فوری به پرونده‌های در جریان مرکز ۶۳۶ خفر</strong>
+            <strong class="text-success" style="font-size:1rem;">📋 پرونده‌های در جریان</strong>
             <div class="small text-muted">نمایش وضعیت استعلام‌ها، کلاسه پرونده، کد ملی و انتقال سریع به کروکی و مکاتبات</div>
           </div>
           <div class="d-flex gap-2">
-            <button type="button" class="btn btn-sm btn-success" onclick="switchMainPane('pane-cases'); switchCaseSubTab('sub-list');">🔍 ۱. جستجو و فیلتر پیشرفته</button>
+            <button type="button" class="btn btn-sm btn-success" onclick="switchMainPane('pane-cases'); switchCaseSubTab('sub-list');">🔍 جستجو و فیلتر</button>
             <button type="button" class="btn btn-sm btn-primary" onclick="switchMainPane('pane-croquis')">🗺️ استودیو نقشه‌کشی UTM</button>
           </div>
         </div>
@@ -1563,7 +1563,7 @@
             <button type="button" id="btn-sub-list" class="case-subtab-btn active" onclick="switchCaseSubTab('sub-list')">🔍 ۱. جستجوی پیشرفته متقاضیان</button>
             <button type="button" id="btn-sub-info" class="case-subtab-btn" onclick="switchCaseSubTab('sub-info')">📝 ۲. ثبت / ویرایش مشخصات و نقاط UTM</button>
             <button type="button" id="btn-sub-matrix" class="case-subtab-btn" onclick="switchCaseSubTab('sub-matrix')">📊 ۳. ماتریس جامع پیگیری ۷ استعلام</button>
-            <button type="button" id="btn-sub-docs" class="case-subtab-btn" onclick="switchCaseSubTab('sub-docs')">📂 ۴. چک‌لیست مدارک و پوشه اختصاصی</button>
+            <button type="button" id="btn-sub-docs" class="case-subtab-btn" onclick="switchCaseSubTab('sub-docs')">مدارک پرونده و پوشه اختصاصی</button>
             <button type="button" id="btn-sub-history" class="case-subtab-btn" onclick="switchCaseSubTab('sub-history')">🕒 ۵. سابقه کامل اقدامات (Audit Log)</button>
           </div>
           <button type="button" class="btn btn-sm btn-success" onclick="startNewCaseWizard('GREENHOUSE_MUSHROOM')">➕ تشکیل پرونده متقاضی جدید</button>
@@ -2141,7 +2141,7 @@
                 <button type="button" id="btn-view-map" class="btn btn-sm btn-outline-success fw-bold" onclick="switchCroquisViewMode('MAP')">🌍 نمای ماهواره‌ای Google Earth</button>
               </div>
               <div class="d-flex flex-wrap gap-1">
-                <button type="button" class="btn btn-sm btn-success" onclick="downloadCaseKML()">🌍 خروجی KML گوگل‌ارث</button>
+                <button type="button" class="btn btn-sm btn-success" onclick="downloadCaseKML()">دریافت KML گوگل‌ارث</button>
                 <label class="btn btn-sm btn-outline-primary m-0" style="cursor:pointer;">
                   📂 ورود فایل KML
                   <input type="file" accept=".kml" hidden onchange="importKmlFileToActiveLayer(event)" />
@@ -2435,9 +2435,9 @@
             </div>
 
             <div class="d-flex flex-wrap gap-2">
-              <button type="button" class="btn btn-success" onclick="saveLetterToSecretariat(true, 'A4')">🖨️ ذخیره و چاپ در کاغذ A4</button>
-              <button type="button" class="btn btn-primary" onclick="saveLetterToSecretariat(true, 'A5')">🖨️ ذخیره و چاپ در کاغذ A5</button>
-              <button type="button" class="btn btn-outline-success" onclick="saveLetterToSecretariat(false)">💾 ثبت در دفتر اندیکاتور</button>
+              <button type="button" class="btn btn-success" onclick="saveLetterToSecretariat(true, 'A4')">چاپ A4</button>
+              <button type="button" class="btn btn-primary" onclick="saveLetterToSecretariat(true, 'A5')">چاپ A5</button>
+              <button type="button" class="btn btn-outline-success" onclick="saveLetterToSecretariat(false)">ثبت در دبیرخانه</button>
             </div>
           </div>
         </div>
@@ -2519,14 +2519,14 @@
 
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
           <div class="d-flex flex-wrap gap-1">
-            <button type="button" class="btn btn-sm btn-outline-success" onclick="renderSinglePreviewSheet()">📄 نامه فعلی دبیرخانه</button>
+            <button type="button" class="btn btn-sm btn-outline-success" onclick="renderSinglePreviewSheet()">پیش‌نمایش نامه</button>
             <button type="button" class="btn btn-sm btn-outline-primary" onclick="printUtmSketchSheet()">🗺️ شیت کروکی چندلایه UTM (۲ برگه مجزا: نقشه + جداول الف و ب)</button>
             <button type="button" class="btn btn-sm btn-outline-dark" onclick="printOfficialForm('FOLDER_COVER')">📋 روکش تکمیل پرونده</button>
             <button type="button" class="btn btn-sm btn-outline-dark" onclick="printOfficialForm('GREENHOUSE_CHECKLIST')">🌱 فرم پایش فنی گلخانه/قارچ</button>
-            <button type="button" class="btn btn-sm btn-outline-dark" onclick="printOfficialForm('PHARMACY_INSPECTION')">💊 فرم ۱۸ بندی داروخانه گیاهپزشکی</button>
+            <button type="button" class="btn btn-sm btn-outline-dark" onclick="printOfficialForm('PHARMACY_INSPECTION')">فرم بازرسی داروخانه گیاهپزشکی</button>
             <button type="button" class="btn btn-sm btn-outline-dark" onclick="printOfficialForm('PLEDGE_CONTRACT')">✍️ تعهدنامه بهره‌بردار</button>
             <button type="button" class="btn btn-sm btn-outline-dark" onclick="printOfficialForm('BINDER_LABEL')">🏷️ لیبل عطف زونکن</button>
-            <button type="button" class="btn btn-sm btn-outline-danger" onclick="issueDeficiencyLetterForActiveCase()">⚠️ اخطاریه نقص مدارک</button>
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="issueDeficiencyLetterForActiveCase()">اخطاریه نقص مدارک</button>
           </div>
           <small class="text-muted fw-bold">✏️ پایان پرش متن به صفحه دوم: با دکمه «تنظیم خودکار تک‌برگی» یا ابزارهای A- و A+ محتوا دقیقاً در یک صفحه تراز می‌شود.</small>
         </div>
@@ -2756,7 +2756,7 @@
               <div class="fw-bold small mb-2 text-dark">🖼️ خوانش و تحلیل هوشمند تصویر سند، قولنامه، پروانه یا نقشه UTM (پشتیبانی از تصویر، PDF، KML/KMZ، GPX و اتوکد DXF/DWG):</div>
               <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
                 <input type="file" id="ai-ocr-file-input" class="form-control form-control-sm" style="max-width:340px;" accept="image/*,.pdf,.kml,.kmz,.gpx,.dxf,.dwg,.csv,.txt" onchange="aiHandleImageSelect(this)" />
-                <button type="button" class="btn btn-sm btn-primary" onclick="aiReadDocumentImagePro()">🔍 تحلیل و خوانش فایل / سند با Gemini</button>
+                <button type="button" class="btn btn-sm btn-primary" onclick="aiReadDocumentImagePro()">خوانش سند</button>
               </div>
               <div class="small text-muted mb-1">
                 📌 فرمت خروجی نقاط UTM: <b>چپ‌به‌راست</b> به صورت <code dir="ltr">X,Y,Z,Zone</code> (مثال: <code dir="ltr">645120.5,3198450.2,1150,39</code>)
@@ -3903,7 +3903,7 @@
       esriBtn.id = 'btn-esri-sat-fallback';
       esriBtn.type = 'button';
       esriBtn.className = 'btn btn-sm btn-warning py-0 fw-bold';
-      esriBtn.innerHTML = '🛰️ ماهواره Esri (بدون تحریم)';
+      esriBtn.innerHTML = 'نقشه Esri';
       esriBtn.onclick = function () {
         window.switchToEsriSatellite();
       };
@@ -3918,80 +3918,80 @@
     'pane-dashboard': {
       title: '📊 پیشخوان فرماندهی',
       items: [
-        { label: '🏠 نمای کلی داشبورد', fn: function () { window.scrollTo({ top: 0, behavior: 'smooth' }); } },
-        { label: '🌱 گروه ۱: گلخانه و قارچ', fn: function () { if (window.filterDirectoryByMainGroupCard) filterDirectoryByMainGroupCard('GREENHOUSE_MUSHROOM'); } },
-        { label: '🐄 گروه ۲: دام و طیور', fn: function () { if (window.filterDirectoryByMainGroupCard) filterDirectoryByMainGroupCard('LIVESTOCK_POULTRY_FISHERIES'); } },
-        { label: '💊 گروه ۳: کلینیک و داروخانه', fn: function () { if (window.filterDirectoryByMainGroupCard) filterDirectoryByMainGroupCard('CLINIC_PHARMACY'); } },
-        { label: '➕ متقاضی جدید', fn: function () { if (window.startNewCaseWizard) startNewCaseWizard('GREENHOUSE_MUSHROOM'); } }
+        { label: 'نمای کلی', fn: function () { window.scrollTo({ top: 0, behavior: 'smooth' }); } },
+        { label: 'گلخانه و قارچ', fn: function () { if (window.filterDirectoryByMainGroupCard) filterDirectoryByMainGroupCard('GREENHOUSE_MUSHROOM'); } },
+        { label: 'دام و طیور', fn: function () { if (window.filterDirectoryByMainGroupCard) filterDirectoryByMainGroupCard('LIVESTOCK_POULTRY_FISHERIES'); } },
+        { label: 'کلینیک و داروخانه', fn: function () { if (window.filterDirectoryByMainGroupCard) filterDirectoryByMainGroupCard('CLINIC_PHARMACY'); } },
+        { label: 'متقاضی جدید', fn: function () { if (window.startNewCaseWizard) startNewCaseWizard('GREENHOUSE_MUSHROOM'); } }
       ]
     },
     'pane-cases': {
       title: '📁 پرونده متقاضیان',
       items: [
-        { id: 'sub-list', label: '🔍 ۱. فهرست و جستجو', fn: function () { if (window.switchCaseSubTab) switchCaseSubTab('sub-list'); } },
-        { id: 'sub-info', label: '📝 ۲. مشخصات و نقاط UTM', fn: function () { if (window.switchCaseSubTab) switchCaseSubTab('sub-info'); } },
-        { id: 'sub-matrix', label: '📊 ۳. ماتریس ۷ استعلام', fn: function () { if (window.switchCaseSubTab) switchCaseSubTab('sub-matrix'); } },
-        { id: 'sub-docs', label: '📂 ۴. چک‌لیست مدارک', fn: function () { if (window.switchCaseSubTab) switchCaseSubTab('sub-docs'); } },
-        { id: 'sub-history', label: '🕒 ۵. سابقه اقدامات', fn: function () { if (window.switchCaseSubTab) switchCaseSubTab('sub-history'); } },
-        { label: '➕ تشکیل پرونده جدید', fn: function () { if (window.startNewCaseWizard) startNewCaseWizard('GREENHOUSE_MUSHROOM'); } }
+        { id: 'sub-list', label: 'فهرست و جستجو', fn: function () { if (window.switchCaseSubTab) switchCaseSubTab('sub-list'); } },
+        { id: 'sub-info', label: 'مشخصات و UTM', fn: function () { if (window.switchCaseSubTab) switchCaseSubTab('sub-info'); } },
+        { id: 'sub-matrix', label: 'استعلام‌ها', fn: function () { if (window.switchCaseSubTab) switchCaseSubTab('sub-matrix'); } },
+        { id: 'sub-docs', label: 'مدارک پرونده', fn: function () { if (window.switchCaseSubTab) switchCaseSubTab('sub-docs'); } },
+        { id: 'sub-history', label: 'سوابق اقدامات', fn: function () { if (window.switchCaseSubTab) switchCaseSubTab('sub-history'); } },
+        { label: 'پرونده جدید', fn: function () { if (window.startNewCaseWizard) startNewCaseWizard('GREENHOUSE_MUSHROOM'); } }
       ]
     },
     'pane-croquis': {
       title: '🗺️ استودیو کروکی UTM',
       items: [
-        { label: '📐 نمای مهندسی (CAD)', fn: function () { if (window.switchCroquisViewMode) switchCroquisViewMode('CAD'); } },
+        { label: 'نمای CAD', fn: function () { if (window.switchCroquisViewMode) switchCroquisViewMode('CAD'); } },
         {
-          label: '🌍 نمای ماهواره‌ای گوگل‌ارث',
+          label: 'نقشه ماهواره‌ای',
           fn: function () {
             if (window.switchCroquisViewMode) switchCroquisViewMode('MAP');
             setTimeout(window.forceRefreshCroquisMap, 100);
             setTimeout(window.forceRefreshCroquisMap, 400);
           }
         },
-        { label: '🛰️ ماهواره Esri (بدون تحریم)', fn: function () { if (window.switchCroquisViewMode) switchCroquisViewMode('MAP'); setTimeout(window.switchToEsriSatellite, 120); } },
-        { label: '🌱 الگوی آماده ۱۰ هکتاری', fn: function () { if (window.loadSample10HectareGreenhouseMap) loadSample10HectareGreenhouseMap(); } },
-        { label: '🌍 خروجی KML', fn: function () { if (window.downloadCaseKML) downloadCaseKML(); } },
-        { label: '✂️ چاپ شیت دوبرگی کروکی', fn: function () { if (window.printUtmSketchSheet) printUtmSketchSheet(); } }
+        { label: 'نقشه Esri', fn: function () { if (window.switchCroquisViewMode) switchCroquisViewMode('MAP'); setTimeout(window.switchToEsriSatellite, 120); } },
+        { label: 'الگوی نمونه', fn: function () { if (window.loadSample10HectareGreenhouseMap) loadSample10HectareGreenhouseMap(); } },
+        { label: 'دریافت KML', fn: function () { if (window.downloadCaseKML) downloadCaseKML(); } },
+        { label: 'چاپ کروکی', fn: function () { if (window.printUtmSketchSheet) printUtmSketchSheet(); } }
       ]
     },
     'pane-letters': {
       title: '✉️ مکاتبات و دبیرخانه',
       items: [
-        { label: '🖨️ ذخیره و چاپ در کاغذ A4', fn: function () { if (window.saveLetterToSecretariat) saveLetterToSecretariat(true, 'A4'); } },
-        { label: '🖨️ ذخیره و چاپ در کاغذ A5', fn: function () { if (window.saveLetterToSecretariat) saveLetterToSecretariat(true, 'A5'); } },
-        { label: '💾 ثبت در دفتر اندیکاتور', fn: function () { if (window.saveLetterToSecretariat) saveLetterToSecretariat(false); } }
+        { label: 'چاپ A4', fn: function () { if (window.saveLetterToSecretariat) saveLetterToSecretariat(true, 'A4'); } },
+        { label: 'چاپ A5', fn: function () { if (window.saveLetterToSecretariat) saveLetterToSecretariat(true, 'A5'); } },
+        { label: 'ثبت در دبیرخانه', fn: function () { if (window.saveLetterToSecretariat) saveLetterToSecretariat(false); } }
       ]
     },
     'pane-print': {
       title: '🖨️ سربرگ و فرم‌های نظارتی',
       items: [
-        { label: '📄 نامه فعلی دبیرخانه', fn: function () { if (window.renderSinglePreviewSheet) renderSinglePreviewSheet(); } },
-        { label: '🗺️ شیت دوبرگی کروکی UTM', fn: function () { if (window.printUtmSketchSheet) printUtmSketchSheet(); } },
-        { label: '📋 روکش پرونده', fn: function () { if (window.printOfficialForm) printOfficialForm('FOLDER_COVER'); } },
-        { label: '🌱 فرم پایش گلخانه/قارچ', fn: function () { if (window.printOfficialForm) printOfficialForm('GREENHOUSE_CHECKLIST'); } },
-        { label: '💊 فرم ۱۸ بندی داروخانه', fn: function () { if (window.printOfficialForm) printOfficialForm('PHARMACY_INSPECTION'); } },
-        { label: '⚠️ اخطاریه نقص مدارک', fn: function () { if (window.issueDeficiencyLetterForActiveCase) issueDeficiencyLetterForActiveCase(); } }
+        { label: 'پیش‌نمایش نامه', fn: function () { if (window.renderSinglePreviewSheet) renderSinglePreviewSheet(); } },
+        { label: 'شیت کروکی UTM', fn: function () { if (window.printUtmSketchSheet) printUtmSketchSheet(); } },
+        { label: 'روکش پرونده', fn: function () { if (window.printOfficialForm) printOfficialForm('FOLDER_COVER'); } },
+        { label: 'پایش گلخانه و قارچ', fn: function () { if (window.printOfficialForm) printOfficialForm('GREENHOUSE_CHECKLIST'); } },
+        { label: 'فرم بازرسی داروخانه', fn: function () { if (window.printOfficialForm) printOfficialForm('PHARMACY_INSPECTION'); } },
+        { label: 'اخطاریه نقص مدارک', fn: function () { if (window.issueDeficiencyLetterForActiveCase) issueDeficiencyLetterForActiveCase(); } }
       ]
     },
     'pane-office': {
       title: '💼 کارتابل و تنظیمات',
       items: [
-        { label: '📦 دانلود نسخه تک‌فایلی ویندوز (.html)', fn: function () { if (window.downloadStandaloneWindowsHTML) downloadStandaloneWindowsHTML(); } },
-        { label: '💾 دانلود فایل پشتیبان کل اطلاعات (.json)', fn: function () { if (window.exportFullSystemBackup) exportFullSystemBackup(); } }
+        { label: 'نسخه ویندوز', fn: function () { if (window.downloadStandaloneWindowsHTML) downloadStandaloneWindowsHTML(); } },
+        { label: 'پشتیبان JSON', fn: function () { if (window.exportFullSystemBackup) exportFullSystemBackup(); } }
       ]
     },
     'pane-ai': {
       title: '🤖 دستیار هوشمند و OCR',
       items: [
-        { label: '🔍 تحلیل و خوانش فایل / سند با Gemini', fn: function () { if (window.aiReadDocumentImagePro) aiReadDocumentImagePro(); } },
-        { label: '⚡ استخراج مشخصات به فرم پرونده', fn: function () { if (window.aiExtractFromRawText) aiExtractFromRawText(); } },
-        { label: '🚀 خلبان خودکار (Auto-Pilot)', fn: function () { if (window.aiRunFullAutopilotPipeline) aiRunFullAutopilotPipeline(); } }
+        { label: 'خوانش سند', fn: function () { if (window.aiReadDocumentImagePro) aiReadDocumentImagePro(); } },
+        { label: 'استخراج اطلاعات', fn: function () { if (window.aiExtractFromRawText) aiExtractFromRawText(); } },
+        { label: 'خلبان خودکار', fn: function () { if (window.aiRunFullAutopilotPipeline) aiRunFullAutopilotPipeline(); } }
       ]
     },
     'pane-guide': {
       title: '📘 راهنمای جامع تصویری',
       items: [
-        { label: '📚 مشاهده مستندات کامل اتوماسیون ۶۳۶ خفر', fn: function () { window.scrollTo({ top: 0, behavior: 'smooth' }); } }
+        { label: 'راهنمای سامانه', fn: function () { window.scrollTo({ top: 0, behavior: 'smooth' }); } }
       ]
     }
   };
@@ -4120,5 +4120,209 @@
   }
 })();
 </script>
+
+<style id="nezam-clean-layout-2026">
+:root{
+  --clean-ink:#24372e;
+  --clean-muted:#718078;
+  --clean-line:#e1e9e3;
+  --clean-paper:#f5f7f5;
+  --clean-forest:#174b38;
+  --clean-green:#2f7654;
+}
+@media screen{
+  html,body{background:var(--clean-paper)!important;color:var(--clean-ink)!important}
+  body{background-image:none!important;font-size:13px!important;line-height:1.65}
+  body::before{display:none!important}
+  .top-hero-bar{
+    padding:.62rem 1.1rem!important;
+    background:#173d30!important;
+    border-bottom:2px solid #d7bd83!important;
+    box-shadow:0 2px 9px rgba(24,55,42,.08)!important;
+  }
+  .top-hero-bar::after{opacity:.18}
+  .top-hero-bar>div{min-height:48px}
+  #nav-logo-box{width:42px!important;height:42px!important}
+  #ui-hero-org{font-size:.72rem!important;color:#d9c99c!important}
+  #ui-hero-office{font-size:1.02rem!important;line-height:1.45!important;letter-spacing:0!important}
+  .top-hero-bar .px-3.py-1.rounded{padding:.28rem .65rem!important;border-radius:8px!important}
+  .nezam-windows-export-btn{min-height:32px!important;padding:.3rem .62rem!important;font-size:.74rem!important;box-shadow:none!important}
+  .active-applicant-ContextBar{
+    padding:.42rem .85rem!important;
+    background:#fff!important;
+    border-bottom:1px solid var(--clean-line)!important;
+    box-shadow:none!important;
+    backdrop-filter:none!important;
+  }
+  .active-applicant-ContextBar svg{display:none!important}
+  #active-case-status-badge{font-size:.75rem!important;padding:.32rem .65rem!important}
+  #active-case-info-summary{font-size:.78rem!important;color:#59685f!important}
+  #global-case-selector{min-height:34px!important;max-width:360px!important;border-radius:8px!important}
+  .active-applicant-ContextBar .btn{min-height:32px!important;padding:.3rem .65rem!important;box-shadow:none!important;font-size:.75rem!important}
+  #no-active-case-warning-banner{padding:.4rem .7rem!important;border-radius:8px!important;box-shadow:none!important}
+
+  .nezam-top-subbar{
+    min-height:44px!important;
+    padding:.38rem .8rem!important;
+    gap:.32rem!important;
+    background:#fff!important;
+    border:0!important;
+    border-bottom:1px solid var(--clean-line)!important;
+    box-shadow:none!important;
+    backdrop-filter:none!important;
+  }
+  .subbar-breadcrumb{font-size:.78rem!important;color:#52665a!important;padding-left:.55rem!important}
+  .subbar-tab-item{
+    flex:0 0 auto!important;
+    padding:.3rem .62rem!important;
+    border:1px solid #e0e8e2!important;
+    border-radius:8px!important;
+    background:#f7faf7!important;
+    color:#4b6254!important;
+    font-size:.74rem!important;
+    font-weight:600!important;
+    box-shadow:none!important;
+  }
+  .subbar-tab-item.active{background:#e8f2eb!important;color:#1c5b3d!important;border-color:#c9ddcf!important;box-shadow:none!important}
+  .subbar-tab-item:hover{transform:none!important;box-shadow:none!important}
+  .card-clean{
+    background:#fff!important;border:1px solid var(--clean-line)!important;
+    border-radius:12px!important;padding:.88rem!important;
+    box-shadow:0 2px 8px rgba(33,66,47,.035)!important;
+  }
+  .card-clean:hover{transform:none!important;box-shadow:0 2px 8px rgba(33,66,47,.035)!important}
+  .card-clean>.border-bottom{padding-bottom:.48rem!important;margin-bottom:.55rem!important}
+  .card-clean>.border-bottom strong{font-size:.9rem!important}
+  .workflow-law-strip{
+    margin-bottom:.7rem!important;padding:.55rem .8rem!important;
+    border:1px solid #dce8df!important;border-right:3px solid #5a9471!important;
+    border-radius:9px!important;background:#edf4ef!important;
+    box-shadow:none!important;
+  }
+  .workflow-law-strip>div:last-child{display:none!important}
+  .workflow-law-strip .badge{background:#e0ece3!important;color:#315d43!important;border:1px solid #cfdfd3!important}
+  .workflow-law-strip .small{font-size:.76rem!important;color:#465a4c!important}
+
+  .kpi-macro-card{
+    min-height:76px!important;padding:.62rem .75rem!important;
+    border:1px solid #e5ece7!important;border-radius:10px!important;
+    background:#fff!important;box-shadow:none!important;
+  }
+  .kpi-macro-card:hover{transform:none!important;box-shadow:none!important}
+  .kpi-mini-bars,.kpi-macro-card::after{display:none!important}
+  .kpi-macro-card [id^="kpi-"]{font-size:1.25rem!important}
+  .cmd-tile-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:.48rem!important}
+  .cmd-tile{
+    min-height:86px!important;padding:.55rem .45rem!important;
+    border:1px solid #e3ebe5!important;border-radius:10px!important;
+    background:#fff!important;box-shadow:none!important;gap:.25rem!important;
+  }
+  .cmd-tile:nth-child(1),.cmd-tile:nth-child(5){display:none!important}
+  .cmd-tile::after{display:none!important}
+  .cmd-tile:hover{transform:none!important;border-color:#c7ddce!important;box-shadow:none!important}
+  .cmd-tile-icon{width:36px!important;height:36px!important;border-radius:10px!important;box-shadow:none!important}
+  .cmd-tile-icon svg{width:22px!important;height:22px!important}
+  .tri-group-card{
+    padding:.8rem!important;border-radius:11px!important;
+    border:1px solid #e4ebe5!important;box-shadow:none!important;
+    background:#fff!important;
+  }
+  .tri-group-card:hover{transform:none!important;box-shadow:none!important}
+  .tri-group-card .small span.d-block{display:none!important}
+  .tri-group-card>div:last-child>span{display:none!important}
+  .tri-group-card .btn{box-shadow:none!important}
+  .table-responsive{border-color:var(--clean-line)!important;box-shadow:none!important}
+  .table{font-size:.8rem!important}
+  .table th,.table td{padding:.52rem .62rem!important}
+  .btn{box-shadow:none!important}
+  .btn:hover{transform:translateY(-1px)!important;box-shadow:none!important}
+  .alert{box-shadow:none!important}
+  .guide-card{box-shadow:none!important}
+  .guide-card:hover{transform:none!important;box-shadow:none!important}
+  .sec-pane.active{animation:none!important}
+  .sec-pane h2,.sec-pane h3{letter-spacing:0!important}
+
+  @media(min-width:992px){
+    .nezam-body-grid{min-height:calc(100vh - 102px)!important}
+    nav.app-navbar{
+      position:sticky!important;top:0!important;
+      width:194px!important;min-width:194px!important;
+      height:calc(100vh - 4px)!important;
+      padding:.68rem .52rem!important;gap:.32rem!important;
+      background:#173e30!important;border:0!important;
+      border-left:1px solid rgba(255,255,255,.08)!important;
+      box-shadow:none!important;
+    }
+    body.nezam-sb-collapsed nav.app-navbar{width:62px!important;min-width:62px!important;padding:.68rem .25rem!important}
+    nav.app-navbar .nav-link{
+      min-height:40px!important;padding:.48rem .58rem!important;
+      border:1px solid transparent!important;border-radius:8px!important;
+      background:rgba(255,255,255,.045)!important;
+      color:#e5eee8!important;font-size:.78rem!important;
+      font-weight:600!important;box-shadow:none!important;
+    }
+    nav.app-navbar .nav-link:hover{
+      transform:none!important;background:rgba(255,255,255,.10)!important;
+      border-color:rgba(255,255,255,.10)!important;
+    }
+    nav.app-navbar .nav-link.active{
+      background:#e8f1ea!important;color:#194b34!important;
+      border-color:#d0e0d4!important;box-shadow:none!important;font-weight:700!important;
+    }
+    body.nezam-sb-collapsed nav.app-navbar .nav-link{font-size:0!important;justify-content:center!important}
+    body.nezam-sb-collapsed nav.app-navbar .nav-link::first-letter{font-size:1.08rem!important}
+    .nezam-sb-top-brand{
+      padding:.38rem .3rem .62rem!important;margin-bottom:.25rem!important;
+      font-size:.76rem!important;border-bottom:1px solid rgba(255,255,255,.12)!important;
+      color:#d9c99c!important;
+    }
+    .nezam-sb-collapse-trigger{width:29px!important;height:29px!important;border-radius:8px!important}
+    .nezam-content-column{width:calc(100% - 194px)!important}
+    body.nezam-sb-collapsed .nezam-content-column{width:calc(100% - 62px)!important}
+    .nezam-content-column>main{padding:1rem 1.15rem!important;max-width:1560px!important;margin:0 auto!important}
+    .nezam-top-subbar{position:sticky!important;top:0!important;z-index:940!important}
+    #pane-dashboard>.row.mb-3:nth-of-type(2)>.col-md-5{width:38%!important}
+    #pane-dashboard>.row.mb-3:nth-of-type(2)>.col-md-7{width:62%!important}
+  }
+  @media(max-width:991px){
+    .top-hero-bar{padding:.52rem .7rem!important}
+    .top-hero-bar>div{gap:.5rem!important}
+    #ui-hero-office{font-size:.91rem!important}
+    .active-applicant-ContextBar{padding:.45rem .65rem!important}
+    .active-applicant-ContextBar>div{gap:.4rem!important}
+    .active-applicant-ContextBar>div:last-of-type{margin-right:auto}
+    #global-case-selector{min-width:210px!important;max-width:320px!important}
+    nav.app-navbar{
+      position:sticky!important;top:0!important;z-index:960!important;
+      gap:.3rem!important;padding:.42rem .5rem!important;
+      background:#173e30!important;border-bottom:1px solid #d7bd83!important;
+      box-shadow:none!important;
+    }
+    nav.app-navbar .nav-link{
+      min-height:36px!important;padding:.36rem .56rem!important;
+      border-radius:8px!important;font-size:.74rem!important;
+      font-weight:600!important;box-shadow:none!important;
+    }
+    .nezam-content-column,body.nezam-sb-collapsed .nezam-content-column{width:100%!important}
+    .nezam-content-column>main{padding:.62rem!important}
+    .nezam-top-subbar{flex-wrap:nowrap!important;overflow-x:auto!important;scrollbar-width:thin}
+    .subbar-tab-item{white-space:nowrap!important}
+    #pane-dashboard>.row.mb-3:nth-of-type(2)>.col-md-5,
+    #pane-dashboard>.row.mb-3:nth-of-type(2)>.col-md-7{width:100%!important}
+    .cmd-tile-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+    .tri-group-card{min-height:0!important}
+  }
+  @media(max-width:560px){
+    .top-hero-bar>div{align-items:flex-start!important}
+    .top-hero-bar .d-flex.flex-wrap.align-items-center.gap-2{width:100%;justify-content:space-between}
+    #global-case-selector{min-width:0!important;max-width:none!important;flex:1 1 100%!important}
+    .active-applicant-ContextBar>div:last-of-type{width:100%}
+    .active-applicant-ContextBar>div:last-of-type .btn{flex:1 1 auto}
+    .nezam-windows-export-btn{font-size:.7rem!important}
+    .card-clean{padding:.72rem!important}
+  }
+}
+</style>
+
 </body>
 </html>
