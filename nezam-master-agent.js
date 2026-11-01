@@ -370,7 +370,7 @@
       if (key === 'mainGroup' && ['GREENHOUSE_MUSHROOM','LIVESTOCK_POULTRY_FISHERIES','CLINIC_PHARMACY'].indexOf(str) < 0) return;
       if (key === 'caseStatus' && ['ACTIVE','IN_PROGRESS','APPROVED','ARCHIVED'].indexOf(str) < 0) return;
       if (key === 'nid' && normalizeText(str).replace(/\D/g, '').length > 11) return;
-      if (key === 'mobile' && normalizeText(str).replace(/\\D/g, '').length > 15) return;
+      if (key === 'mobile' && normalizeText(str).replace(/\D/g, '').length > 15) return;
       if (key === 'utm' && !/^[0-9۰-۹٠-٩.,،;\sXYZxyz=:+-]*$/.test(str)) return;
       clean[key] = str;
     });
@@ -1134,8 +1134,21 @@
     if (!apiKey) {
       if (localResult) {
         addMessage('assistant', '<b>پاسخ از داده‌های محلی اتوماسیون</b><br>' + formatText(localResult));
+      } else if (window.Nezaam636Knowledge && typeof window.Nezaam636Knowledge.buildContext === 'function') {
+        try {
+          var offlineKnowledge = await window.Nezaam636Knowledge.buildContext(question, 4200);
+          if (offlineKnowledge && offlineKnowledge.context) {
+            addMessage('assistant', '<b>یافته‌های مخزن دانش (جستجوی محلی)</b><br>' +
+              formatText(offlineKnowledge.context) +
+              '<br><small>این متن از اسناد ذخیره‌شده بازیابی شده است؛ برای تحلیل، مقایسه و تکمیل فرم با زبان طبیعی، Gemini را متصل کن.</small>');
+            return;
+          }
+        } catch (offlineSearchError) {
+          console.warn('Offline knowledge search failed:', offlineSearchError);
+        }
+        addMessage('system', 'برای تحلیل هوشمند و اجرای ابزارها، ابتدا کلید Gemini را در بخش دستیار هوشمند تنظیم و تست کن. جستجوی محلی مخزن دانش در دسترس است.');
       } else {
-        addMessage('system', 'برای اجرای عامل هوشمند و تحلیل زبانی، ابتدا در بخش «دستیار هوشمند» کلید Gemini را وارد و اتصال را تست کن. دستورات «آمار دفتر»، «پرونده فعال» و «پیگیری‌های باز» در حالت محلی نیز قابل اجرا هستند.');
+        addMessage('system', 'برای اجرای عامل هوشمند و تحلیل زبانی، ابتدا در بخش «دستیار هوشمند» کلید Gemini را وارد و اتصال را تست کن. آمار دفتر، پرونده فعال و پیگیری‌های باز در حالت محلی قابل اجرا هستند.');
       }
       return;
     }
