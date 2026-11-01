@@ -1711,6 +1711,8 @@ async function aiSendChatMessage() {
   try {
     var contextToggle = document.getElementById('ai-case-context-toggle');
     if (contextToggle && contextToggle.checked && typeof window.buildNezam636AIContext === 'function') {
+      // رضایت به اشتراک‌گذاری فقط برای همین پیام معتبر است و پس از مصرف خاموش می‌شود.
+      contextToggle.checked = false;
       var caseContext = window.buildNezam636AIContext();
       if (caseContext) {
         promptForModel += '\n\n--- خلاصه پرونده فعال مرکز ۶۳۶ (فقط برای همین درخواست) ---\n' +
