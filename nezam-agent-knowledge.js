@@ -343,11 +343,10 @@
     try {
       await uploadOriginalToDrive(doc, file);
       if (doc.status === 'indexed' && doc.text) await uploadExtractedTextToDrive(doc);
-      await putDocument(doc);
-      await syncKnowledgeSnapshot(false);
-      doc.cloudIndexStatus = 'saved';
+      doc.cloudIndexStatus = 'included-in-snapshot';
       doc.cloudIndexError = '';
       await putDocument(doc);
+      await syncKnowledgeSnapshot(false);
     } catch (cloudError) {
       doc.driveStatus = doc.driveStatus || 'failed';
       doc.driveError = String(cloudError && cloudError.message ? cloudError.message : cloudError).slice(0, 500);
@@ -413,11 +412,10 @@
       await putDocument(doc);
       try {
         await uploadExtractedTextToDrive(doc);
-        await putDocument(doc);
-        await syncKnowledgeSnapshot(false);
-        doc.cloudIndexStatus = 'saved';
+        doc.cloudIndexStatus = 'included-in-snapshot';
         doc.cloudIndexError = '';
         await putDocument(doc);
+        await syncKnowledgeSnapshot(false);
       } catch (cloudError) {
         doc.cloudIndexStatus = 'pending';
         doc.cloudIndexError = String(cloudError && cloudError.message ? cloudError.message : cloudError).slice(0, 500);
@@ -524,21 +522,26 @@
         var cloudLabel = d.driveStatus === 'saved'
           ? '<span class="kv-status ok">اصل فایل در Google Drive ذخیره شد</span>'
           : '<span class="kv-status wait">ذخیره ابری تأیید نشده</span>';
+        var indexLabel = d.cloudIndexStatus === 'included-in-snapshot'
+          ? '<span class="kv-status ok">شاخص جستجو در پشتیبان Drive ذخیره شد</span>'
+          : (d.status === 'indexed' ? '<span class="kv-status wait">شاخص جستجو نیازمند همگام‌سازی است</span>' : '');
         var retry = d.driveStatus !== 'saved' && d.blob
           ? '<button type="button" data-kv-action="retry" data-kv-id="' + esc(d.id) + '">ارسال مجدد به Drive</button>' : '';
+        var syncRetry = d.status === 'indexed' && d.cloudIndexStatus !== 'included-in-snapshot'
+          ? '<button type="button" data-kv-action="sync" data-kv-id="' + esc(d.id) + '">همگام‌سازی شاخص</button>' : '';
         var download = d.blob
           ? '<button type="button" data-kv-action="download" data-kv-id="' + esc(d.id) + '">دانلود فایل</button>'
           : '<small>فایل اصلی در پوشه کتابخانه Google Drive نگهداری می‌شود.</small>';
         return '<article class="kv-doc"><div class="kv-doc-main"><b>' + esc(d.name) + '</b><small>' +
           esc(d.category || 'عمومی') + (d.issuer ? ' · ' + esc(d.issuer) : '') +
           (d.effectiveDate ? ' · ' + esc(d.effectiveDate) : '') +
-          ' · ' + formatBytes(d.size || 0) + '</small><div>' + statusLabel(d) + ' ' + cloudLabel + '</div>' +
+          ' · ' + formatBytes(d.size || 0) + '</small><div>' + statusLabel(d) + ' ' + cloudLabel + ' ' + indexLabel + '</div>' +
           (d.error ? '<p class="kv-error">' + esc(d.error) + '</p>' : '') +
           (d.driveError ? '<p class="kv-error">خطای Drive: ' + esc(d.driveError) + '</p>' : '') +
           (d.cloudIndexError ? '<p class="kv-error">پشتیبان دانش: ' + esc(d.cloudIndexError) + '</p>' : '') +
           (d.extractionNote ? '<p class="kv-note">' + esc(d.extractionNote) + '</p>' : '') +
           (d.status === 'indexed' ? '<small>متن استخراج‌شده: ' + esc(d.charCount || 0) + ' نویسه · قطعه: ' + esc((d.chunks || []).length) + '</small>' : '') +
-          '</div><div class="kv-doc-actions">' + action + retry +
+          '</div><div class="kv-doc-actions">' + action + retry + syncRetry +
           '<button type="button" data-kv-action="read" data-kv-id="' + esc(d.id) + '">نمایش متن</button>' +
           download +
           '<button type="button" data-kv-action="delete" data-kv-id="' + esc(d.id) + '">حذف</button></div></article>';
@@ -672,11 +675,26 @@
         if (!retryDoc || !retryDoc.blob) throw new Error('فایل اصلی در این مرورگر موجود نیست؛ آن را از رایانه دوباره انتخاب کن.');
         await uploadOriginalToDrive(retryDoc, retryDoc.blob);
         if (retryDoc.status === 'indexed' && retryDoc.text) await uploadExtractedTextToDrive(retryDoc);
+        retryDoc.cloudIndexStatus = 'included-in-snapshot';
+        retryDoc.cloudIndexError = '';
         await putDocument(retryDoc);
         await syncKnowledgeSnapshot(false);
-        retryDoc.cloudIndexStatus = 'saved';
-        await putDocument(retryDoc);
-        toast('ذخیره سند و فهرست دانش در Google Drive تأیید شد.');
+        toast('فایل اصلی و شاخص قابل جستجو در Google Drive ذخیره شدند.');
+      } else if (action === 'sync') {
+        var syncDoc = await getDocument(id);
+        if (!syncDoc || !syncDoc.text) throw new Error('متن استخراج‌شده این سند موجود نیست.');
+        syncDoc.cloudIndexStatus = 'included-in-snapshot';
+        syncDoc.cloudIndexError = '';
+        await putDocument(syncDoc);
+        try {
+          await syncKnowledgeSnapshot(false);
+          toast('شاخص این سند در پشتیبان Google Drive ذخیره شد.');
+        } catch (syncError) {
+          syncDoc.cloudIndexStatus = 'pending';
+          syncDoc.cloudIndexError = String(syncError && syncError.message ? syncError.message : syncError);
+          await putDocument(syncDoc);
+          throw syncError;
+        }
       } else if (action === 'delete') {
         if (!confirm('سند و متن استخراج‌شده آن از مخزن محلی حذف شود؟')) return;
         await deleteDocument(id);
