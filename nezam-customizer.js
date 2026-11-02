@@ -92,7 +92,11 @@ var tplCfg = JSON.parse(JSON.stringify(DEFAULT_TEMPLATES));
 var currentTemplateKey = "WATER";
 var currentPaperSize = "A4"; // A4 | A5
 var currentPreviewLetterId = null;
-var currentPreviewMode = "LETTER"; // LETTER | CROQUIS | FORM
+var currentPreviewDraft = null;
+var currentPreviewMode = "EDITOR"; // EDITOR | LETTER_DRAFT | LETTER | CROQUIS | FORM
+var letterDraftCaseId = "";
+var letterDraftDirty = false;
+var printRequestActive = false;
 
 try {
   var sb = localStorage.getItem("nezam636_branding_cfg");
@@ -120,11 +124,59 @@ function safeHexColor(value, fallback) {
 }
 function sanitizeOfficeRichHtml(input) {
   var parsed = new DOMParser().parseFromString(String(input || ""), "text/html");
-  var allowed = new Set(["A","B","STRONG","I","EM","U","S","P","BR","DIV","SPAN","UL","OL","LI","TABLE","THEAD","TBODY","TFOOT","TR","TD","TH","BLOCKQUOTE","H1","H2","H3","H4","H5","H6","HR","SMALL","SUB","SUP"]);
+  var allowed = new Set(["A","B","STRONG","I","EM","U","S","P","BR","DIV","SPAN","UL","OL","LI","TABLE","THEAD","TBODY","TFOOT","TR","TD","TH","BLOCKQUOTE","H1","H2","H3","H4","H5","H6","HR","SMALL","SUB","SUP","FONT"]);
   var blocked = new Set(["SCRIPT","STYLE","IFRAME","OBJECT","EMBED","SVG","MATH","FORM","INPUT","BUTTON","VIDEO","AUDIO","LINK","META","BASE","IMG"]);
-  var root = document.createElement("div");
+  var safeStyleProps = [
+    "font-size","font-weight","font-style","font-family","color","background-color",
+    "text-align","text-decoration","text-decoration-line","line-height","direction",
+    "width","max-width","min-width","height","margin","margin-top","margin-right",
+    "margin-bottom","margin-left","padding","padding-top","padding-right",
+    "padding-bottom","padding-left","border","border-top","border-right",
+    "border-bottom","border-left","border-collapse","border-spacing","border-radius",
+    "vertical-align","white-space","table-layout","letter-spacing","text-indent"
+  ];
+  function safeCssValue(prop, raw) {
+    var v = String(raw || "").trim();
+    if (!v || /[{};<>]|url\s*\(|expression\s*\(|javascript:/i.test(v)) return "";
+    if (prop === "font-weight") return /^(normal|bold|[1-9]00)$/i.test(v) ? v : "";
+    if (prop === "font-style") return /^(normal|italic|oblique)$/i.test(v) ? v : "";
+    if (prop === "text-align") return /^(left|right|center|justify|start|end)$/i.test(v) ? v : "";
+    if (prop === "direction") return /^(ltr|rtl)$/i.test(v) ? v : "";
+    if (prop === "border-collapse") return /^(collapse|separate)$/i.test(v) ? v : "";
+    if (prop === "table-layout") return /^(auto|fixed)$/i.test(v) ? v : "";
+    if (prop === "white-space") return /^(normal|pre|pre-line|pre-wrap|nowrap)$/i.test(v) ? v : "";
+    if (prop === "vertical-align") return /^(baseline|top|middle|bottom|sub|super)$/i.test(v) ? v : "";
+    if (prop === "font-family") return /^[a-z0-9 ,"'_-]{1,80}$/i.test(v) ? v : "";
+    if (prop === "color" || prop === "background-color") {
+      return /^(#[0-9a-f]{3,8}|rgba?\(\s*[\d.%\s,]+\)|[a-z]{3,20}|transparent)$/i.test(v) ? v : "";
+    }
+    if (prop === "font-size") {
+      var fs = v.match(/^(\d{1,2}(?:\.\d+)?)(pt|px|mm|em|rem|%)$/i);
+      return fs && Number(fs[1]) > 0 && Number(fs[1]) <= 36 ? v : "";
+    }
+    if (prop === "line-height") return /^(normal|[0-4](?:\.\d+)?(?:%|px|pt)?)$/i.test(v) ? v : "";
+    if (prop === "border" || (prop.indexOf("border-") === 0 && prop !== "border-collapse" && prop !== "border-spacing" && prop !== "border-radius")) {
+      return /^(none|0|(?:0?\.\d+|\d+(?:\.\d+)?)(?:px|pt|mm)\s+(solid|dashed|dotted|double)\s+(#[0-9a-f]{3,8}|black|white|gray|grey|red|blue|green))$/i.test(v) ? v : "";
+    }
+    if (prop === "border-radius") return /^(?:0|(?:\d+(?:\.\d+)?)(?:px|pt|mm|%))$/i.test(v) ? v : "";
+    if (prop === "border-spacing") return /^(?:0|(?:\d+(?:\.\d+)?)(?:px|pt|mm))(?:\s+(?:\d+(?:\.\d+)?)(?:px|pt|mm))?$/i.test(v) ? v : "";
+    if (prop === "margin" || prop.indexOf("margin-") === 0 || prop === "padding" || prop.indexOf("padding-") === 0) {
+      return /^(?:0|auto|(?:\d+(?:\.\d+)?)(?:px|pt|mm|%))(?:\s+(?:0|auto|(?:\d+(?:\.\d+)?)(?:px|pt|mm|%))){0,3}$/i.test(v) ? v : "";
+    }
+    if (prop === "width" || prop === "max-width" || prop === "min-width" || prop === "height") {
+      return /^(?:auto|100%|(?:\d+(?:\.\d+)?)(?:px|pt|mm|cm|%))$/i.test(v) ? v : "";
+    }
+    if (prop === "letter-spacing" || prop === "text-indent") return /^(?:0|(?:-?\d+(?:\.\d+)?)(?:px|pt|mm|em))$/i.test(v) ? v : "";
+    if (prop === "text-decoration" || prop === "text-decoration-line") {
+      return /^(none|underline|line-through|overline)(\s+(underline|line-through|overline))*$/i.test(v) ? v : "";
+    }
+    return "";
+  }
   function copyNode(node, parent) {
-    if (node.nodeType === 3) { parent.appendChild(document.createTextNode(node.nodeValue || "")); return; }
+    if (node.nodeType === 3) {
+      parent.appendChild(document.createTextNode(node.nodeValue || ""));
+      return;
+    }
     if (node.nodeType !== 1) return;
     var tag = node.tagName.toUpperCase();
     if (blocked.has(tag)) return;
@@ -141,6 +193,14 @@ function sanitizeOfficeRichHtml(input) {
       var align = String(node.getAttribute("align") || "").toLowerCase();
       if (["left","right","center"].indexOf(align) !== -1) clean.setAttribute("align", align);
     }
+    if (tag === "FONT") {
+      var fontColor = node.getAttribute("color") || "";
+      var fontSize = node.getAttribute("size") || "";
+      var fontFace = node.getAttribute("face") || "";
+      if (/^(#[0-9a-f]{3,8}|[a-z]{3,20})$/i.test(fontColor)) clean.setAttribute("color", fontColor);
+      if (/^[1-7]$/.test(fontSize)) clean.setAttribute("size", fontSize);
+      if (/^[a-z0-9 ,"'_-]{1,80}$/i.test(fontFace)) clean.setAttribute("face", fontFace);
+    }
     if (tag === "A") {
       var href = node.getAttribute("href") || "";
       if (/^(https?:|mailto:)/i.test(href)) {
@@ -149,122 +209,297 @@ function sanitizeOfficeRichHtml(input) {
         clean.setAttribute("target", "_blank");
       }
     }
+    if (node.style) {
+      var cleanStyles = [];
+      safeStyleProps.forEach(function (prop) {
+        var value = safeCssValue(prop, node.style.getPropertyValue(prop));
+        if (value) cleanStyles.push(prop + ":" + value);
+      });
+      if (cleanStyles.length) clean.setAttribute("style", cleanStyles.join(";"));
+    }
     Array.prototype.forEach.call(node.childNodes, function (child) { copyNode(child, clean); });
     parent.appendChild(clean);
   }
+  var root = document.createElement("div");
   Array.prototype.forEach.call(parsed.body.childNodes, function (node) { copyNode(node, root); });
   return root.innerHTML;
 }
 
 function applyDynamicPrintPageSizeCSS(size) {
-  var s = (size === "A5") ? "A5" : "A4";
-  var mmDims = (s === "A5") ? "148mm 210mm" : "210mm 297mm";
+  var s = size === "A5" ? "A5" : "A4";
+  var width = s === "A5" ? "148mm" : "210mm";
+  var height = s === "A5" ? "210mm" : "297mm";
   var styleEl = document.getElementById("dynamic-print-page-style");
   if (!styleEl) {
     styleEl = document.createElement("style");
     styleEl.id = "dynamic-print-page-style";
     document.head.appendChild(styleEl);
   }
-  // قانون @page باید در سطح اول استایل باشد تا مرورگر حاشیه پیش‌فرض را صفر کرده و سایز دقیق A4/A5 را اعمال کند
-  styleEl.textContent = "@page { size: " + mmDims + "; margin: 0; }";
+  styleEl.textContent = "@page { size: " + width + " " + height + "; margin: 0; }";
+}
+
+function findSecretariatLetter(letterId) {
+  if (!letterId || !Array.isArray(lettersDB)) return null;
+  for (var i = 0; i < lettersDB.length; i++) {
+    if (lettersDB[i] && String(lettersDB[i].id) === String(letterId)) return lettersDB[i];
+  }
+  return null;
+}
+
+function persistLetterAndCaseData() {
+  var letterKey = "nezam636_letters";
+  var caseKey = "nezam636_unified_cases";
+  var oldLetters = null, oldCases = null;
+  try {
+    oldLetters = localStorage.getItem(letterKey);
+    oldCases = localStorage.getItem(caseKey);
+    localStorage.setItem(letterKey, JSON.stringify(lettersDB || []));
+    localStorage.setItem(caseKey, JSON.stringify(casesDB || []));
+  } catch (storageError) {
+    console.error("Nezam636 letter transaction failed:", storageError);
+    try {
+      if (oldLetters === null) localStorage.removeItem(letterKey);
+      else localStorage.setItem(letterKey, oldLetters);
+      if (oldCases === null) localStorage.removeItem(caseKey);
+      else localStorage.setItem(caseKey, oldCases);
+    } catch (rollbackError) {
+      console.error("Nezam636 letter transaction rollback failed:", rollbackError);
+    }
+    return false;
+  }
+  try {
+    if (typeof renderSecretariatTable === "function") renderSecretariatTable();
+    if (typeof renderActiveCaseHistory === "function") renderActiveCaseHistory();
+  } catch (viewError) {
+    console.warn("Letter saved; a related view could not refresh:", viewError);
+  }
+  return true;
+}
+
+function getNextSecretariatNumber() {
+  var dateDigits = toEn(String(todayShamsi() || "")).replace(/\D/g, "");
+  var prefix = dateDigits.length >= 8 ? dateDigits.slice(0, 8) : "14050101";
+  var maxSequence = 0;
+  (Array.isArray(lettersDB) ? lettersDB : []).forEach(function (letter) {
+    var number = toEn(String((letter || {}).number || "")).replace(/\D/g, "");
+    if (number.indexOf(prefix) === 0 && number.length > prefix.length) {
+      var seq = parseInt(number.slice(prefix.length), 10);
+      if (Number.isFinite(seq) && seq > maxSequence) maxSequence = seq;
+    }
+  });
+  return toFa(prefix + String(maxSequence + 1).padStart(2, "0"));
+}
+
+function isSecretariatNumberAvailable(number, ignoreId) {
+  var normalized = toEn(String(number || "")).replace(/[\s\-_/]/g, "");
+  if (!normalized) return false;
+  return !(Array.isArray(lettersDB) ? lettersDB : []).some(function (letter) {
+    if (!letter || (ignoreId && String(letter.id) === String(ignoreId))) return false;
+    return toEn(String(letter.number || "")).replace(/[\s\-_/]/g, "") === normalized;
+  });
+}
+
+function getLetterDraftFromEditor() {
+  var c = getActiveCase();
+  if (!c) return null;
+  if (letterDraftCaseId && String(letterDraftCaseId) !== String(c.id) && !editingLetterId) {
+    showToastMsg("پیش‌نویس متعلق به پرونده دیگری است؛ ابتدا یکی از قالب‌های نامه را برای پرونده فعال انتخاب کنید.", true);
+    return null;
+  }
+  var recipientEl = document.getElementById("l-recipient");
+  var editor = document.getElementById("l-body-rich");
+  var bodyField = document.getElementById("l-body");
+  var numberEl = document.getElementById("l-number");
+  var dateEl = document.getElementById("l-date");
+  var attachEl = document.getElementById("l-attach");
+  var directionEl = document.getElementById("l-direction");
+  var paperEl = document.getElementById("l-paper-size");
+  var includeEl = document.getElementById("l-include-utm");
+  if (!recipientEl || (!editor && !bodyField)) {
+    showToastMsg("فرم نامه کامل بارگذاری نشده است.", true);
+    return null;
+  }
+  var number = toFa(String(numberEl && numberEl.value || "").trim());
+  if (!number) number = getNextSecretariatNumber();
+  var date = toFa(String(dateEl && dateEl.value || "").trim() || todayShamsi());
+  var body = sanitizeOfficeRichHtml(editor ? editor.innerHTML : String(bodyField.value || "").replace(/\n/g, "<br>"));
+  var plainBody = editor ? (editor.innerText || editor.textContent || "").trim() : String(bodyField.value || "").trim();
+  if (!plainBody) {
+    showToastMsg("متن نامه خالی است؛ ابتدا متن نامه را تکمیل کنید.", true);
+    if (editor) editor.focus();
+    return null;
+  }
+  var rec = String(recipientEl.value || "").trim();
+  if (!rec) {
+    showToastMsg("عنوان گیرنده نامه را وارد کنید.", true);
+    recipientEl.focus();
+    return null;
+  }
+  var map = null;
+  try { if (typeof getActiveCroquisMap === "function") map = getActiveCroquisMap(); } catch (mapError) {
+    console.warn("Could not resolve current UTM map:", mapError);
+  }
+  var includeUtm = !!(includeEl && includeEl.checked);
+  var isNat = rec.indexOf("منابع طبیعی") !== -1;
+  var coordinateHtml = includeUtm ? buildAllSelectedFeaturesUtmTableHTML(c, c.utm || "", isNat) : "";
+  var hasUtm = !!(coordinateHtml && coordinateHtml.trim());
+  return {
+    id: editingLetterId || null,
+    caseId: c.id,
+    number: number,
+    date: date,
+    type: directionEl && directionEl.value === "IN" ? "IN" : "OUT",
+    attach: getLetterAttachmentLabel(String(attachEl && attachEl.value || "ندارد"), hasUtm),
+    recipient: rec,
+    appName: c.name || "",
+    appNid: c.nid || "",
+    project: c.project || "",
+    cap: c.cap || "",
+    land: c.land || "",
+    landParcel: c.landParcel || "",
+    water: c.water || "",
+    loc: c.loc || "",
+    utm: c.utm || "",
+    croquisMapId: map && map.id ? map.id : (activeCroquisMapId || ""),
+    utmAttachmentHtml: coordinateHtml,
+    body: body,
+    paperSize: paperEl && paperEl.value === "A5" ? "A5" : (currentPaperSize || "A4"),
+    includeUtm: includeUtm
+  };
+}
+
+function renderLetterPreviewObject(letter, forcedPaperSize, mode) {
+  var stage = document.getElementById("a4-preview-stage");
+  if (!stage || !letter) return false;
+  var pSize = forcedPaperSize === "A5" ? "A5" : (forcedPaperSize === "A4" ? "A4" : (letter.paperSize || currentPaperSize || "A4"));
+  var isDraft = mode === "LETTER_DRAFT";
+  currentPreviewMode = isDraft ? "LETTER_DRAFT" : "LETTER";
+  currentPreviewLetterId = isDraft ? null : letter.id;
+  currentPreviewDraft = isDraft ? letter : null;
+  if (letter.croquisMapId) activeCroquisMapId = letter.croquisMapId;
+  window.setPaperSize(pSize, true);
+  var isNat = (letter.recipient || "").indexOf("منابع طبیعی") !== -1;
+  var includeUtm = letter.includeUtm === true;
+  var linkedCase = (Array.isArray(window.casesDB) ? window.casesDB : []).find(function (item) {
+    return item && String(item.id) === String(letter.caseId);
+  }) || getActiveCase();
+  var coordinateHtml = (typeof letter.utmAttachmentHtml === "string" && letter.utmAttachmentHtml.trim())
+    ? letter.utmAttachmentHtml
+    : (includeUtm && linkedCase ? buildAllSelectedFeaturesUtmTableHTML(linkedCase, letter.utm || linkedCase.utm || "", isNat) : "");
+  var hasUtm = includeUtm && !!(coordinateHtml && coordinateHtml.trim());
+  var attachmentLabel = getLetterAttachmentLabel(letter.attach, hasUtm);
+
+  stage.innerHTML = buildSingleA4HTML(letter.recipient, sanitizeOfficeRichHtml(letter.body), letter.number, letter.date, attachmentLabel, letter.utm, isNat, true, pSize, false, "");
+  if (hasUtm) {
+    var sheets = splitUtmAttachmentTableHtml(coordinateHtml, pSize);
+    var intro = "جدول مختصات UTM مربوط به زمین و عوارض پرونده «" +
+      safeHtmlText(letter.appName || (linkedCase && linkedCase.name) || "") +
+      "»، پیوست نامه شماره " + safeHtmlText(toFa(letter.number || "")) + " است.";
+    for (var si = 0; si < sheets.length; si++) {
+      var title = "پیوست مختصات - صفحه " + toFa(si + 1) + " از " + toFa(sheets.length);
+      stage.innerHTML += buildSingleA4HTML("پیوست: جدول مختصات UTM", intro, letter.number, letter.date,
+        "جدول مختصات UTM", letter.utm, isNat, true, pSize, true, title, sheets[si]);
+    }
+  }
+  updatePrintUtmBtnState(hasUtm);
+  updatePaperActionButtons();
+  setTimeout(function () { autoFitPaperContent(stage); }, 70);
+  return true;
+}
+
+function updatePaperActionButtons() {
+  var saveBtn = document.getElementById("btn-save-print-edits");
+  if (saveBtn) {
+    var supported = currentPreviewMode === "LETTER" || currentPreviewMode === "LETTER_DRAFT";
+    saveBtn.disabled = !supported;
+    saveBtn.title = supported ? "ذخیره تغییرات متن و پیوست نامه در دبیرخانه" : "این دکمه فقط برای نامه‌ها فعال است؛ فرم و کروکی را با خروجی چاپ یا فایل ذخیره کنید.";
+  }
 }
 
 window.setPaperSize = function(size, skipSave) {
-  var prevSize = currentPaperSize;
-  currentPaperSize = (size === "A5") ? "A5" : "A4";
+  var previous = currentPaperSize;
+  currentPaperSize = size === "A5" ? "A5" : "A4";
   try { localStorage.setItem("nezam636_paper_size", currentPaperSize); } catch (e) {}
   applyDynamicPrintPageSizeCSS(currentPaperSize);
-
-  var selLetters = document.getElementById("l-paper-size");
-  if (selLetters && selLetters.value !== currentPaperSize) selLetters.value = currentPaperSize;
-
-  var selPrint = document.getElementById("print-paper-size-select");
-  if (selPrint && selPrint.value !== currentPaperSize) selPrint.value = currentPaperSize;
+  var letterSelect = document.getElementById("l-paper-size");
+  var printSelect = document.getElementById("print-paper-size-select");
+  if (letterSelect && letterSelect.value !== currentPaperSize) letterSelect.value = currentPaperSize;
+  if (printSelect && printSelect.value !== currentPaperSize) printSelect.value = currentPaperSize;
 
   var btnA4 = document.getElementById("btn-paper-a4");
   var btnA5 = document.getElementById("btn-paper-a5");
   if (btnA4) btnA4.className = "btn btn-sm " + (currentPaperSize === "A4" ? "btn-success fw-bold" : "btn-outline-success fw-bold");
   if (btnA5) btnA5.className = "btn btn-sm " + (currentPaperSize === "A5" ? "btn-success fw-bold" : "btn-outline-success fw-bold");
 
-  var badgeEl = document.getElementById("active-paper-size-badge");
-  if (badgeEl) {
-    badgeEl.textContent = currentPaperSize === "A5"
-      ? "📄 قالب فعال: کاغذ A5 (۱۴۸×۲۱۰ میلی‌متر)"
-      : "📄 قالب فعال: کاغذ A4 (۲۱۰×۲۹۷ میلی‌متر)";
-  }
+  var badge = document.getElementById("active-paper-size-badge");
+  if (badge) badge.textContent = currentPaperSize === "A5"
+    ? "📄 قالب فعال: کاغذ A5 (۱۴۸×۲۱۰ میلی‌متر)"
+    : "📄 قالب فعال: کاغذ A4 (۲۱۰×۲۹۷ میلی‌متر)";
 
   var pages = document.querySelectorAll("#a4-preview-stage .a4-page");
   for (var i = 0; i < pages.length; i++) {
     pages[i].setAttribute("data-paper-size", currentPaperSize);
-    if (currentPaperSize === "A5") {
-      pages[i].classList.add("paper-a5");
-    } else {
-      pages[i].classList.remove("paper-a5");
-    }
+    pages[i].classList.toggle("paper-a5", currentPaperSize === "A5");
   }
 
   if (!skipSave) {
-    if (prevSize !== currentPaperSize) {
-      if (currentPreviewMode === "CROQUIS") {
-        printUtmSketchSheet();
-      } else if (currentPreviewMode === "LETTER") {
-        renderSinglePreviewSheet(null, currentPaperSize);
-      } else if (currentPreviewMode === "FORM" && window.currentActiveFormKey) {
-        printOfficialForm(window.currentActiveFormKey);
-      } else {
-        setTimeout(autoFitPaperContent, 40);
-      }
-    } else {
-      setTimeout(autoFitPaperContent, 40);
-    }
-    if (currentPreviewLetterId) {
-      for (var j = 0; j < lettersDB.length; j++) {
-        if (lettersDB[j].id === currentPreviewLetterId) {
-          lettersDB[j].paperSize = currentPaperSize;
-          saveAllDB();
-          break;
-        }
+    if (previous !== currentPaperSize) {
+      if (currentPreviewMode === "CROQUIS") printUtmSketchSheet();
+      else if (currentPreviewMode === "FORM" && window.currentActiveFormKey) printOfficialForm(window.currentActiveFormKey);
+      else if (currentPreviewMode === "LETTER") {
+        var saved = findSecretariatLetter(currentPreviewLetterId);
+        if (saved) renderSinglePreviewSheet(saved, currentPaperSize);
+        else setTimeout(autoFitPaperContent, 50);
+      } else if (currentPreviewMode === "LETTER_DRAFT" && currentPreviewDraft) {
+        renderLetterPreviewObject(currentPreviewDraft, currentPaperSize, "LETTER_DRAFT");
+      } else setTimeout(autoFitPaperContent, 50);
+    } else setTimeout(autoFitPaperContent, 50);
+
+    if (currentPreviewMode === "LETTER" && currentPreviewLetterId) {
+      var savedLetter = findSecretariatLetter(currentPreviewLetterId);
+      if (savedLetter && savedLetter.paperSize !== currentPaperSize) {
+        savedLetter.paperSize = currentPaperSize;
+        if (!persistLetterAndCaseData()) showToastMsg("اندازه کاغذ تغییر کرد، اما ذخیره آن در بایگانی ناموفق بود.", true);
       }
     }
   }
+  updatePaperActionButtons();
 };
 
 window.doPrintPaperSheet = function() {
-  if (typeof window.savePaperEditsToSecretariat === "function") {
-    window.savePaperEditsToSecretariat();
+  if (printRequestActive) return false;
+  if (currentPreviewMode === "LETTER" || currentPreviewMode === "LETTER_DRAFT") {
+    var saved = window.savePaperEditsToSecretariat({ silent: true, log: false });
+    if (!saved) {
+      showToastMsg("چاپ متوقف شد؛ ابتدا نامه را به‌درستی ذخیره کنید.", true);
+      return false;
+    }
   }
   applyDynamicPrintPageSizeCSS(currentPaperSize);
   switchMainPane("pane-print");
-  if (currentPreviewMode !== "CROQUIS") {
-    autoFitPaperContent();
-  }
+  if (currentPreviewMode !== "CROQUIS") autoFitPaperContent();
+  printRequestActive = true;
   setTimeout(function() {
-    window.print();
-  }, 80);
+    try { window.print(); }
+    catch (printError) {
+      printRequestActive = false;
+      console.error("Nezam636 print failed:", printError);
+      showToastMsg("باز کردن پنجره چاپ ناموفق بود: " + (printError.message || printError), true);
+    }
+  }, 160);
+  return true;
 };
 
 window.addEventListener("beforeprint", function() {
   applyDynamicPrintPageSizeCSS(currentPaperSize);
   var pages = document.querySelectorAll("#a4-preview-stage .a4-page");
-  for (var i = 0; i < pages.length; i++) {
-    if (currentPaperSize === "A5") pages[i].classList.add("paper-a5");
-    else pages[i].classList.remove("paper-a5");
-  }
+  for (var i = 0; i < pages.length; i++) pages[i].classList.toggle("paper-a5", currentPaperSize === "A5");
 });
+window.addEventListener("afterprint", function() { printRequestActive = false; });
 
 window.triggerSmartPrint = function(forcedSize) {
-  if (forcedSize === "A4" || forcedSize === "A5") {
-    window.setPaperSize(forcedSize, false);
-  } else {
-    applyDynamicPrintPageSizeCSS(currentPaperSize);
-  }
-  if (typeof window.savePaperEditsToSecretariat === "function") {
-    window.savePaperEditsToSecretariat();
-  }
-  autoFitPaperContent();
-  setTimeout(function() {
-    window.print();
-  }, 80);
+  if (forcedSize === "A4" || forcedSize === "A5") window.setPaperSize(forcedSize, true);
+  return window.doPrintPaperSheet();
 };
 
 window.getInquiryDataObject = function() {
@@ -346,26 +581,50 @@ function selectInquiryTemplate(key) {
   syncLetterEditorWithActiveCase();
 }
 
-function syncLetterEditorWithActiveCase() {
-  if (editingLetterId) return;
+function syncLetterEditorWithActiveCase(force) {
+  if (editingLetterId) return true;
   var c = getActiveCase();
-  if (!c) return;
+  if (!c) {
+    letterDraftCaseId = "";
+    return false;
+  }
+  if (!force && String(letterDraftCaseId) === String(c.id)) return true;
+  if (!force && letterDraftDirty && letterDraftCaseId && String(letterDraftCaseId) !== String(c.id)) {
+    showToastMsg("پیش‌نویس قبلی هنوز ذخیره نشده است؛ برای پرونده جدید یک قالب نامه انتخاب کنید.", true);
+    return false;
+  }
+
   var d = window.getInquiryDataObject();
   var spec = window.buildInquirySpec(currentTemplateKey, d);
   var numEl = document.getElementById("l-number");
   var dateEl = document.getElementById("l-date");
   var recEl = document.getElementById("l-recipient");
   var bodyEl = document.getElementById("l-body");
+  var dirEl = document.getElementById("l-direction");
+  var attachEl = document.getElementById("l-attach");
+  var includeEl = document.getElementById("l-include-utm");
 
-  if (numEl && !numEl.value) numEl.value = toFa("140502130" + (lettersDB.length + 1));
-  if (dateEl && !dateEl.value) dateEl.value = todayShamsi();
-  if (recEl) recEl.value = spec.rec;
+  if (numEl) numEl.value = getNextSecretariatNumber();
+  if (dateEl) dateEl.value = todayShamsi();
+  if (recEl) recEl.value = spec.rec || "";
   if (bodyEl) {
-    bodyEl.value = spec.body;
+    bodyEl.value = spec.body || "";
     syncTextareaToRichEditor();
   }
+  if (dirEl && !dirEl.value) dirEl.value = "OUT";
+  if (attachEl && !attachEl.value) attachEl.value = "ندارد";
+  if (includeEl) includeEl.checked = true;
+
+  letterDraftCaseId = c.id;
+  letterDraftDirty = false;
+  currentPreviewDraft = null;
+  currentPreviewLetterId = null;
+  currentPreviewMode = "EDITOR";
+  updatePaperActionButtons();
+  return true;
 }
-window.rebuildLetterBody = syncLetterEditorWithActiveCase;
+window.syncLetterEditorWithActiveCase = syncLetterEditorWithActiveCase;
+window.rebuildLetterBody = function() { return syncLetterEditorWithActiveCase(true); };
 
 function syncRichEditorToTextarea() {
   var editor = document.getElementById("l-body-rich");
@@ -373,6 +632,7 @@ function syncRichEditorToTextarea() {
   if (editor && ta) {
     editor.innerHTML = sanitizeOfficeRichHtml(editor.innerHTML);
     ta.value = editor.innerText || editor.textContent;
+    if (!window.__nezam636ProgrammaticLetterSync) letterDraftDirty = true;
   }
 }
 window.syncRichEditorToTextarea = syncRichEditorToTextarea;
