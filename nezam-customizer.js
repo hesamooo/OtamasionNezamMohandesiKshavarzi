@@ -256,6 +256,16 @@ function confirmDiscardLetterChanges(actionLabel) {
     "\n\nآیا ادامه می‌دهید؟");
 }
 
+function clearUnsavedLetterStateAfterConfirmation() {
+  editingLetterId = null;
+  currentPreviewLetterId = null;
+  currentPreviewDraft = null;
+  letterDraftDirty = false;
+  paperPreviewDirty = false;
+  var alertEl = document.getElementById("letter-edit-alert");
+  if (alertEl) alertEl.style.display = "none";
+}
+
 function bindLetterPreviewDirtyTracking(stage) {
   if (!stage || stage.dataset.letterPreviewDirtyBound === "1") return;
   stage.dataset.letterPreviewDirtyBound = "1";
@@ -460,8 +470,28 @@ function updatePaperActionButtons() {
 }
 
 window.setPaperSize = function(size, skipSave) {
+  var requestedSize = size === "A5" ? "A5" : "A4";
+  if (!skipSave && requestedSize !== currentPaperSize) {
+    if (paperPreviewDirty) {
+      showToastMsg("ابتدا تغییرات روی خود برگه را ذخیره کنید؛ سپس اندازه کاغذ را عوض کنید.", true);
+      var printSizeSelector = document.getElementById("print-paper-size-select");
+      if (printSizeSelector) printSizeSelector.value = currentPaperSize;
+      var letterSizeSelector = document.getElementById("l-paper-size");
+      if (letterSizeSelector) letterSizeSelector.value = currentPaperSize;
+      return false;
+    }
+    if (letterDraftDirty && (currentPreviewMode === "LETTER" || currentPreviewMode === "LETTER_DRAFT")) {
+      var latestDraft = getLetterDraftFromEditor();
+      if (!latestDraft) return false;
+      latestDraft.id = editingLetterId || (currentPreviewDraft && currentPreviewDraft.id) || null;
+      currentPreviewDraft = latestDraft;
+      currentPreviewLetterId = null;
+      currentPreviewMode = "LETTER_DRAFT";
+      letterDraftDirty = false;
+    }
+  }
   var previous = currentPaperSize;
-  currentPaperSize = size === "A5" ? "A5" : "A4";
+  currentPaperSize = requestedSize;
   try { localStorage.setItem("nezam636_paper_size", currentPaperSize); } catch (e) {}
   applyDynamicPrintPageSizeCSS(currentPaperSize);
   var letterSelect = document.getElementById("l-paper-size");
@@ -634,7 +664,8 @@ function selectInquiryTemplate(key) {
     requireActiveCase("انتخاب قالب نامه استعلام", function () { selectInquiryTemplate(key); });
     return false;
   }
-  if (hasUnsavedLetterChanges() && !confirmDiscardLetterChanges("با انتخاب قالب جدید، متن فعلی ویرایشگر جایگزین می‌شود.")) return false;
+  if (!confirmDiscardLetterChanges("با انتخاب قالب جدید، متن یا پیش‌نمایش فعلی کنار گذاشته می‌شود.")) return false;
+  clearUnsavedLetterStateAfterConfirmation();
   currentTemplateKey = key;
   editingLetterId = null;
   currentPreviewLetterId = null;
@@ -857,6 +888,10 @@ window.savePaperEditsToSecretariat = function(options) {
     if (!silent) showToastMsg("این عملیات فقط برای نامه‌ها فعال است؛ فرم‌ها و کروکی‌ها را از مسیر خروجی چاپ ذخیره کنید.", true);
     return false;
   }
+  if (letterDraftDirty && paperPreviewDirty) {
+    if (!silent) showToastMsg("هم متن فرم و هم خود برگه تغییر کرده‌اند؛ ابتدا پیش‌نمایش را دوباره بسازید تا دو نسخه با هم تداخل نکنند.", true);
+    return false;
+  }
 
   var pageEls = stage.querySelectorAll(".a4-page");
   var pageEl = pageEls.length ? pageEls[0] : null;
@@ -1077,6 +1112,7 @@ function cancelLetterEditing() {
   var alertEl = document.getElementById("letter-edit-alert");
   if (alertEl) alertEl.style.display = "none";
   letterDraftDirty = false;
+  paperPreviewDirty = false;
   syncLetterEditorWithActiveCase(true);
   showToastMsg("ویرایش نامه لغو شد؛ قالب پیش‌نویس پرونده دوباره بارگذاری شد.");
 }
@@ -1115,6 +1151,7 @@ function editLetterFromSecretariat(letterId) {
   currentPreviewMode = "EDITOR";
   letterDraftCaseId = linkedCase.id;
   letterDraftDirty = false;
+  paperPreviewDirty = false;
   var fields = {
     "l-direction": letter.type || "OUT",
     "l-number": letter.number || "",
@@ -1159,6 +1196,8 @@ function previewCurrentLetterDraft(forcedPaperSize) {
   currentPreviewLetterId = null;
   var pSize = forcedPaperSize || draft.paperSize || currentPaperSize;
   if (!renderLetterPreviewObject(draft, pSize, "LETTER_DRAFT")) return false;
+  letterDraftDirty = false;
+  paperPreviewDirty = false;
   if (typeof window.switchMainPane === "function") window.switchMainPane("pane-print");
   showToastMsg("پیش‌نمایش پیش‌نویس آماده است؛ با ذخیره یا چاپ، نامه در دبیرخانه ثبت می‌شود.");
   return true;
@@ -1613,6 +1652,8 @@ window.insertLetterTable = function() {
 };
 
 function issueDeficiencyLetterForActiveCase() {
+  if (!confirmDiscardLetterChanges("با ساخت اخطاریه جدید، پیش‌نویس یا ویرایش فعلی کنار گذاشته می‌شود.")) return false;
+  clearUnsavedLetterStateAfterConfirmation();
   var c = getActiveCase();
   if (!c) {
     requireActiveCase("صدور ابلاغیه نواقص مدارک", function () { issueDeficiencyLetterForActiveCase(); });
@@ -1659,6 +1700,7 @@ function issueDeficiencyLetterForActiveCase() {
 
 function printOfficialForm(formType) {
   if (!confirmDiscardLetterChanges("با آماده‌سازی فرم رسمی، پیش‌نمایش یا ویرایش نامه جایگزین می‌شود.")) return false;
+  clearUnsavedLetterStateAfterConfirmation();
   var c = getActiveCase();
   if (!c) {
     requireActiveCase("چاپ فرم رسمی برای پرونده", function () { printOfficialForm(formType); });
@@ -3742,7 +3784,10 @@ window.setCroquisPrintFocusLayer = function(layerId) {
 
 /* چاپ رسمی کروکی چندلایه زمین به تفکیک ۲ برگه مجزا (برگه اول: نقشه ماهواره‌ای با ابزار تعاملی برش کادر و برگه دوم: جداول مساحت و مختصات کامل X, Y, ارتفاع, Zone) */
 function printUtmSketchSheet() {
-  if (currentPreviewMode !== "CROQUIS" && !confirmDiscardLetterChanges("با آماده‌سازی کروکی، پیش‌نمایش یا ویرایش نامه جایگزین می‌شود.")) return false;
+  if (currentPreviewMode !== "CROQUIS") {
+    if (!confirmDiscardLetterChanges("با آماده‌سازی کروکی، پیش‌نمایش یا ویرایش نامه جایگزین می‌شود.")) return false;
+    clearUnsavedLetterStateAfterConfirmation();
+  }
   var c = getActiveCase();
   if (!c) {
     requireActiveCase("چاپ برگه کروکی مهندسی زمین", function () { printUtmSketchSheet(); });
