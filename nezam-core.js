@@ -631,6 +631,18 @@ function normalizeAllCasesSchema() {
     if (!c.caseStatus) c.caseStatus = "ACTIVE";
     if (!c.utmZone) c.utmZone = "39R";
     if (!Array.isArray(c.customFields)) c.customFields = [];
+    // مهاجرت امن پلاک ثبتی از فیلدهای سفارشی قدیمی به فیلد مستقل پرونده
+    if (c.landParcel == null || c.landParcel === "") {
+      var legacyParcel = "";
+      for (var pf = 0; pf < c.customFields.length; pf++) {
+        var customLabel = String((c.customFields[pf] || {}).label || "");
+        if (customLabel.indexOf("پلاک") !== -1) {
+          legacyParcel = String(c.customFields[pf].value || "");
+          if (legacyParcel) break;
+        }
+      }
+      c.landParcel = legacyParcel;
+    }
     if (!Array.isArray(c.history)) {
       c.history = [{ date: (c.issueDate || todayShamsi()) + " - ۰۸:۰۰", action: "ثبت اولیه پرونده در سامانه", by: "مدیر مرکز ۶۳۶" }];
     }
@@ -778,7 +790,7 @@ function renderGuardModalApplicantList() {
   for (var i = 0; i < casesDB.length; i++) {
     var c = casesDB[i];
     if (grpFilter !== "ALL" && c.mainGroup !== grpFilter) continue;
-    var hay = toEn([c.code, c.name, c.nid, c.mobile, c.project, c.loc, c.repName || ""].join(" ")).toLowerCase();
+    var hay = toEn([c.code, c.name, c.nid, c.mobile, c.project, c.loc, c.landParcel || "", c.repName || ""].join(" ")).toLowerCase();
     if (q && hay.indexOf(q) === -1) continue;
 
     var grpMeta = APPLICANT_MAIN_GROUPS[c.mainGroup] || APPLICANT_MAIN_GROUPS.LIVESTOCK_POULTRY_FISHERIES;
@@ -847,7 +859,8 @@ function updateActiveApplicantBarUI() {
         '<span class="badge bg-light text-dark border me-1">کلاسه: ' + escapeHtmlCore(toFa(c.code)) + '</span>' +
         '<span class="badge bg-light text-dark border me-1">کدملی/شناسه: ' + escapeHtmlCore(toFa(c.nid)) + '</span>' +
         '<span class="badge bg-success-subtle text-success border border-success me-1">' + escapeHtmlCore(c.project) + ' (' + escapeHtmlCore(toFa(c.cap)) + ')</span>' +
-        '<span class="badge bg-light text-secondary border">📍 ' + escapeHtmlCore(c.loc) + '</span>';
+        '<span class="badge bg-light text-secondary border">📍 ' + escapeHtmlCore(c.loc) + '</span>' +
+        (c.landParcel ? '<span class="badge bg-light text-primary border">پلاک: ' + escapeHtmlCore(toFa(c.landParcel)) + '</span>' : '');
     }
     if (lockBanner) lockBanner.style.display = "none";
   }
@@ -1059,6 +1072,8 @@ function loadActiveCaseIntoForm() {
   document.getElementById("c-project").value = c.project || "";
   document.getElementById("c-cap").value = toFa(c.cap || "");
   document.getElementById("c-land").value = toFa(c.land || "");
+  var parcelInput = document.getElementById("c-land-parcel");
+  if (parcelInput) parcelInput.value = toFa(c.landParcel || "");
   document.getElementById("c-water").value = toFa(c.water || "");
   document.getElementById("c-loc").value = c.loc || "";
   document.getElementById("c-subarea").value = c.subarea || "";
@@ -1112,6 +1127,7 @@ function startNewCaseWizard(presetGroup) {
     project: sp.title,
     cap: grp === "GREENHOUSE_MUSHROOM" ? "۱۰۰۰ مترمربع" : (grp === "CLINIC_PHARMACY" ? "۱ واحد" : "۲۰۰ راس"),
     land: grp === "GREENHOUSE_MUSHROOM" ? "۱۲۵۰" : (grp === "CLINIC_PHARMACY" ? "۴۵" : "۱۲۰۰"),
+    landParcel: "",
     water: grp === "GREENHOUSE_MUSHROOM" ? "۸۰۰۰" : (grp === "CLINIC_PHARMACY" ? "۲۰۰" : "۲۰۰۰"),
     subarea: "مسقف: ۱۰۰۰ م.م | محوطه: ۲۵۰ م.م",
     loc: "فارس/ خفر/ مرکزی / خفر",
@@ -1189,6 +1205,7 @@ function saveActiveCaseChanges(goToLetters) {
   c.project = document.getElementById("c-project").value.trim();
   c.cap = toFa(document.getElementById("c-cap").value.trim());
   c.land = toFa(document.getElementById("c-land").value.trim());
+  c.landParcel = toFa((document.getElementById("c-land-parcel") || {}).value || "");
   c.water = toFa(document.getElementById("c-water").value.trim());
   c.loc = document.getElementById("c-loc").value.trim();
   c.subarea = document.getElementById("c-subarea").value.trim();
@@ -1278,7 +1295,7 @@ function renderApplicantsDirectoryTable() {
     if (fStatus !== "ALL" && (c.caseStatus || "ACTIVE") !== fStatus) continue;
     if (fDate && toEn(c.issueDate || "").indexOf(fDate) === -1) continue;
 
-    var searchHay = toEn([c.code, c.name, c.nid, c.mobile, c.project, c.loc, c.repName || "", c.regNo || ""].join(" ")).toLowerCase();
+    var searchHay = toEn([c.code, c.name, c.nid, c.mobile, c.project, c.loc, c.landParcel || "", c.repName || "", c.regNo || ""].join(" ")).toLowerCase();
     if (q && searchHay.indexOf(q) === -1) continue;
 
     matched++;
@@ -1298,7 +1315,7 @@ function renderApplicantsDirectoryTable() {
       '</td>' +
       '<td><span class="badge ' + grpMeta.badgeClass + '">' + escapeHtmlCore(grpMeta.shortTitle) + '</span></td>' +
       '<td class="text-start"><b>' + escapeHtmlCore(c.project) + '</b><br><small class="text-muted">ظرفیت: ' + escapeHtmlCore(toFa(c.cap)) + ' | زمین: ' + escapeHtmlCore(toFa(c.land)) + ' م.م</small></td>' +
-      '<td class="text-start"><small class="fw-bold text-success">' + escapeHtmlCore(c.loc) + '</small><br><small class="text-muted">تاریخ ثبت: ' + escapeHtmlCore(toFa(c.issueDate)) + '</small></td>' +
+      '<td class="text-start"><small class="fw-bold text-success">' + escapeHtmlCore(c.loc) + '</small><br><small class="text-primary">پلاک ثبتی: ' + escapeHtmlCore(toFa(c.landParcel || "---")) + '</small><br><small class="text-muted">تاریخ ثبت: ' + escapeHtmlCore(toFa(c.issueDate)) + '</small></td>' +
       '<td><span class="badge ' + stMeta.cls + '">' + stMeta.txt + '</span><br><small class="text-muted">' + escapeHtmlCore(toFa(mapsCount)) + ' نقشه کروکی</small></td>' +
       '<td>' +
         '<div class="d-flex gap-1 justify-content-center flex-wrap">' +
@@ -1841,25 +1858,41 @@ function renderSecretariatTable() {
   }
   tbody.innerHTML = html || "<tr><td colspan='4' class='text-center py-3 text-muted'>نامه‌ای یافت نشد.</td></tr>";
 
-  if (!tbody.dataset.secureActionsBound) {
-    tbody.dataset.secureActionsBound = "1";
-    tbody.addEventListener("click", function (event) {
-      var btn = event.target.closest("button[data-letter-action]");
-      if (!btn || !tbody.contains(btn)) return;
-      var id = btn.getAttribute("data-letter-id");
-      var action = btn.getAttribute("data-letter-action");
-      var idx = lettersDB.findIndex(function (letter) { return letter && String(letter.id) === id; });
-      if (idx < 0) return;
-      if (action === "edit") editLetterFromSecretariat(id);
-      else if (action === "a4") previewSavedLetter(id, "A4");
-      else if (action === "a5") previewSavedLetter(id, "A5");
-      else if (action === "delete") {
+  // اتصال رویدادها در هر بار رندر؛ کلیک‌های بایگانی پس از جستجو و فیلتر نیز فعال می‌مانند.
+  tbody.onclick = function (event) {
+    var target = event.target;
+    var btn = target && target.closest ? target.closest("button[data-letter-action]") : null;
+    if (!btn || !tbody.contains(btn)) return;
+    var id = btn.getAttribute("data-letter-id");
+    var action = btn.getAttribute("data-letter-action");
+    var idx = lettersDB.findIndex(function (letter) { return letter && String(letter.id) === String(id); });
+    if (idx < 0) {
+      showToastMsg("نامه انتخاب‌شده در دفتر اندیکاتور پیدا نشد؛ جدول را تازه‌سازی کنید.", true);
+      return;
+    }
+    try {
+      if (action === "edit") {
+        if (typeof window.editLetterFromSecretariat === "function") window.editLetterFromSecretariat(id);
+        else if (typeof editLetterFromSecretariat === "function") editLetterFromSecretariat(id);
+        else showToastMsg("ماژول ویرایش نامه بارگذاری نشده است.", true);
+      } else if (action === "a4" || action === "a5") {
+        var size = action === "a5" ? "A5" : "A4";
+        if (typeof window.printArchivedLetter === "function") window.printArchivedLetter(id, size);
+        else if (typeof window.previewSavedLetter === "function") {
+          window.previewSavedLetter(id, size);
+          showToastMsg("پیش‌نمایش نامه آماده شد؛ از دکمه چاپ مستقیم استفاده کنید.");
+        } else showToastMsg("موتور چاپ نامه بارگذاری نشده است.", true);
+      } else if (action === "delete") {
         if (!confirm("آیا از حذف این نامه از دفتر اندیکاتور اطمینان دارید؟")) return;
         lettersDB.splice(idx, 1);
         saveAllDB();
+        showToastMsg("نامه از دفتر اندیکاتور حذف شد.");
       }
-    });
-  }
+    } catch (error) {
+      console.error("Secretariat action failed:", error);
+      showToastMsg("اجرای عملیات بایگانی ناموفق بود: " + (error && error.message ? error.message : "خطای نامشخص"), true);
+    }
+  };
 }
 function filterLettersTable(dirVal) {
   var sel = document.getElementById("sec-filter-dir");
