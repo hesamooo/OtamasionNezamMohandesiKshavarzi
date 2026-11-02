@@ -1179,6 +1179,8 @@ function previewSavedLetter(letterId, forcedPaperSize) {
   }
   editingLetterId = null;
   currentPreviewDraft = null;
+  letterDraftDirty = false;
+  letterDraftCaseId = linkedCase.id;
   var targetSize = forcedPaperSize === "A5" ? "A5" : (forcedPaperSize === "A4" ? "A4" : (letter.paperSize || currentPaperSize || "A4"));
   if (!renderLetterPreviewObject(letter, targetSize, "LETTER")) return false;
   if (typeof window.switchMainPane === "function") window.switchMainPane("pane-print");
