@@ -414,11 +414,16 @@ function renderLetterPreviewObject(letter, forcedPaperSize, mode) {
 }
 
 function updatePaperActionButtons() {
+  var supported = currentPreviewMode === "LETTER" || currentPreviewMode === "LETTER_DRAFT";
   var saveBtn = document.getElementById("btn-save-print-edits");
+  var utmBtn = document.getElementById("btn-toggle-print-utm");
   if (saveBtn) {
-    var supported = currentPreviewMode === "LETTER" || currentPreviewMode === "LETTER_DRAFT";
     saveBtn.disabled = !supported;
     saveBtn.title = supported ? "ذخیره تغییرات متن و پیوست نامه در دبیرخانه" : "این دکمه فقط برای نامه‌ها فعال است؛ فرم و کروکی را با خروجی چاپ یا فایل ذخیره کنید.";
+  }
+  if (utmBtn) {
+    utmBtn.disabled = !supported;
+    utmBtn.title = supported ? "فعال یا غیرفعال کردن برگه پیوست مختصات UTM" : "این گزینه فقط برای پیش‌نمایش نامه فعال است.";
   }
 }
 
@@ -474,6 +479,11 @@ window.setPaperSize = function(size, skipSave) {
 
 window.doPrintPaperSheet = function() {
   if (printRequestActive) return false;
+  var stage = document.getElementById("a4-preview-stage");
+  if (!stage || !stage.querySelector(".a4-page")) {
+    showToastMsg("هیچ برگه‌ای برای چاپ آماده نیست؛ ابتدا نامه، فرم یا کروکی را پیش‌نمایش بگیرید.", true);
+    return false;
+  }
   if (currentPreviewMode === "LETTER" || currentPreviewMode === "LETTER_DRAFT") {
     var saved = window.savePaperEditsToSecretariat({ silent: true, log: false });
     if (!saved) {
@@ -999,6 +1009,7 @@ function cancelLetterEditing() {
 window.cancelLetterEditing = cancelLetterEditing;
 
 function editLetterFromSecretariat(letterId) {
+  if ((editingLetterId || letterDraftDirty) && !confirm("تغییرات پیش‌نویس فعلی ذخیره نشده است. با باز کردن نامه دیگر، این تغییرات کنار گذاشته می‌شود. ادامه می‌دهید؟")) return false;
   var letter = findSecretariatLetter(letterId);
   if (!letter) {
     showToastMsg("نامه انتخاب‌شده در دفتر اندیکاتور پیدا نشد.", true);
@@ -1090,6 +1101,7 @@ function renderSinglePreviewSheet(letterObj, forcedPaperSize) {
 window.renderSinglePreviewSheet = renderSinglePreviewSheet;
 
 function previewSavedLetter(letterId, forcedPaperSize) {
+  if ((editingLetterId || letterDraftDirty) && !confirm("پیش‌نویس ویرایشگر ذخیره نشده است. با باز کردن نامه بایگانی، پیش‌نویس کنار گذاشته می‌شود. ادامه می‌دهید؟")) return false;
   var letter = findSecretariatLetter(letterId);
   if (!letter) {
     showToastMsg("نامه انتخاب‌شده در دفتر اندیکاتور پیدا نشد.", true);
@@ -4179,12 +4191,7 @@ function initBrandingAndTemplatesUI() {
   }
   setPaperSize(currentPaperSize, true);
   renderTemplateButtonsInLettersPane();
-  syncLetterEditorWithActiveCase(true);
-  var previewStage = document.getElementById("a4-preview-stage");
-  if (previewStage) previewStage.innerHTML = "";
-  currentPreviewMode = "EDITOR";
-  currentPreviewLetterId = null;
-  currentPreviewDraft = null;
+  if (currentPreviewMode === "EDITOR") syncLetterEditorWithActiveCase();
   updatePaperActionButtons();
   if (typeof window.initCroquisWorkspaceForActiveCase === "function") {
     window.initCroquisWorkspaceForActiveCase();
