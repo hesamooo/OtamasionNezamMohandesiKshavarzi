@@ -1095,6 +1095,10 @@ function editLetterFromSecretariat(letterId) {
 window.editLetterFromSecretariat = editLetterFromSecretariat;
 
 function previewCurrentLetterDraft(forcedPaperSize) {
+  if (!getActiveCase()) {
+    requireActiveCase("پیش‌نمایش پیش‌نویس نامه", function () { previewCurrentLetterDraft(forcedPaperSize); });
+    return false;
+  }
   var draft = getLetterDraftFromEditor();
   if (!draft) return false;
   draft.id = editingLetterId || null;
