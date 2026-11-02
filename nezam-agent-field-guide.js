@@ -18,6 +18,7 @@
     hoverTimer: null,
     scrollLockUntil: 0,
     touchMode: false,
+    enabled: true,
     armedKey: '',
     cache: Object.create(null)
   };
@@ -271,7 +272,10 @@
       '#nezam636-field-guide-panel .fg-actions button{border:1px solid #aac8b2;border-radius:7px;background:rgba(237,246,239,.9);color:#205735;padding:5px 8px;font:700 10px Tahoma;cursor:pointer}' +
       '#nezam636-field-guide-panel .fg-muted{font-size:9px;color:#758178;margin-top:5px}' +
       '@media(max-width:600px){#nezam636-field-guide-panel{width:min(300px,calc(100vw - 16px));max-height:190px;font-size:11px}}' +
-      '@media print{#nezam636-field-guide-panel{display:none!important}}';
+      '#nezam636-field-guide-toggle{position:fixed;right:22px;bottom:22px;z-index:12493;border:1px solid rgba(65,112,76,.35);border-radius:999px;padding:9px 13px;background:rgba(248,255,249,.94);backdrop-filter:blur(12px);color:#245b38;font:700 11px Tahoma,Arial;box-shadow:0 5px 18px rgba(19,61,36,.15);cursor:pointer}' +
+      '#nezam636-field-guide-toggle.is-off{background:rgba(245,246,243,.95);color:#66736a;border-color:#cbd3cc}' +
+      '@media(max-width:600px){#nezam636-field-guide-toggle{right:10px;bottom:12px;padding:8px 10px}}' +
+      '@media print{#nezam636-field-guide-panel,#nezam636-field-guide-toggle{display:none!important}}';
     document.head.appendChild(style);
 
     var panel = document.createElement('section');
@@ -289,6 +293,32 @@
     byId('nezam636-field-guide-close').addEventListener('click', function () {
       panel.classList.remove('is-open');
     });
+  }
+  function setToggleLabel() {
+    if (!state.toggle) return;
+    state.toggle.textContent = state.enabled ? 'راهنمای صفحه: روشن' : 'راهنمای صفحه: خاموش';
+    state.toggle.classList.toggle('is-off', !state.enabled);
+    state.toggle.setAttribute('aria-pressed', state.enabled ? 'true' : 'false');
+    state.toggle.title = state.enabled ? 'برای خاموش‌کردن راهنمای فیلدها کلیک کن' : 'برای روشن‌کردن راهنمای فیلدها کلیک کن';
+  }
+  function setEnabled(enabled) {
+    state.enabled = Boolean(enabled);
+    state.requestId++;
+    if (!state.enabled && state.panel) state.panel.classList.remove('is-open');
+    if (!state.enabled) { state.target = null; state.armedKey = ''; }
+    try { window.localStorage.setItem('nezam636_field_guide_enabled', state.enabled ? '1' : '0'); } catch (e) {}
+    setToggleLabel();
+    return state.enabled;
+  }
+  function makeToggle() {
+    if (state.toggle || byId('nezam636-field-guide-toggle')) return;
+    var button = document.createElement('button');
+    button.type = 'button';
+    button.id = 'nezam636-field-guide-toggle';
+    button.addEventListener('click', function () { setEnabled(!state.enabled); });
+    document.body.appendChild(button);
+    state.toggle = button;
+    setToggleLabel();
   }
   function setBody(text, title) {
     var titleEl = byId('nezam636-field-guide-title');
@@ -391,7 +421,7 @@
     if (window.showToastMsg) window.showToastMsg('پیشنهاد در فیلد قرار گرفت؛ برای ذخیره پرونده، دکمه ثبت را جداگانه بزن.', false);
   }
   async function explain(el) {
-    if (!el || !el.isConnected) return;
+    if (!state.enabled || !el || !el.isConnected) return;
     state.target = el;
     var requestId = ++state.requestId;
     var context = caseContext();
@@ -434,7 +464,7 @@
     renderResult(desc, result, retrieval.sources || [], retrieval, context, false);
   }
   function onMouseMove(event) {
-    if (state.touchMode || Date.now() < state.scrollLockUntil) return;
+    if (!state.enabled || state.touchMode || Date.now() < state.scrollLockUntil) return;
     if (state.panel && state.panel.contains(event.target)) return;
     var el = findTarget(event.target);
     if (!el || el === state.target) return;
@@ -442,12 +472,13 @@
     state.hoverTimer = setTimeout(function () { explain(el); }, 420);
   }
   function onFocus(event) {
+    if (!state.enabled) return;
     var el = findTarget(event.target);
     if (!el || el === state.target) return;
     explain(el);
   }
   function onMobileClick(event) {
-    if (!state.touchMode) return;
+    if (!state.enabled || !state.touchMode) return;
     var el = findTarget(event.target);
     if (!el) return;
     var key = String(el.id || el.getAttribute('aria-label') || fieldLabel(el));
@@ -469,7 +500,9 @@
   }
   function init() {
     if (!document.body) return;
+    try { state.enabled = window.localStorage.getItem('nezam636_field_guide_enabled') !== '0'; } catch (e) { state.enabled = true; }
     makePanel();
+    makeToggle();
     state.touchMode = Boolean(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
     document.addEventListener('mousemove', onMouseMove, true);
     document.addEventListener('focusin', onFocus, true);
@@ -493,6 +526,8 @@
   window.Nezaam636FieldGuide = {
     explain: function (element) { return explain(element); },
     close: function () { if (state.panel) state.panel.classList.remove('is-open'); },
-    version: '1.1.0'
+    setEnabled: setEnabled,
+    isEnabled: function () { return state.enabled; },
+    version: '1.2.0'
   };
 })();
