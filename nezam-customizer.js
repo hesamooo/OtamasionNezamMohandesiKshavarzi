@@ -543,6 +543,7 @@ window.savePaperEditsToSecretariat = function() {
       utm: c.utm,
       body: currentPreviewMode === "LETTER" ? newBodyHtml : ("سند چاپی ذخیره‌شده در کاغذ " + currentPaperSize),
       paperSize: currentPaperSize,
+      includeUtm: false,
       savedPaperHtml: pageEl.outerHTML
     };
     lettersDB.unshift(created);
@@ -637,10 +638,13 @@ function editLetterFromSecretariat(letterId) {
   });
   if (linkedCase) {
     activeCaseId = linkedCase.id;
+    activeCroquisMapId = l.croquisMapId || "";
+    activeCroquisLayerId = "";
     try { localStorage.setItem("nezam636_active_case_id", String(linkedCase.id)); } catch (storageError) {}
     try {
       if (typeof populateGlobalCaseSelector === "function") populateGlobalCaseSelector();
       if (typeof loadActiveCaseIntoForm === "function") loadActiveCaseIntoForm();
+      if (typeof window.initCroquisWorkspaceForActiveCase === "function") window.initCroquisWorkspaceForActiveCase();
     } catch (caseUiError) {
       console.warn("Could not refresh linked case form before editing archived letter:", caseUiError);
     }
@@ -661,7 +665,7 @@ function editLetterFromSecretariat(letterId) {
     if (el) el.value = fields[id];
   });
   var includeUtmEl = document.getElementById("l-include-utm");
-  if (includeUtmEl) includeUtmEl.checked = l.includeUtm !== false;
+  if (includeUtmEl) includeUtmEl.checked = l.includeUtm === true;
   if (typeof window.syncTextareaToRichEditor === "function") window.syncTextareaToRichEditor();
   if (l.paperSize && typeof window.setPaperSize === "function") window.setPaperSize(l.paperSize, true);
 
@@ -1018,7 +1022,7 @@ function renderSinglePreviewSheet(letterObj, forcedPaperSize) {
   var pSize = forcedPaperSize || l.paperSize || currentPaperSize || "A4";
   setPaperSize(pSize, true);
   var isNat = (l.recipient || "").indexOf("منابع طبیعی") !== -1;
-  var incUtm = l.includeUtm !== false;
+  var incUtm = l.includeUtm === true;
   var linkedCase = (Array.isArray(window.casesDB) ? window.casesDB : []).find(function (item) { return item && String(item.id) === String(l.caseId); }) || c;
   var coordinateHtml = (typeof l.utmAttachmentHtml === "string" && l.utmAttachmentHtml.trim())
     ? l.utmAttachmentHtml
@@ -1044,7 +1048,7 @@ window.toggleUtmInPreviewSheet = function() {
   if (currentPreviewMode !== "LETTER") return;
   for (var i = 0; i < lettersDB.length; i++) {
     if (lettersDB[i].id === currentPreviewLetterId) {
-      lettersDB[i].includeUtm = lettersDB[i].includeUtm === false ? true : false;
+      lettersDB[i].includeUtm = lettersDB[i].includeUtm === true ? false : true;
       renderSinglePreviewSheet(lettersDB[i]);
       saveAllDB();
       showToastMsg(lettersDB[i].includeUtm ? "✅ برگه پیوست مختصات به نامه اضافه شد." : "❌ برگه پیوست مختصات از نامه حذف شد.");
