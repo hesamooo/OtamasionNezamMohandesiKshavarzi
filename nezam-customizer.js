@@ -468,11 +468,6 @@ function renderLetterPreviewObject(letter, forcedPaperSize, mode) {
   var attachmentLabel = getLetterAttachmentLabel(letter.attach, hasUtm);
 
   stage.innerHTML = buildSingleA4HTML(letter.recipient, sanitizeOfficeRichHtml(letter.body), letter.number, letter.date, attachmentLabel, letter.utm, isNat, true, pSize, false, "");
-  var letterPages = stage.querySelectorAll(".a4-page");
-  for (var letterPageIndex = 0; letterPageIndex < letterPages.length; letterPageIndex++) {
-    letterPages[letterPageIndex].setAttribute("data-page-kind", letterPageIndex === 0 ? "letter" : "letter-appendix");
-    letterPages[letterPageIndex].setAttribute("data-paper-size", pSize);
-  }
   if (hasUtm) {
     var sheets = splitUtmAttachmentTableHtml(coordinateHtml, pSize);
     var intro = "جدول مختصات UTM مربوط به زمین و عوارض پرونده «" +
@@ -483,6 +478,11 @@ function renderLetterPreviewObject(letter, forcedPaperSize, mode) {
       stage.innerHTML += buildSingleA4HTML("پیوست: جدول مختصات UTM", intro, letter.number, letter.date,
         "جدول مختصات UTM", letter.utm, isNat, true, pSize, true, title, sheets[si]);
     }
+  }
+  var letterPages = stage.querySelectorAll(".a4-page");
+  for (var letterPageIndex = 0; letterPageIndex < letterPages.length; letterPageIndex++) {
+    letterPages[letterPageIndex].setAttribute("data-page-kind", letterPageIndex === 0 ? "letter" : "letter-appendix");
+    letterPages[letterPageIndex].setAttribute("data-paper-size", pSize);
   }
   updatePrintUtmBtnState(hasUtm);
   updatePaperActionButtons();
