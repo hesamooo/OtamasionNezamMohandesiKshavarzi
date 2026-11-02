@@ -532,15 +532,16 @@ window.savePaperEditsToSecretariat = function() {
 /* دانلود فایل مستقل برگه A4 یا A5 جهت بایگانی یا چاپ در هر سیستم */
 window.downloadPaperSheetFile = function(forcedSize) {
   if (forcedSize === "A4" || forcedSize === "A5") {
-    setPaperSize(forcedSize, false);
+    setPaperSize(forcedSize, true);
   }
+  autoFitPaperContent();
   window.savePaperEditsToSecretariat();
   var stage = document.getElementById("a4-preview-stage");
   if (!stage) return;
   var c = getActiveCase();
   var pSize = currentPaperSize || "A4";
   var wMm = pSize === "A5" ? "148mm" : "210mm";
-  var hMm = pSize === "A5" ? "207mm" : "294mm";
+  var hMm = pSize === "A5" ? "208mm" : "295mm";
   var docHtml = '<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="UTF-8">' +
     '<title>برگه رسمی ' + pSize + ' - مرکز خدمات ۶۳۶ خفر</title>' +
     '<style>' +
@@ -666,8 +667,12 @@ function previewSavedLetter(letterId, forcedPaperSize, printNow) {
   if (linkedCase) {
     activeCaseId = linkedCase.id;
     try { localStorage.setItem("nezam636_active_case_id", String(linkedCase.id)); } catch (storageError) {}
-    try { if (typeof populateGlobalCaseSelector === "function") populateGlobalCaseSelector(); }
-    catch (caseUiError) { console.warn("Could not refresh active applicant selector for archived print:", caseUiError); }
+    try {
+      if (typeof populateGlobalCaseSelector === "function") populateGlobalCaseSelector();
+      if (typeof window.initCroquisWorkspaceForActiveCase === "function") window.initCroquisWorkspaceForActiveCase();
+    } catch (caseUiError) {
+      console.warn("Could not refresh active applicant/croquis context for archived print:", caseUiError);
+    }
   }
 
   var targetSize = forcedPaperSize === "A5" ? "A5" : (forcedPaperSize === "A4" ? "A4" : (l.paperSize || currentPaperSize || "A4"));
@@ -680,23 +685,13 @@ function previewSavedLetter(letterId, forcedPaperSize, printNow) {
   if (linkedCase && typeof window.switchMainPane === "function") window.switchMainPane("pane-print");
   else activatePaneForArchivedLetter("pane-print");
 
-  showToastMsg("پیش‌نمایش نامه شماره " + toFa(l.number || "") + " روی کاغذ " + targetSize + " آماده شد.");
-  if (printNow) {
-    window.setTimeout(function () {
-      try {
-        if (typeof window.triggerSmartPrint === "function") window.triggerSmartPrint(targetSize);
-        else window.print();
-      } catch (error) {
-        console.error("Archived letter print failed:", error);
-        showToastMsg("خطای چاپ نامه: " + (error && error.message ? error.message : String(error)), true);
-      }
-    }, 300);
-  }
+  showToastMsg("پیش‌نمایش نامه شماره " + toFa(l.number || "") + " روی کاغذ " + targetSize + " آماده شد؛ برای حفظ مقیاس، از دکمه چاپ اصلی استفاده کنید.");
   return true;
 }
 window.previewSavedLetter = previewSavedLetter;
 window.printArchivedLetter = function(letterId, paperSize) {
-  return previewSavedLetter(letterId, paperSize, true);
+  // نام سازگار با نسخه‌های قبل؛ فقط پیش‌نمایش را آماده می‌کند تا چاپ از مسیر استاندارد انجام شود.
+  return previewSavedLetter(letterId, paperSize, false);
 };
 
 function quickIssueSingleInquiry(tplKey) {
