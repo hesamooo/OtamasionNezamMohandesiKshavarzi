@@ -1392,7 +1392,15 @@
         if (panel) panel.classList.remove('is-open');
       },
       runLocalOverview: overview,
-      version: '1.0.0'
+      getFieldGuideContext: function () {
+        var c = activeCase();
+        return {
+          consent: state.allowCaseData === true,
+          hasActiveCase: Boolean(c),
+          case: state.allowCaseData === true && c ? safeCaseSummary(c, false) : null
+        };
+      },
+      version: '1.1.0'
     };
   }
 
