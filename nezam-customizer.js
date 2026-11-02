@@ -460,17 +460,18 @@ function renderLetterPreviewObject(letter, forcedPaperSize, mode) {
   currentPreviewDraft = isDraft ? letter : null;
   paperPreviewDirty = false;
   bindLetterPreviewDirtyTracking(stage);
-  if (letter.croquisMapId) activeCroquisMapId = letter.croquisMapId;
+  if (letter.officeLetter !== true && letter.croquisMapId) activeCroquisMapId = letter.croquisMapId;
   window.setPaperSize(pSize, true);
   var isNat = (letter.recipient || "").indexOf("منابع طبیعی") !== -1;
-  var includeUtm = letter.includeUtm === true;
+  var includeUtm = letter.officeLetter !== true && letter.includeUtm === true;
   var linkedCase = letter.officeLetter === true ? null :
     ((Array.isArray(window.casesDB) ? window.casesDB : []).find(function (item) {
       return item && String(item.id) === String(letter.caseId);
     }) || getActiveCase());
-  var coordinateHtml = (typeof letter.utmAttachmentHtml === "string" && letter.utmAttachmentHtml.trim())
-    ? letter.utmAttachmentHtml
-    : (includeUtm && linkedCase ? buildAllSelectedFeaturesUtmTableHTML(linkedCase, letter.utm || linkedCase.utm || "", isNat) : "");
+  var coordinateHtml = letter.officeLetter === true ? "" :
+    ((typeof letter.utmAttachmentHtml === "string" && letter.utmAttachmentHtml.trim())
+      ? letter.utmAttachmentHtml
+      : (includeUtm && linkedCase ? buildAllSelectedFeaturesUtmTableHTML(linkedCase, letter.utm || linkedCase.utm || "", isNat) : ""));
   var hasUtm = includeUtm && !!(coordinateHtml && coordinateHtml.trim());
   var attachmentLabel = getLetterAttachmentLabel(letter.attach, hasUtm);
 
@@ -1349,6 +1350,22 @@ function cancelLetterEditing() {
   else {
     letterDraftCaseId = "";
     currentPreviewMode = "EDITOR";
+    var emptyFields = {
+      "l-direction": "OUT",
+      "l-number": getNextSecretariatNumber(),
+      "l-date": todayShamsi(),
+      "l-attach": "ندارد",
+      "l-recipient": "",
+      "l-body": ""
+    };
+    Object.keys(emptyFields).forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.value = emptyFields[id];
+    });
+    var rich = document.getElementById("l-body-rich");
+    if (rich) rich.innerHTML = "";
+    var includeEl = document.getElementById("l-include-utm");
+    if (includeEl) includeEl.checked = false;
   }
   updateLetterScopeUI();
   showToastMsg("ویرایش نامه لغو شد؛ هیچ تغییری در سوابق ذخیره نشد.");
