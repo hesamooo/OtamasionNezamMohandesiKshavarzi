@@ -869,6 +869,11 @@
         break-after: auto !important;
       }
 
+      /* حاشیه داخلی لیبل زونکن باید با وجود reset عمومی چاپ حفظ شود. */
+      .a4-page[data-page-kind="binder-label"] {
+        padding: 15mm !important;
+      }
+
       #printed-croquis-map-holder,
       .printed-croquis-satellite-box,
       .printed-croquis-satellite-box * {
@@ -2984,7 +2989,7 @@
 
   <!-- ماژول‌های اصلی اتوماسیون مرکز خدمات ۶۳۶ خفر -->
   <script src="./nezam-core.js?v=20261102-parcel-r3"></script>
-  <script src="./nezam-customizer.js?v=20261102-letter-system-audit-r5"></script>
+  <script src="./nezam-customizer.js?v=20261102-print-engine-r6"></script>
   <script src="./nezam-ai-assistant.js?v=20261101-security-r3"></script>
 
   <!-- ماژول اصلاح‌شده و دوطرفه اتصال سامانه ۶۳۶ خفر به گوگل درایو (ذخیره و بازخوانی ۱۰۰٪ اطلاعات) -->
