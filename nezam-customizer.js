@@ -415,11 +415,17 @@ function renderLetterPreviewObject(letter, forcedPaperSize, mode) {
 
 function updatePaperActionButtons() {
   var supported = currentPreviewMode === "LETTER" || currentPreviewMode === "LETTER_DRAFT";
+  var previewDraftSupported = currentPreviewMode === "EDITOR" || currentPreviewMode === "LETTER_DRAFT" || !!editingLetterId || letterDraftDirty;
   var saveBtn = document.getElementById("btn-save-print-edits");
+  var previewDraftBtn = document.getElementById("btn-preview-letter-draft");
   var utmBtn = document.getElementById("btn-toggle-print-utm");
   if (saveBtn) {
     saveBtn.disabled = !supported;
     saveBtn.title = supported ? "ذخیره تغییرات متن و پیوست نامه در دبیرخانه" : "این دکمه فقط برای نامه‌ها فعال است؛ فرم و کروکی را با خروجی چاپ یا فایل ذخیره کنید.";
+  }
+  if (previewDraftBtn) {
+    previewDraftBtn.disabled = !previewDraftSupported;
+    previewDraftBtn.title = previewDraftSupported ? "پیش‌نمایش پیش‌نویس جاری و آماده‌سازی آن برای ثبت یا چاپ" : "برای ساخت پیش‌نویس، ابتدا قالب نامه را انتخاب یا متن نامه را ویرایش کنید.";
   }
   if (utmBtn) {
     utmBtn.disabled = !supported;
