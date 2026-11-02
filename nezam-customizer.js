@@ -1151,7 +1151,7 @@ window.printArchivedLetter = function(letterId, paperSize) {
 
 function quickIssueSingleInquiry(tplKey) {
   requireActiveCase("صدور استعلام تکی برای متقاضی", function() {
-    selectInquiryTemplate(tplKey);
+    if (!selectInquiryTemplate(tplKey)) return;
     saveLetterToSecretariat(true);
   });
 }
