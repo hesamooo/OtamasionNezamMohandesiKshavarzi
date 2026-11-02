@@ -274,7 +274,7 @@ window.getInquiryDataObject = function() {
       num: toFa((document.getElementById("l-number") || {}).value || "۱۴۰۵۰۲۱۳۰۱"),
       date: toFa((document.getElementById("l-date") || {}).value || todayShamsi()),
       attach: (document.getElementById("l-attach") || {}).value || "ندارد",
-      name: "---", nid: "---", project: "---", cap: "---", land: "---", water: "---", loc: "---", utm: "", extra: ""
+      name: "---", nid: "---", project: "---", cap: "---", land: "---", landParcel: "---", water: "---", loc: "---", utm: "", extra: ""
     };
   }
   var extra = "";
@@ -292,6 +292,7 @@ window.getInquiryDataObject = function() {
     project: c.project || "",
     cap: toFa(c.cap || ""),
     land: toFa(c.land || ""),
+    landParcel: toFa(c.landParcel || ""),
     water: toFa(c.water || ""),
     loc: c.loc || "",
     utm: c.utm || "",
@@ -307,6 +308,8 @@ window.buildInquirySpec = function(typeKey, d) {
     .replace(/\{طرح\}/g, d.project)
     .replace(/\{ظرفیت\}/g, d.cap)
     .replace(/\{مساحت\}/g, d.land)
+    .replace(/\{پلاک ثبتی\}/g, d.landParcel || "")
+    .replace(/\{پلاک\}/g, d.landParcel || "")
     .replace(/\{آب\}/g, d.water)
     .replace(/\{موقعیت\}/g, d.loc) + (d.extra || "");
   return { rec: item.rec, body: body };
@@ -413,6 +416,7 @@ function saveLetterToSecretariat(goToPrint, forcedPaperSize) {
     project: c.project,
     cap: c.cap,
     land: c.land,
+    landParcel: c.landParcel || "",
     water: c.water,
     loc: c.loc,
     utm: c.utm,
@@ -506,6 +510,7 @@ window.savePaperEditsToSecretariat = function() {
       project: c.project,
       cap: c.cap,
       land: c.land,
+      landParcel: c.landParcel || "",
       water: c.water,
       loc: c.loc,
       utm: c.utm,
@@ -601,21 +606,92 @@ function editLetterFromSecretariat(letterId) {
   }
 }
 
-function previewSavedLetter(letterId, forcedPaperSize) {
+function activatePaneForArchivedLetter(paneId) {
+  var pane = document.getElementById(paneId);
+  if (!pane) return false;
+  var panes = document.querySelectorAll(".sec-pane");
+  for (var i = 0; i < panes.length; i++) panes[i].classList.remove("active");
+  pane.classList.add("active");
+  var navLinks = document.querySelectorAll(".app-navbar .nav-link");
+  for (var j = 0; j < navLinks.length; j++) navLinks[j].classList.remove("active");
+  var nav = document.getElementById(paneId === "pane-letters" ? "nav-btn-letters" : "nav-btn-print");
+  if (nav) nav.classList.add("active");
+  return true;
+}
+
+function editLetterFromSecretariat(letterId) {
   for (var i = 0; i < lettersDB.length; i++) {
-    if (lettersDB[i].id === letterId) {
+    if (String(lettersDB[i].id) === String(letterId)) {
       var l = lettersDB[i];
-      if (l.caseId) selectActiveCase(l.caseId);
-      var targetSize = forcedPaperSize || l.paperSize || currentPaperSize || "A4";
-      l.paperSize = targetSize;
-      currentPreviewLetterId = l.id;
-      setPaperSize(targetSize, false);
-      renderSinglePreviewSheet(l, targetSize);
-      switchMainPane("pane-print");
+      editingLetterId = l.id;
+      var linkedCase = (Array.isArray(window.casesDB) ? window.casesDB : []).find(function (c) {
+        return c && String(c.id) === String(l.caseId);
+      });
+      if (linkedCase) selectActiveCase(linkedCase.id);
+      document.getElementById("l-direction").value = l.type || "OUT";
+      document.getElementById("l-number").value = l.number || "";
+      document.getElementById("l-date").value = l.date || "";
+      document.getElementById("l-attach").value = l.attach || "ندارد";
+      document.getElementById("l-recipient").value = l.recipient || "";
+      document.getElementById("l-body").value = l.body || "";
+      if (l.paperSize) setPaperSize(l.paperSize, true);
+
+      var alertEl = document.getElementById("letter-edit-alert");
+      if (alertEl) {
+        alertEl.style.display = "flex";
+        alertEl.className = "alert alert-warning py-2 px-3 small fw-bold mb-3 d-flex justify-content-between align-items-center";
+        alertEl.innerHTML = '<span>✏️ در حال ویرایش نامه شماره «' + safeHtmlText(toFa(l.number)) + '» (' + safeHtmlText(l.appName) + ' - کاغذ ' + (l.paperSize === "A5" ? "A5" : "A4") + ')</span>' +
+          '<button class="btn btn-sm btn-outline-dark py-0" onclick="editingLetterId=null;document.getElementById(\'letter-edit-alert\').style.display=\'none\';syncLetterEditorWithActiveCase();">لغو ویرایش</button>';
+      }
+      if (typeof getActiveCase === "function" && getActiveCase()) switchMainPane("pane-letters");
+      else activatePaneForArchivedLetter("pane-letters");
       break;
     }
   }
 }
+window.editLetterFromSecretariat = editLetterFromSecretariat;
+
+function previewSavedLetter(letterId, forcedPaperSize, printNow) {
+  var l = null;
+  for (var i = 0; i < lettersDB.length; i++) {
+    if (String(lettersDB[i].id) === String(letterId)) { l = lettersDB[i]; break; }
+  }
+  if (!l) {
+    showToastMsg("نامه انتخاب‌شده در دفتر اندیکاتور پیدا نشد.", true);
+    return false;
+  }
+  var linkedCase = (Array.isArray(window.casesDB) ? window.casesDB : []).find(function (c) {
+    return c && String(c.id) === String(l.caseId);
+  });
+  // فقط در صورت وجود واقعی پرونده، آن را فعال می‌کنیم؛ شناسه قدیمی نباید انتخاب فعال را خراب کند.
+  if (linkedCase) selectActiveCase(linkedCase.id);
+
+  var targetSize = forcedPaperSize === "A5" ? "A5" : (forcedPaperSize === "A4" ? "A4" : (l.paperSize || currentPaperSize || "A4"));
+  currentPreviewLetterId = l.id;
+  setPaperSize(targetSize, false);
+  renderSinglePreviewSheet(l, targetSize);
+
+  if (typeof getActiveCase === "function" && getActiveCase()) switchMainPane("pane-print");
+  else activatePaneForArchivedLetter("pane-print");
+
+  showToastMsg("پیش‌نمایش نامه شماره " + toFa(l.number || "") + " روی کاغذ " + targetSize + " آماده شد.");
+  if (printNow) {
+    window.setTimeout(function () {
+      try {
+        if (typeof window.triggerSmartPrint === "function") window.triggerSmartPrint(targetSize);
+        else window.print();
+      } catch (error) {
+        console.error("Archived letter print failed:", error);
+        showToastMsg("آماده‌سازی چاپ ناموفق بود: " + (error && error.message ? error.message : "خطای نامشخص"), true);
+      }
+    }, 250);
+  }
+  return true;
+}
+window.previewSavedLetter = previewSavedLetter;
+window.printArchivedLetter = function(letterId, paperSize) {
+  return previewSavedLetter(letterId, paperSize, true);
+};
 
 function quickIssueSingleInquiry(tplKey) {
   requireActiveCase("صدور استعلام تکی برای متقاضی", function() {
