@@ -476,30 +476,11 @@ function updatePaperActionButtons() {
 }
 
 window.setPaperSize = function(size, skipSave) {
-  var requestedSize = size === "A5" ? "A5" : "A4";
-  if (!skipSave && requestedSize !== currentPaperSize) {
-    if (paperPreviewDirty) {
-      showToastMsg("ابتدا تغییرات روی خود برگه را ذخیره کنید؛ سپس اندازه کاغذ را عوض کنید.", true);
-      var printSizeSelector = document.getElementById("print-paper-size-select");
-      if (printSizeSelector) printSizeSelector.value = currentPaperSize;
-      var letterSizeSelector = document.getElementById("l-paper-size");
-      if (letterSizeSelector) letterSizeSelector.value = currentPaperSize;
-      return false;
-    }
-    if (letterDraftDirty && (currentPreviewMode === "LETTER" || currentPreviewMode === "LETTER_DRAFT")) {
-      var latestDraft = getLetterDraftFromEditor();
-      if (!latestDraft) return false;
-      latestDraft.id = editingLetterId || (currentPreviewDraft && currentPreviewDraft.id) || null;
-      currentPreviewDraft = latestDraft;
-      currentPreviewLetterId = null;
-      currentPreviewMode = "LETTER_DRAFT";
-      letterDraftDirty = false;
-    }
-  }
   var previous = currentPaperSize;
-  currentPaperSize = requestedSize;
+  currentPaperSize = size === "A5" ? "A5" : "A4";
   try { localStorage.setItem("nezam636_paper_size", currentPaperSize); } catch (e) {}
   applyDynamicPrintPageSizeCSS(currentPaperSize);
+
   var letterSelect = document.getElementById("l-paper-size");
   var printSelect = document.getElementById("print-paper-size-select");
   if (letterSelect && letterSelect.value !== currentPaperSize) letterSelect.value = currentPaperSize;
@@ -523,23 +504,34 @@ window.setPaperSize = function(size, skipSave) {
 
   if (!skipSave) {
     if (previous !== currentPaperSize) {
-      if (currentPreviewMode === "CROQUIS") printUtmSketchSheet();
-      else if (currentPreviewMode === "FORM" && window.currentActiveFormKey) printOfficialForm(window.currentActiveFormKey);
-      else if (currentPreviewMode === "LETTER") {
-        var saved = findSecretariatLetter(currentPreviewLetterId);
-        if (saved) renderSinglePreviewSheet(saved, currentPaperSize);
-        else setTimeout(autoFitPaperContent, 50);
-      } else if (currentPreviewMode === "LETTER_DRAFT" && currentPreviewDraft) {
-        renderLetterPreviewObject(currentPreviewDraft, currentPaperSize, "LETTER_DRAFT");
-      } else setTimeout(autoFitPaperContent, 50);
-    } else setTimeout(autoFitPaperContent, 50);
-
-    if (currentPreviewMode === "LETTER" && currentPreviewLetterId) {
-      var savedLetter = findSecretariatLetter(currentPreviewLetterId);
-      if (savedLetter && savedLetter.paperSize !== currentPaperSize) {
-        savedLetter.paperSize = currentPaperSize;
-        if (!persistLetterAndCaseData()) showToastMsg("اندازه کاغذ تغییر کرد، اما ذخیره آن در بایگانی ناموفق بود.", true);
+      if (currentPreviewMode === "CROQUIS") {
+        printUtmSketchSheet();
+      } else if (currentPreviewMode === "FORM" && window.currentActiveFormKey) {
+        printOfficialForm(window.currentActiveFormKey);
+      } else {
+        // تغییر A4/A5 نباید پیش‌نمایش ویرایش‌شده را از روی نسخه بایگانی بازسازی کند.
+        if (currentPreviewMode === "LETTER" && currentPreviewLetterId) {
+          var savedLetter = findSecretariatLetter(currentPreviewLetterId);
+          if (savedLetter) {
+            var oldSize = savedLetter.paperSize;
+            savedLetter.paperSize = currentPaperSize;
+            if (!persistLetterAndCaseData()) {
+              savedLetter.paperSize = oldSize;
+              showToastMsg("اندازه کاغذ تغییر کرد، اما ذخیره آن در بایگانی ناموفق بود.", true);
+            }
+          }
+        } else if (currentPreviewMode === "LETTER_DRAFT" && currentPreviewDraft) {
+          currentPreviewDraft.paperSize = currentPaperSize;
+        }
+        setTimeout(function () {
+          var fit = autoFitPaperContent();
+          if (fit.pendingCount && typeof window.requestAnimationFrame === "function") {
+            window.requestAnimationFrame(function () { autoFitPaperContent(); });
+          }
+        }, 60);
       }
+    } else {
+      setTimeout(function () { autoFitPaperContent(); }, 60);
     }
   }
   updatePaperActionButtons();
@@ -551,36 +543,80 @@ window.doPrintPaperSheet = function() {
     showToastMsg("پیش‌نویس هنوز پیش‌نمایش نشده است؛ ابتدا «پیش‌نمایش پیش‌نویس نامه» را بزنید.", true);
     return false;
   }
+
   var stage = document.getElementById("a4-preview-stage");
   if (!stage || !stage.querySelector(".a4-page")) {
     showToastMsg("هیچ برگه‌ای برای چاپ آماده نیست؛ ابتدا نامه، فرم یا کروکی را پیش‌نمایش بگیرید.", true);
     return false;
   }
-  if (currentPreviewMode === "LETTER" || currentPreviewMode === "LETTER_DRAFT") {
-    var saved = window.savePaperEditsToSecretariat({ silent: true, log: false });
-    if (!saved) {
-      showToastMsg("چاپ متوقف شد؛ ابتدا نامه را به‌درستی ذخیره کنید.", true);
-      return false;
-    }
-  }
-  applyDynamicPrintPageSizeCSS(currentPaperSize);
+
   switchMainPane("pane-print");
-  if (currentPreviewMode !== "CROQUIS") {
-    var fitResult = autoFitPaperContent();
+  applyDynamicPrintPageSizeCSS(currentPaperSize);
+
+  var attempts = 0;
+  function scheduleFrame(callback) {
+    if (typeof window.requestAnimationFrame === "function") window.requestAnimationFrame(callback);
+    else setTimeout(callback, 40);
+  }
+
+  function prepareAndPrint() {
+    var firstPage = stage.querySelector(".a4-page");
+    var rect = firstPage ? firstPage.getBoundingClientRect() : null;
+    if ((!rect || rect.width < 100 || rect.height < 100) && attempts < 12) {
+      attempts++;
+      scheduleFrame(prepareAndPrint);
+      return;
+    }
+    if (!rect || rect.width < 100 || rect.height < 100) {
+      showToastMsg("صفحه چاپ هنوز قابل اندازه‌گیری نیست؛ دوباره پیش‌نمایش را باز کنید.", true);
+      return;
+    }
+
+    var fitResult = currentPreviewMode === "CROQUIS"
+      ? { overflowCount: 0, pendingCount: 0 }
+      : autoFitPaperContent(stage);
+
+    if (fitResult.pendingCount) {
+      if (attempts < 12) {
+        attempts++;
+        scheduleFrame(prepareAndPrint);
+        return;
+      }
+      showToastMsg("اندازه‌گیری صفحه چاپ کامل نشد؛ از نمایش بودن پیش‌نمایش اطمینان حاصل کنید.", true);
+      return;
+    }
     if ((currentPreviewMode === "LETTER" || currentPreviewMode === "LETTER_DRAFT") && fitResult.overflowCount) {
-      showToastMsg("چاپ متوقف شد؛ بخشی از نامه هنوز از محدوده کاغذ بیرون می‌زند. متن را کوتاه یا کاغذ A4 را انتخاب کنید.", true);
-      return false;
+      showToastMsg("چاپ متوقف شد؛ یک یا چند برگه هنوز از محدوده خارج می‌شوند. متن را کوتاه‌تر کنید یا A4 را انتخاب کنید.", true);
+      return;
+    }
+
+    // تغییرات پیش‌نمایش فقط پس از موفقیت کنترل چیدمان در دبیرخانه ثبت می‌شوند.
+    if (currentPreviewMode === "LETTER_DRAFT" || (currentPreviewMode === "LETTER" && paperPreviewDirty)) {
+      var saved = window.savePaperEditsToSecretariat({ silent: true, log: false });
+      if (!saved) {
+        showToastMsg("چاپ متوقف شد؛ ذخیره نامه یا پیوست آن موفق نبود.", true);
+        return;
+      }
+    }
+
+    printRequestActive = true;
+    applyDynamicPrintPageSizeCSS(currentPaperSize);
+    try {
+      scheduleFrame(function () {
+        try { window.print(); }
+        catch (printError) {
+          printRequestActive = false;
+          console.error("Nezam636 print failed:", printError);
+          showToastMsg("باز کردن پنجره چاپ ناموفق بود: " + (printError.message || printError), true);
+        }
+      });
+    } catch (scheduleError) {
+      printRequestActive = false;
+      showToastMsg("آماده‌سازی چاپ ناموفق بود: " + (scheduleError.message || scheduleError), true);
     }
   }
-  printRequestActive = true;
-  setTimeout(function() {
-    try { window.print(); }
-    catch (printError) {
-      printRequestActive = false;
-      console.error("Nezam636 print failed:", printError);
-      showToastMsg("باز کردن پنجره چاپ ناموفق بود: " + (printError.message || printError), true);
-    }
-  }, 160);
+
+  scheduleFrame(prepareAndPrint);
   return true;
 };
 
@@ -976,12 +1012,13 @@ window.savePaperEditsToSecretariat = function(options) {
   else lettersDB[existingIndex] = updated;
 
   var changed = wasNew || oldLetterJson !== JSON.stringify(updated);
-  if (wasNew || (changed && opts.log !== false)) {
+  if (changed && opts.log !== false) {
     logCaseAction(caseObj, (wasNew ? "صدور و ثبت نامه شماره " : "ذخیره اصلاحات نامه شماره ") +
       toFa(newNum) + " روی کاغذ " + currentPaperSize);
   }
 
-  if (!persistLetterAndCaseData()) {
+  // در نبود تغییر واقعی، از نوشتن تکراری در LocalStorage و بازآرایی غیرضروری آرشیو پرهیز می‌شود.
+  if (changed && !persistLetterAndCaseData()) {
     lettersDB = JSON.parse(oldLettersJson);
     caseObj.history = JSON.parse(oldHistoryJson);
     if (!silent) showToastMsg("ذخیره تغییرات نامه ناموفق بود؛ نسخه قبلی حفظ شد.", true);
@@ -1069,15 +1106,15 @@ window.downloadPaperSheetFile = function(forcedSize) {
     showToastMsg("ابتدا پیش‌نمایش نامه، فرم یا کروکی را آماده کنید.", true);
     return false;
   }
-  if (currentPreviewMode === "LETTER" || currentPreviewMode === "LETTER_DRAFT") {
-    if (!window.savePaperEditsToSecretariat({ silent: true, log: false })) {
-      showToastMsg("فایل ساخته نشد؛ ذخیره نامه با خطا مواجه شد.", true);
-      return false;
-    }
-  }
   var fitResult = autoFitPaperContent(stage);
-  if ((currentPreviewMode === "LETTER" || currentPreviewMode === "LETTER_DRAFT") && fitResult.overflowCount) {
-    showToastMsg("خروجی HTML ساخته نشد؛ بخشی از نامه در محدوده صفحه جا نمی‌شود. متن را کوتاه یا A4 انتخاب کنید.", true);
+  if ((currentPreviewMode === "LETTER" || currentPreviewMode === "LETTER_DRAFT") &&
+      (fitResult.pendingCount || fitResult.overflowCount)) {
+    showToastMsg("خروجی HTML ساخته نشد؛ صفحه هنوز کامل قابل اندازه‌گیری نیست یا محتوا از محدوده بیرون می‌زند.", true);
+    return false;
+  }
+  if ((currentPreviewMode === "LETTER" || currentPreviewMode === "LETTER_DRAFT") &&
+      !window.savePaperEditsToSecretariat({ silent: true, log: false })) {
+    showToastMsg("فایل ساخته نشد؛ ذخیره نامه با خطا مواجه شد.", true);
     return false;
   }
   var pSize = currentPaperSize || "A4";
@@ -1439,9 +1476,11 @@ function buildSingleA4HTML(rec, bodyTxt, numStr, dateStr, attachStr, utmRaw, isN
 
 function autoFitPaperContent(container) {
   var stage = container || document.getElementById("a4-preview-stage");
-  if (!stage) return { overflowCount: 0, pages: 0 };
+  if (!stage) return { overflowCount: 0, pendingCount: 0, pages: 0 };
   var pages = stage.querySelectorAll(".a4-page");
   var overflowCount = 0;
+  var pendingCount = 0;
+
   for (var i = 0; i < pages.length; i++) {
     var page = pages[i];
     var body = page.querySelector(".lh-body");
@@ -1449,40 +1488,61 @@ function autoFitPaperContent(container) {
     var txt = page.querySelector(".l-txt");
     if (!body || !txt) {
       page.removeAttribute("data-content-overflow");
+      page.removeAttribute("data-fit-pending");
       continue;
     }
+
+    // اندازه‌گیری صفحه پنهان معتبر نیست؛ تا زمان نمایش برگه صبر می‌کنیم.
+    var rect = page.getBoundingClientRect();
+    if (!rect.width || !rect.height || !body.clientHeight || (wrap && !wrap.clientHeight)) {
+      page.setAttribute("data-fit-pending", "true");
+      pendingCount++;
+      continue;
+    }
+    page.removeAttribute("data-fit-pending");
+
     var isA5 = page.classList.contains("paper-a5");
-    var currentSize = isA5 ? 8.8 : 10.5;
+    var currentSize = parseFloat(page.getAttribute("data-user-font-pt"));
+    if (!Number.isFinite(currentSize)) currentSize = isA5 ? 8.8 : 10.5;
     var minTextSize = isA5 ? 6.8 : 7.2;
     var lineH = isA5 ? 1.65 : 1.95;
     var tables = page.querySelectorAll(".utm-table-print");
     var tblFont = isA5 ? 7.2 : 8.2;
     var minTableSize = isA5 ? 5.2 : 5.8;
+
     txt.style.fontSize = currentSize + "pt";
     txt.style.lineHeight = String(lineH);
+    for (var t0 = 0; t0 < tables.length; t0++) tables[t0].style.fontSize = tblFont + "pt";
+
     function hasOverflow() {
-      return body.scrollHeight > body.clientHeight + 2 || (wrap && wrap.scrollHeight > wrap.clientHeight + 2);
+      return body.scrollHeight > body.clientHeight + 2 ||
+        (!!wrap && wrap.scrollHeight > wrap.clientHeight + 2);
     }
+
     var count = 0;
-    while (hasOverflow() && count < 28) {
+    while (hasOverflow() && count < 36) {
       var oldTextSize = currentSize;
-      currentSize = Math.max(minTextSize, currentSize - 0.25);
-      lineH = Math.max(1.2, lineH - 0.035);
+      var oldTableSize = tblFont;
+      currentSize = Math.max(minTextSize, currentSize - 0.2);
+      lineH = Math.max(1.18, lineH - 0.025);
+      tblFont = Math.max(minTableSize, tblFont - 0.15);
       txt.style.fontSize = currentSize + "pt";
       txt.style.lineHeight = String(lineH);
-      if (tables.length) {
-        tblFont = Math.max(minTableSize, tblFont - 0.2);
-        for (var t = 0; t < tables.length; t++) tables[t].style.fontSize = tblFont + "pt";
-      }
+      for (var t = 0; t < tables.length; t++) tables[t].style.fontSize = tblFont + "pt";
       count++;
-      if (currentSize === oldTextSize && tblFont <= minTableSize) break;
+      if (currentSize === oldTextSize && tblFont === oldTableSize) break;
     }
+
     var overflow = hasOverflow();
     page.setAttribute("data-content-overflow", overflow ? "true" : "false");
+    page.setAttribute("data-fit-font-pt", currentSize.toFixed(2));
+    page.setAttribute("data-fit-table-pt", tblFont.toFixed(2));
     if (overflow) overflowCount++;
   }
-  return { overflowCount: overflowCount, pages: pages.length };
+
+  return { overflowCount: overflowCount, pendingCount: pendingCount, pages: pages.length };
 }
+
 window.autoFitPaperContent = autoFitPaperContent;
 
 window.autoFitCurrentPaper = function() {
@@ -1494,14 +1554,30 @@ window.autoFitCurrentPaper = function() {
 
 window.adjustPaperFontSize = function(delta) {
   var stage = document.getElementById("a4-preview-stage");
-  if (!stage) return;
+  if (!stage) return false;
   var txts = stage.querySelectorAll(".l-txt");
+  if (!txts.length) {
+    showToastMsg("در این نوع برگه، تنظیم اندازه متن در دسترس نیست.", true);
+    return false;
+  }
   txts.forEach(function(el) {
-    var cur = parseFloat(window.getComputedStyle(el).fontSize) || 14;
-    el.style.fontSize = Math.max(9, Math.min(24, cur + delta * 1.5)) + "px";
+    var page = el.closest(".a4-page");
+    if (!page) return;
+    var currentPx = parseFloat(window.getComputedStyle(el).fontSize) || 14;
+    var currentPt = currentPx * 0.75;
+    var nextPt = Math.max(page.classList.contains("paper-a5") ? 6.8 : 7.2,
+      Math.min(16, currentPt + (delta > 0 ? 0.75 : -0.75)));
+    page.setAttribute("data-user-font-pt", nextPt.toFixed(2));
   });
-  showToastMsg(delta > 0 ? "اندازه قلم برگه بزرگ‌تر شد (A+)" : "اندازه قلم برگه کوچک‌تر شد (A-)");
+  var result = autoFitPaperContent(stage);
+  showToastMsg(result.overflowCount
+    ? "اندازه قلم تغییر کرد، اما بخشی از محتوا هنوز جا نمی‌شود."
+    : (delta > 0 ? "اندازه قلم بزرگ‌تر شد (A+)." : "اندازه قلم کوچک‌تر شد (A-)."),
+    !!result.overflowCount);
+  return !result.overflowCount;
 };
+
+
 
 function splitUtmAttachmentTableHtml(tableHtml, paperSize) {
   if (!tableHtml) return [];
@@ -1562,40 +1638,72 @@ window.toggleUtmInPreviewSheet = function() {
     showToastMsg("ابتدا یک نامه را پیش‌نمایش بگیرید.", true);
     return false;
   }
+
   var original = JSON.parse(JSON.stringify(letter));
+  var stage = document.getElementById("a4-preview-stage");
+  var firstPage = stage && stage.querySelector(".a4-page");
+  if (firstPage) {
+    var recEl = firstPage.querySelector(".l-rec");
+    var txtEl = firstPage.querySelector(".l-txt");
+    var numEl = firstPage.querySelector(".paper-meta-num");
+    var dateEl = firstPage.querySelector(".paper-meta-date");
+    var attachEl = firstPage.querySelector(".paper-meta-attach");
+    if (recEl) letter.recipient = recEl.innerText.trim();
+    if (txtEl) letter.body = sanitizeOfficeRichHtml(txtEl.innerHTML);
+    if (numEl) letter.number = numEl.innerText.trim();
+    if (dateEl) letter.date = dateEl.innerText.trim();
+    var appendixBeforeToggle = collectUtmAppendixFromStage(stage);
+    if (appendixBeforeToggle) {
+      letter.utmAttachmentHtml = appendixBeforeToggle;
+      letter.includeUtm = true;
+    } else if (letter.includeUtm !== true) {
+      letter.utmAttachmentHtml = "";
+    }
+    letter.attach = getLetterAttachmentLabel(attachEl ? attachEl.innerText.trim() : letter.attach,
+      !!(appendixBeforeToggle || letter.includeUtm === true));
+  }
+
   letter.includeUtm = letter.includeUtm !== true;
   if (letter.includeUtm && !(letter.utmAttachmentHtml || "").trim()) {
     var caseObj = (Array.isArray(window.casesDB) ? window.casesDB : []).find(function (item) {
       return item && String(item.id) === String(letter.caseId);
-    }) || getActiveCase();
+    });
+    if (!caseObj) {
+      Object.keys(letter).forEach(function (key) { delete letter[key]; });
+      Object.assign(letter, original);
+      showToastMsg("پرونده مرتبط برای بازیابی مختصات پیدا نشد.", true);
+      return false;
+    }
     if (letter.croquisMapId) activeCroquisMapId = letter.croquisMapId;
-    letter.utmAttachmentHtml = caseObj
-      ? buildAllSelectedFeaturesUtmTableHTML(caseObj, letter.utm || caseObj.utm || "", (letter.recipient || "").indexOf("منابع طبیعی") !== -1)
-      : "";
+    letter.utmAttachmentHtml = buildAllSelectedFeaturesUtmTableHTML(
+      caseObj, letter.utm || caseObj.utm || "", (letter.recipient || "").indexOf("منابع طبیعی") !== -1
+    );
   }
+
   var hasCoordinates = letter.includeUtm === true && !!(letter.utmAttachmentHtml && letter.utmAttachmentHtml.trim());
   if (letter.includeUtm && !hasCoordinates) {
+    Object.keys(letter).forEach(function (key) { delete letter[key]; });
     Object.assign(letter, original);
     showToastMsg("برای این پرونده مختصات قابل پیوست پیدا نشد.", true);
     return false;
   }
   letter.attach = getLetterAttachmentLabel(letter.attach, hasCoordinates);
+
   if (!isDraft && !persistLetterAndCaseData()) {
     Object.keys(letter).forEach(function (key) { delete letter[key]; });
     Object.assign(letter, original);
     showToastMsg("ذخیره تغییر وضعیت پیوست مختصات ناموفق بود.", true);
     return false;
   }
-  if (isDraft) {
-    paperPreviewDirty = true;
-    letterDraftDirty = true;
-  } else {
-    paperPreviewDirty = false;
-  }
+
+  paperPreviewDirty = isDraft;
+  if (isDraft) letterDraftDirty = true;
   renderLetterPreviewObject(letter, currentPaperSize, isDraft ? "LETTER_DRAFT" : "LETTER");
   showToastMsg(hasCoordinates ? "برگه پیوست مختصات به نامه اضافه شد." : "پیوست مختصات از نامه حذف شد.");
   return true;
 };
+
+
 
 function updatePrintUtmBtnState(isOn) {
   var btn = document.getElementById("btn-toggle-print-utm");
@@ -4256,15 +4364,15 @@ function exportStageToWordDoc() {
     showToastMsg("ابتدا یک نامه، فرم یا کروکی را پیش‌نمایش بگیرید.", true);
     return false;
   }
-  if (currentPreviewMode === "LETTER" || currentPreviewMode === "LETTER_DRAFT") {
-    if (!window.savePaperEditsToSecretariat({ silent: true, log: false })) {
-      showToastMsg("خروجی Word ساخته نشد؛ ذخیره نامه با خطا مواجه شد.", true);
-      return false;
-    }
-  }
   var fitResult = autoFitPaperContent(stage);
-  if ((currentPreviewMode === "LETTER" || currentPreviewMode === "LETTER_DRAFT") && fitResult.overflowCount) {
-    showToastMsg("خروجی Word ساخته نشد؛ بخشی از نامه در محدوده صفحه جا نمی‌شود. متن را کوتاه یا A4 انتخاب کنید.", true);
+  if ((currentPreviewMode === "LETTER" || currentPreviewMode === "LETTER_DRAFT") &&
+      (fitResult.pendingCount || fitResult.overflowCount)) {
+    showToastMsg("خروجی Word ساخته نشد؛ صفحه هنوز کامل قابل اندازه‌گیری نیست یا محتوا از محدوده بیرون می‌زند.", true);
+    return false;
+  }
+  if ((currentPreviewMode === "LETTER" || currentPreviewMode === "LETTER_DRAFT") &&
+      !window.savePaperEditsToSecretariat({ silent: true, log: false })) {
+    showToastMsg("خروجی Word ساخته نشد؛ ذخیره نامه با خطا مواجه شد.", true);
     return false;
   }
   var pSize = currentPaperSize || "A4";
