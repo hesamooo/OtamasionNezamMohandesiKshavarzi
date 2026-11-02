@@ -1407,12 +1407,12 @@ function buildSingleA4HTML(rec, bodyTxt, numStr, dateStr, attachStr, utmRaw, isN
     '</div>' +
     '<div class="lh-body">' +
       '<div class="lh-content-wrap">' +
-        (rec ? '<div class="l-rec" contenteditable="true">' + safeRec + '</div><div style="font-weight:800;margin-bottom:2mm;font-size:10.5pt;" contenteditable="true">با سلام</div>' : '') +
+        (rec ? '<div class="l-rec" contenteditable="true">' + safeRec + '</div><div class="l-greeting" style="font-weight:800;margin-bottom:2mm;font-size:10.5pt;">با سلام</div>' : '') +
         '<div class="l-txt" style="' + (isRawHtml ? 'white-space:normal;' : '') + '" contenteditable="true">' + renderedBody + '</div>' +
         utmTableHtml +
       '</div>' +
       '<div class="sign-area">' +
-        '<div class="sign-box" contenteditable="true">' +
+        '<div class="sign-box">' +
           '<div>با تشکر</div>' +
           '<div>' + safeManagerTitle + '</div>' +
           '<div>' + safeManagerName + '</div>' +
