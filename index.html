@@ -4963,5 +4963,528 @@
   <script src="./nezam-agent-knowledge.js?v=20261101-agent-knowledge-r4"></script>
   <script src="./nezam-rule-advisor.js?v=20261101-rule-advisor-r2"></script>
   <script src="./nezam-agent-field-guide.js?v=20261102-field-guide-r3"></script>
+<style id="nezam-ui-modern-2026-r1">
+/* Modern office workspace — visual-only layer. Print and application logic remain unchanged. */
+@media screen {
+  :root {
+    --ui-bg: #f4f7f5;
+    --ui-surface: #ffffff;
+    --ui-surface-soft: #f8faf8;
+    --ui-ink: #1f3027;
+    --ui-muted: #718078;
+    --ui-line: #e1e9e3;
+    --ui-green: #236746;
+    --ui-green-strong: #174b35;
+    --ui-green-soft: #eaf3ed;
+    --ui-gold: #d6b76f;
+    --ui-radius: 15px;
+    --ui-shadow: 0 5px 20px rgba(26, 57, 39, .055);
+  }
+
+  html { scroll-behavior: smooth; }
+  body {
+    color: var(--ui-ink) !important;
+    background:
+      radial-gradient(ellipse at 8% 0%, rgba(69, 135, 91, .075), transparent 30rem),
+      linear-gradient(180deg, #f8faf8 0%, var(--ui-bg) 100%) !important;
+    background-attachment: fixed;
+    font-family: "Vazirmatn", "IRANSansX", "Segoe UI", Tahoma, Arial, sans-serif !important;
+    font-size: 14px !important;
+    line-height: 1.75 !important;
+    letter-spacing: 0 !important;
+  }
+  button, input, select, textarea { font: inherit; }
+  a { color: var(--ui-green); }
+  ::selection { background: #d9ebdf; color: #174b35; }
+  :focus-visible { outline: 3px solid rgba(48, 129, 83, .36) !important; outline-offset: 2px; }
+
+  /* هدر سازمانی: جمع‌وجور، خوانا و رسمی */
+  .top-hero-bar {
+    padding: .82rem clamp(1rem, 2.4vw, 2rem) !important;
+    background:
+      radial-gradient(circle at 8% 130%, rgba(101, 166, 121, .18), transparent 23rem),
+      linear-gradient(112deg, #102f23 0%, #174934 58%, #1d4433 100%) !important;
+    border: 0 !important;
+    border-bottom: 3px solid var(--ui-gold) !important;
+    box-shadow: 0 5px 18px rgba(18, 55, 37, .13) !important;
+  }
+  .top-hero-bar::after { opacity: .35; }
+  .top-hero-bar > div { min-height: 54px; }
+  #nav-logo-box {
+    width: 48px !important;
+    height: 48px !important;
+    border-radius: 14px !important;
+    box-shadow: 0 0 0 4px rgba(255,255,255,.07), 0 5px 14px rgba(0,0,0,.16) !important;
+  }
+  #ui-hero-org {
+    color: #d7c89d !important;
+    font-size: .76rem !important;
+    font-weight: 650 !important;
+  }
+  #ui-hero-office {
+    color: #fff !important;
+    font-size: clamp(1rem, 1.55vw, 1.28rem) !important;
+    font-weight: 800 !important;
+    line-height: 1.55 !important;
+    text-shadow: none !important;
+  }
+  #live-clock { color: #f1d994 !important; }
+  .top-hero-bar .px-3.py-1.rounded {
+    padding: .38rem .78rem !important;
+    border: 1px solid rgba(255,255,255,.16) !important;
+    border-radius: 10px !important;
+    background: rgba(255,255,255,.08) !important;
+    box-shadow: none !important;
+    backdrop-filter: blur(8px);
+  }
+  .nezam-windows-export-btn {
+    min-height: 37px !important;
+    padding: .38rem .85rem !important;
+    border: 1px solid rgba(255,255,255,.18) !important;
+    border-radius: 10px !important;
+    background: linear-gradient(135deg, #ead49b, #d8b76f) !important;
+    color: #25392d !important;
+    box-shadow: 0 3px 9px rgba(0,0,0,.12) !important;
+  }
+
+  /* نوار پرونده فعال: همیشه مشخص، بدون ازدحام */
+  .active-applicant-ContextBar {
+    padding: .62rem clamp(.9rem, 2vw, 1.7rem) !important;
+    background: rgba(255,255,255,.96) !important;
+    border: 0 !important;
+    border-bottom: 1px solid var(--ui-line) !important;
+    box-shadow: 0 3px 12px rgba(35,70,48,.035) !important;
+    backdrop-filter: blur(12px);
+  }
+  .active-applicant-ContextBar > div:first-child { gap: .8rem !important; }
+  #active-case-status-badge {
+    padding: .38rem .76rem !important;
+    border: 1px solid #cfe2d4 !important;
+    border-radius: 999px !important;
+    background: #eaf4ed !important;
+    color: #246746 !important;
+    font-size: .78rem !important;
+  }
+  #active-case-info-summary { color: #52665a !important; font-size: .83rem; font-weight: 650; }
+  #global-case-selector {
+    min-height: 40px !important;
+    max-width: min(400px, 45vw) !important;
+    border: 1px solid #d9e4dc !important;
+    border-radius: 10px !important;
+    background: #fbfdfb !important;
+    box-shadow: none !important;
+  }
+  .active-applicant-ContextBar .btn { min-height: 38px !important; box-shadow: none !important; }
+  #no-active-case-warning-banner { border-radius: 11px !important; }
+
+  /* شبکهٔ اصلی: نوار ناوبری به‌عنوان فضای ثابت ابزارها */
+  .nezam-body-grid { align-items: stretch !important; }
+  nav.app-navbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,.22) transparent;
+  }
+  nav.app-navbar .nav-link {
+    min-height: 44px !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: .58rem !important;
+    padding: .58rem .72rem !important;
+    border: 1px solid transparent !important;
+    border-radius: 10px !important;
+    background: transparent !important;
+    color: #e3eee7 !important;
+    text-align: right !important;
+    font-size: .84rem !important;
+    font-weight: 650 !important;
+    line-height: 1.45 !important;
+    box-shadow: none !important;
+    transition: background .18s ease, color .18s ease, border-color .18s ease, transform .18s ease !important;
+  }
+  nav.app-navbar .nav-link:hover {
+    transform: translateX(-2px) !important;
+    background: rgba(255,255,255,.09) !important;
+    border-color: rgba(255,255,255,.09) !important;
+    color: #fff !important;
+    box-shadow: none !important;
+  }
+  nav.app-navbar .nav-link.active {
+    background: #e8f1e9 !important;
+    border-color: #d6e5d9 !important;
+    color: #174b35 !important;
+    font-weight: 800 !important;
+    box-shadow: 0 3px 10px rgba(0,0,0,.10) !important;
+  }
+  nav.app-navbar .nav-link.active::after { background: #3c8a5d !important; }
+  .nezam-sb-top-brand {
+    min-height: 44px;
+    color: #e7d49b !important;
+    font-size: .83rem !important;
+    font-weight: 800 !important;
+    letter-spacing: 0 !important;
+  }
+  .nezam-sb-collapse-trigger {
+    width: 31px !important;
+    height: 31px !important;
+    border-radius: 9px !important;
+    background: rgba(255,255,255,.09) !important;
+    border: 1px solid rgba(255,255,255,.18) !important;
+  }
+  .nezam-sb-collapse-trigger:hover {
+    background: #dfc47f !important;
+    color: #173d2b !important;
+    transform: none !important;
+  }
+  .nezam-content-column { min-width: 0 !important; }
+  .nezam-content-column > main {
+    width: 100% !important;
+    max-width: 1740px !important;
+    margin: 0 auto !important;
+    padding: clamp(1rem, 2vw, 1.8rem) clamp(1rem, 2.2vw, 2rem) 2.5rem !important;
+  }
+
+  /* نوار بخش جاری و زیرتب‌ها */
+  .nezam-top-subbar {
+    min-height: 54px !important;
+    padding: .58rem clamp(1rem, 2vw, 1.7rem) !important;
+    gap: .45rem !important;
+    background: rgba(255,255,255,.94) !important;
+    border: 0 !important;
+    border-bottom: 1px solid var(--ui-line) !important;
+    box-shadow: 0 3px 12px rgba(31,67,45,.035) !important;
+    backdrop-filter: blur(12px);
+  }
+  .subbar-breadcrumb {
+    color: #285d40 !important;
+    font-size: .86rem !important;
+    font-weight: 800 !important;
+    border-left: 1px solid #dce6de !important;
+  }
+  .subbar-tab-item {
+    min-height: 34px;
+    padding: .38rem .72rem !important;
+    border: 1px solid transparent !important;
+    border-radius: 9px !important;
+    background: #f4f7f4 !important;
+    color: #5a6b60 !important;
+    font-size: .78rem !important;
+    font-weight: 650 !important;
+    box-shadow: none !important;
+  }
+  .subbar-tab-item:hover {
+    background: #eaf3ec !important;
+    border-color: #d9e8dd !important;
+    transform: none !important;
+  }
+  .subbar-tab-item.active {
+    background: #e7f1e9 !important;
+    border-color: #cfe1d3 !important;
+    color: #1e6844 !important;
+    box-shadow: none !important;
+  }
+
+  /* محتوا و کارت‌ها: خطوط و سایه‌های کم، سلسله‌مراتب روشن */
+  main { color: var(--ui-ink) !important; }
+  .sec-pane.active { animation: uiPaneEnter .2s ease both !important; }
+  @keyframes uiPaneEnter {
+    from { opacity: .55; transform: translateY(3px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .card-clean {
+    padding: 1.12rem !important;
+    border: 1px solid var(--ui-line) !important;
+    border-radius: var(--ui-radius) !important;
+    background: var(--ui-surface) !important;
+    box-shadow: var(--ui-shadow) !important;
+    transition: border-color .18s ease, box-shadow .18s ease !important;
+  }
+  .card-clean::before { display: none !important; }
+  .card-clean:hover {
+    transform: none !important;
+    border-color: #d2e1d6 !important;
+    box-shadow: 0 7px 22px rgba(26,57,39,.07) !important;
+  }
+  .card-clean > .border-bottom {
+    border-bottom-color: #e8eee9 !important;
+    padding-bottom: .72rem !important;
+  }
+  .card-clean > .border-bottom strong {
+    color: #275c40 !important;
+    font-size: .96rem !important;
+    font-weight: 800 !important;
+  }
+  .workflow-law-strip {
+    display: block !important;
+    margin-bottom: 1rem !important;
+    padding: .9rem 1.05rem !important;
+    border: 1px solid #dce8df !important;
+    border-right: 4px solid #4b8d63 !important;
+    border-radius: 13px !important;
+    background: linear-gradient(110deg, #f0f6f1, #fbfcfa 72%) !important;
+    box-shadow: none !important;
+  }
+  .workflow-law-strip > div:first-child { margin-bottom: .58rem; }
+  .workflow-law-strip > div:last-child {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: .42rem !important;
+    align-items: center;
+  }
+  .workflow-law-strip .badge {
+    background: #e1ece4 !important;
+    border: 1px solid #d2e2d6 !important;
+    color: #2e6445 !important;
+  }
+  .workflow-step-pill {
+    padding: .42rem .68rem !important;
+    border: 1px solid #dfe9e1 !important;
+    border-radius: 9px !important;
+    background: #fff !important;
+    color: #43594a !important;
+    font-size: .79rem !important;
+    cursor: pointer;
+    box-shadow: none !important;
+  }
+  .workflow-step-pill:hover {
+    background: #f7fbf7 !important;
+    border-color: #bcd4c2 !important;
+    transform: none !important;
+    box-shadow: none !important;
+  }
+
+  /* کارت‌های شاخص و میانبرها */
+  .kpi-macro-card {
+    min-height: 88px !important;
+    padding: .85rem .95rem !important;
+    border: 1px solid #e5ece6 !important;
+    border-radius: 12px !important;
+    background: #fff !important;
+    box-shadow: none !important;
+  }
+  .kpi-macro-card:hover { transform: none !important; box-shadow: none !important; }
+  .kpi-macro-card [id^="kpi-"] { font-size: 1.55rem !important; font-weight: 850 !important; }
+  .kpi-macro-card::before, .kpi-macro-card::after { opacity: .5; }
+  .cmd-tile-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: .65rem !important; }
+  .cmd-tile {
+    min-height: 112px !important;
+    padding: .85rem .65rem !important;
+    gap: .38rem !important;
+    border: 1px solid #e4ebe5 !important;
+    border-radius: 13px !important;
+    background: #fff !important;
+    box-shadow: none !important;
+  }
+  .cmd-tile:nth-child(1), .cmd-tile:nth-child(5) { display: flex !important; }
+  .cmd-tile::after { display: none !important; }
+  .cmd-tile:hover {
+    transform: translateY(-2px) !important;
+    border-color: #bdd7c4 !important;
+    background: #fbfefb !important;
+    box-shadow: 0 6px 16px rgba(30,83,51,.07) !important;
+  }
+  .cmd-tile-icon {
+    width: 43px !important;
+    height: 43px !important;
+    border: 1px solid #dfebe2 !important;
+    border-radius: 12px !important;
+    box-shadow: none !important;
+  }
+  .tri-group-card {
+    padding: 1.08rem !important;
+    border-radius: 14px !important;
+    background: #fff !important;
+    box-shadow: 0 3px 12px rgba(29,67,43,.045) !important;
+  }
+  .tri-group-card:hover { transform: translateY(-2px) !important; box-shadow: 0 8px 18px rgba(29,67,43,.08) !important; }
+  .tri-group-card .small { line-height: 1.85; }
+
+  /* فرم‌ها: میدان‌های واضح‌تر و فاصلهٔ مناسب‌تر */
+  label {
+    display: inline-block;
+    margin-bottom: .28rem !important;
+    color: #435b4c !important;
+    font-size: .82rem !important;
+    font-weight: 700 !important;
+  }
+  .form-control, .form-select {
+    min-height: 41px !important;
+    padding: .48rem .72rem !important;
+    border: 1px solid #d7e3da !important;
+    border-radius: 10px !important;
+    background: #fff !important;
+    color: #273a2e !important;
+    font-size: .87rem !important;
+    box-shadow: 0 1px 2px rgba(24,65,39,.025) !important;
+  }
+  .form-control:hover, .form-select:hover { border-color: #b5cdbb !important; }
+  .form-control:focus, .form-select:focus {
+    border-color: #57946b !important;
+    box-shadow: 0 0 0 3px rgba(58,130,79,.12) !important;
+  }
+  textarea.form-control { min-height: 96px !important; line-height: 1.8 !important; }
+  input[type="file"] { border-style: dashed !important; background: #fafcfb !important; }
+  .input-group-text {
+    border: 1px solid #d7e3da !important;
+    border-radius: 10px !important;
+    background: #eff5f0 !important;
+    color: #3d644a !important;
+  }
+
+  /* دکمه‌ها و وضعیت‌ها */
+  .btn {
+    min-height: 38px !important;
+    padding: .48rem .88rem !important;
+    border-radius: 10px !important;
+    font-size: .83rem !important;
+    font-weight: 750 !important;
+    box-shadow: none !important;
+    transition: transform .15s ease, background .15s ease, border-color .15s ease !important;
+  }
+  .btn:hover { transform: translateY(-1px) !important; box-shadow: none !important; filter: brightness(1.025); }
+  .btn:active { transform: translateY(0) !important; }
+  .btn-sm { min-height: 33px !important; padding: .34rem .68rem !important; font-size: .77rem !important; }
+  .btn-success { background: #27734d !important; border-color: #216a45 !important; color: #fff !important; }
+  .btn-primary { background: #456f8d !important; border-color: #3d6683 !important; color: #fff !important; }
+  .btn-danger { background: #b95f50 !important; border-color: #ae5849 !important; color: #fff !important; }
+  .btn-warning { background: #e6c77e !important; border-color: #d7b96f !important; color: #2d3b2f !important; }
+  .btn-dark { background: #30483a !important; border-color: #293f32 !important; color: #fff !important; }
+  .btn-light, .btn-outline-success, .btn-outline-primary, .btn-outline-danger, .btn-outline-dark, .btn-outline-secondary {
+    background: #fff !important;
+    border: 1px solid #dce7df !important;
+    color: #405b49 !important;
+  }
+  .btn-outline-danger { color: #a84c42 !important; border-color: #ebd9d6 !important; }
+
+  .badge { padding: .34em .72em !important; border-radius: 999px !important; font-weight: 750 !important; }
+  .alert {
+    padding: .8rem 1rem !important;
+    border-width: 1px !important;
+    border-radius: 12px !important;
+    box-shadow: none !important;
+  }
+
+  /* جداول: خوانایی و امکان مرور داده‌های طولانی */
+  .table-responsive {
+    border: 1px solid #e2eae4 !important;
+    border-radius: 12px !important;
+    background: #fff !important;
+    box-shadow: none !important;
+  }
+  .table { font-size: .82rem !important; }
+  .table th, .table td { padding: .62rem .72rem !important; }
+  .table thead th {
+    background: #eff5f0 !important;
+    border-bottom: 1px solid #d9e5dc !important;
+    color: #2d6243 !important;
+    font-weight: 800 !important;
+  }
+  .table tbody tr:nth-child(even) { background: #fbfdfb; }
+  .table tbody tr:hover { background: #f2f8f3 !important; }
+  .table td { border-bottom-color: #edf1ed !important; }
+
+  /* دستیار، پیام‌ها و پنجره‌های تعاملی */
+  #ai-chat-history {
+    border: 1px solid #e0e9e2 !important;
+    border-radius: 14px !important;
+    background: #f6f9f6 !important;
+  }
+  #ai-chat-history > div {
+    border: 1px solid #e2eae4 !important;
+    border-radius: 12px !important;
+    box-shadow: none !important;
+  }
+  .guard-modal-overlay { background: rgba(12,31,21,.58) !important; backdrop-filter: blur(5px); }
+  .guard-modal-card { border: 1px solid #e1e9e3 !important; border-radius: 18px !important; }
+  .toast-msg { border-radius: 12px !important; }
+
+  /* اندازه‌های نمایشگر بزرگ */
+  @media (min-width: 1440px) {
+    .nezam-content-column > main { max-width: 1840px !important; padding-left: 2rem !important; padding-right: 2rem !important; }
+    .card-clean { padding: 1.25rem !important; }
+  }
+
+  /* تبلت و تلفن: ناوبری افقی، کنترل‌های تمام‌عرض و بدون فشردگی */
+  @media (max-width: 991px) {
+    .nezam-body-grid { display: flex !important; flex-direction: column !important; }
+    nav.app-navbar {
+      position: sticky !important;
+      top: 0 !important;
+      z-index: 960 !important;
+      width: 100% !important;
+      min-width: 0 !important;
+      height: auto !important;
+      flex: 0 0 auto !important;
+      flex-direction: row !important;
+      flex-wrap: nowrap !important;
+      gap: .38rem !important;
+      padding: .52rem .65rem !important;
+      overflow-x: auto !important;
+      overflow-y: hidden !important;
+      background: #173e30 !important;
+      border: 0 !important;
+      border-bottom: 2px solid var(--ui-gold) !important;
+      box-shadow: 0 4px 12px rgba(20,60,39,.12) !important;
+    }
+    nav.app-navbar .nav-link {
+      flex: 0 0 auto !important;
+      min-height: 39px !important;
+      padding: .42rem .68rem !important;
+      font-size: .78rem !important;
+      background: rgba(255,255,255,.07) !important;
+      border-color: rgba(255,255,255,.10) !important;
+      color: #edf4ef !important;
+      white-space: nowrap !important;
+    }
+    nav.app-navbar .nav-link.active {
+      background: #e8f1e9 !important;
+      color: #174b35 !important;
+      border-color: #d6e5d9 !important;
+    }
+    .nezam-sb-top-brand { display: none !important; }
+    .nezam-content-column, body.nezam-sb-collapsed .nezam-content-column { width: 100% !important; }
+    .nezam-content-column > main { padding: 1rem .9rem 2rem !important; }
+    .nezam-top-subbar { position: sticky !important; top: 49px !important; }
+    .workflow-law-strip { padding: .8rem !important; }
+  }
+  @media (max-width: 620px) {
+    body { font-size: 13px !important; }
+    .top-hero-bar { padding: .72rem .78rem !important; }
+    .top-hero-bar > div { align-items: flex-start !important; gap: .7rem !important; }
+    #nav-logo-box { width: 42px !important; height: 42px !important; border-radius: 12px !important; }
+    #ui-hero-org { font-size: .68rem !important; }
+    #ui-hero-office { font-size: .91rem !important; }
+    .top-hero-bar .px-3.py-1.rounded { font-size: .76rem; }
+    .top-hero-bar .nezam-windows-export-btn { width: auto !important; }
+    .active-applicant-ContextBar { padding: .62rem .72rem !important; }
+    .active-applicant-ContextBar > div { align-items: stretch !important; }
+    .active-applicant-ContextBar > div:last-of-type { display: grid !important; grid-template-columns: 1fr 1fr; }
+    #global-case-selector { grid-column: 1 / -1; width: 100% !important; max-width: 100% !important; }
+    .active-applicant-ContextBar .btn { min-height: 36px !important; padding: .34rem .48rem !important; font-size: .72rem !important; }
+    .nezam-top-subbar { top: 47px !important; padding: .45rem .62rem !important; }
+    .subbar-breadcrumb { width: 100%; border: 0 !important; padding: 0 0 .2rem !important; }
+    .subbar-tab-item { min-height: 32px; padding: .32rem .55rem !important; font-size: .72rem !important; }
+    .nezam-content-column > main { padding: .78rem .65rem 1.6rem !important; }
+    .card-clean { padding: .85rem !important; border-radius: 13px !important; }
+    .workflow-law-strip { padding: .72rem !important; }
+    .workflow-law-strip > div:last-child { gap: .32rem !important; }
+    .workflow-step-pill { font-size: .72rem !important; padding: .34rem .48rem !important; }
+    .cmd-tile-grid { grid-template-columns: repeat(2, minmax(0,1fr)) !important; gap: .5rem !important; }
+    .cmd-tile { min-height: 100px !important; padding: .7rem .45rem !important; }
+    .cmd-tile-icon { width: 38px !important; height: 38px !important; }
+    .kpi-macro-card { min-height: 76px !important; padding: .62rem .68rem !important; }
+    .table { font-size: .74rem !important; }
+    .table th, .table td { padding: .42rem .46rem !important; }
+  }
+
+  /* کاهش حرکت برای کاربرانی که این ترجیح را فعال کرده‌اند */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: .01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: .01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+</style>
 </body>
 </html>
