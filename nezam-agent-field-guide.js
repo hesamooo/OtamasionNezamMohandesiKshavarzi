@@ -16,6 +16,7 @@
     busy: false,
     requestId: 0,
     hoverTimer: null,
+    scrollLockUntil: 0,
     touchMode: false,
     armedKey: '',
     cache: Object.create(null)
@@ -228,7 +229,7 @@
     return [
       'نقش: راهنمای تعاملی و کارشناس پشتیبان اتوماسیون دفتر خدمات غیردولتی کشاورزی و منابع طبیعی مرکز ۶۳۶ خفر.',
       'هدف: کاربر روی یک فیلد یا دکمه قرار گرفته است. دقیقاً توضیح بده این کنترل چیست، چه چیزی باید وارد کند یا پیش از کلیک چه کاری انجام دهد، و چرا.',
-      'پاسخ فارسی، روشن، کوتاه و اجرایی باشد. برای کاربر اداری بنویس، نه برنامه‌نویس.',
+      'پاسخ بسیار کوتاه باشد: حداکثر ۲ جمله، بدون مقدمه و فهرست طولانی. مستقیم بگو چه کند و چرا.',
       'عنوان کنترل: ' + desc.label,
       'نوع کنترل: ' + desc.kind + ' | نوع HTML: ' + desc.type + ' | شناسه: ' + desc.id,
       'بخش سامانه: ' + desc.section,
@@ -248,8 +249,8 @@
       '۴) بین الزام مستند، برداشت از رابط سامانه و پیشنهاد کارشناسی تفاوت بگذار.',
       '۵) پیشنهاد مقدار فیلد فقط وقتی مجاز است که از پروندهِ مجاز یا سند بازیابی‌شده قابل استخراج باشد؛ در غیر این صورت suggested_value را خالی بگذار.',
       '۶) کدملی، تلفن، رمز یا کلید API را بازگو نکن.',
-      'خروجی فقط JSON معتبر و بدون Markdown با این قالب باشد:',
-      '{"explanation":"توضیح این کنترل","what_to_enter":"چه چیزی وارد شود یا پیش از کلیک چه کنیم","why":"دلیل","next_step":"اقدام بعدی کوتاه","caution":"هشدار یا ابهام","suggested_value":"","confidence":"مستند/برداشت از رابط/راهنمای عمومی","source_refs":["S1"]}'
+      'خروجی فقط JSON معتبر و بدون Markdown باشد. هر فیلد حداکثر یک جمله کوتاه؛ هیچ توضیح اضافی یا تکراری ننویس:',
+      '{"explanation":"کارکرد در یک جمله","what_to_enter":"داده یا اقدام در یک جمله","why":"دلیل کوتاه","next_step":"","caution":"فقط هشدار ضروری","suggested_value":"","confidence":"مستند/رابط/عمومی","source_refs":["S1"]}'
     ].join('\n');
   }
   function makePanel() {
@@ -257,55 +258,34 @@
     var style = document.createElement('style');
     style.id = 'nezam636-field-guide-style';
     style.textContent =
-      '#nezam636-field-guide-toggle{position:fixed;right:16px;bottom:16px;z-index:12490;border:1px solid #9bb9a4;border-radius:999px;background:#fff;color:#1b5334;padding:9px 13px;font:700 12px Tahoma;box-shadow:0 5px 18px #1d493022;cursor:pointer}' +
-      '#nezam636-field-guide-toggle.is-on{background:#1b5334;color:#fff;border-color:#17452f}' +
-      '#nezam636-field-guide-panel{position:fixed;right:16px;bottom:65px;z-index:12491;width:min(410px,calc(100vw - 32px));max-height:min(68vh,560px);overflow:auto;display:none;direction:rtl;text-align:right;background:#fff;border:1px solid #b9d2bf;border-radius:15px;box-shadow:0 14px 42px #173d2860;color:#24372a;font:12px/1.9 Tahoma,Arial}' +
+      '#nezam636-field-guide-panel{position:fixed;z-index:12491;width:min(330px,calc(100vw - 24px));max-height:230px;overflow:auto;display:none;direction:rtl;text-align:right;background:rgba(249,255,250,.88);backdrop-filter:blur(16px) saturate(155%);-webkit-backdrop-filter:blur(16px) saturate(155%);border:1px solid rgba(73,125,88,.38);border-radius:13px;box-shadow:0 10px 32px rgba(19,61,36,.19),inset 0 1px 0 rgba(255,255,255,.85);color:#20382a;font:12px/1.75 Tahoma,Arial;user-select:text;-webkit-user-select:text;pointer-events:auto}' +
       '#nezam636-field-guide-panel.is-open{display:block}' +
-      '#nezam636-field-guide-panel .fg-head{position:sticky;top:0;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 12px;background:linear-gradient(120deg,#173f2b,#2e7049);color:#fff;border-radius:14px 14px 0 0}' +
-      '#nezam636-field-guide-panel .fg-head button{border:1px solid #ffffff66;background:#ffffff17;color:#fff;border-radius:7px;padding:3px 8px;cursor:pointer}' +
-      '#nezam636-field-guide-panel .fg-body{padding:11px 13px;white-space:pre-wrap;overflow-wrap:anywhere}' +
-      '#nezam636-field-guide-panel .fg-block{padding:7px 9px;margin:7px 0;border:1px solid #e1ebe2;background:#f7faf7;border-radius:9px}' +
-      '#nezam636-field-guide-panel .fg-block b{display:block;color:#245b38;margin-bottom:2px}' +
-      '#nezam636-field-guide-panel .fg-source{font-size:10px;color:#526b59;border-top:1px solid #e4ece5;padding-top:6px;margin-top:7px}' +
-      '#nezam636-field-guide-panel .fg-actions{display:flex;flex-wrap:wrap;gap:6px;padding:0 12px 12px}' +
-      '#nezam636-field-guide-panel .fg-actions button{border:1px solid #aac8b2;border-radius:8px;background:#edf6ef;color:#205735;padding:6px 10px;font:700 11px Tahoma;cursor:pointer}' +
-      '#nezam636-field-guide-panel .fg-muted{font-size:10px;color:#69786d}' +
-      '@media(max-width:600px){#nezam636-field-guide-toggle{right:10px;bottom:10px;padding:9px 11px}#nezam636-field-guide-panel{right:8px;bottom:58px;width:calc(100vw - 16px);max-height:62vh}}' +
-      '@media print{#nezam636-field-guide-toggle,#nezam636-field-guide-panel{display:none!important}}';
+      '#nezam636-field-guide-panel .fg-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px;background:rgba(30,87,51,.09);border-bottom:1px solid rgba(73,125,88,.18);color:#1f5634}' +
+      '#nezam636-field-guide-panel .fg-head b{font-size:11px;line-height:1.5}' +
+      '#nezam636-field-guide-panel .fg-head button{border:0;background:rgba(255,255,255,.65);color:#315a3d;border-radius:7px;padding:2px 7px;cursor:pointer;font:11px Tahoma}' +
+      '#nezam636-field-guide-panel .fg-body{padding:8px 10px;white-space:pre-wrap;overflow-wrap:anywhere;user-select:text;-webkit-user-select:text;cursor:text}' +
+      '#nezam636-field-guide-panel .fg-line{margin:0 0 5px}' +
+      '#nezam636-field-guide-panel .fg-line b{color:#245b38}' +
+      '#nezam636-field-guide-panel .fg-source{font-size:10px;color:#526b59;border-top:1px solid rgba(73,125,88,.2);padding:5px 10px 7px;user-select:text;-webkit-user-select:text}' +
+      '#nezam636-field-guide-panel .fg-actions{display:flex;flex-wrap:wrap;gap:5px;padding:0 9px 8px}' +
+      '#nezam636-field-guide-panel .fg-actions button{border:1px solid #aac8b2;border-radius:7px;background:rgba(237,246,239,.9);color:#205735;padding:5px 8px;font:700 10px Tahoma;cursor:pointer}' +
+      '#nezam636-field-guide-panel .fg-muted{font-size:9px;color:#758178;margin-top:5px}' +
+      '@media(max-width:600px){#nezam636-field-guide-panel{width:min(300px,calc(100vw - 16px));max-height:190px;font-size:11px}}' +
+      '@media print{#nezam636-field-guide-panel{display:none!important}}';
     document.head.appendChild(style);
-
-    var toggle = document.createElement('button');
-    toggle.type = 'button';
-    toggle.id = 'nezam636-field-guide-toggle';
-    toggle.textContent = '🪄 راهنمای لمس: خاموش';
-    toggle.setAttribute('aria-pressed', 'false');
-    document.body.appendChild(toggle);
-    state.toggle = toggle;
 
     var panel = document.createElement('section');
     panel.id = 'nezam636-field-guide-panel';
     panel.setAttribute('role', 'region');
     panel.setAttribute('aria-live', 'polite');
     panel.innerHTML =
-      '<div class="fg-head"><b id="nezam636-field-guide-title">راهنمای هوشمند کنترل</b><button type="button" id="nezam636-field-guide-close">بستن ✕</button></div>' +
-      '<div class="fg-body" id="nezam636-field-guide-body">روی فیلد یا دکمه برو تا راهنمای مرتبط نمایش داده شود.</div>' +
+      '<div class="fg-head"><b id="nezam636-field-guide-title">راهنمای هوشمند</b><button type="button" id="nezam636-field-guide-close" aria-label="بستن راهنما">✕</button></div>' +
+      '<div class="fg-body" id="nezam636-field-guide-body">روی فیلد یا دکمه برو تا راهنمای کوتاه نمایش داده شود.</div>' +
+      '<div class="fg-source" id="nezam636-field-guide-source" hidden></div>' +
       '<div class="fg-actions" id="nezam636-field-guide-actions"></div>';
     document.body.appendChild(panel);
     state.panel = panel;
-    toggle.addEventListener('click', function () {
-      state.touchMode = !state.touchMode;
-      state.armedKey = '';
-      toggle.classList.toggle('is-on', state.touchMode);
-      toggle.setAttribute('aria-pressed', state.touchMode ? 'true' : 'false');
-      toggle.textContent = state.touchMode ? '🪄 راهنمای لمس: روشن' : '🪄 راهنمای لمس: خاموش';
-      panel.classList.toggle('is-open', state.touchMode);
-      if (state.touchMode) {
-        setBody('حالت راهنمای لمس فعال شد.\nیک بار روی هر فیلد یا دکمه بزن تا توضیح و پیشنهاد نمایش داده شود؛ لمس دوم همان کنترل، عملیات عادی آن را اجرا می‌کند.', 'راهنمای لمس');
-        byId('nezam636-field-guide-actions').innerHTML = '';
-      } else {
-        panel.classList.remove('is-open');
-      }
-    });
+
     byId('nezam636-field-guide-close').addEventListener('click', function () {
       panel.classList.remove('is-open');
     });
@@ -315,60 +295,80 @@
     var body = byId('nezam636-field-guide-body');
     if (titleEl) titleEl.textContent = title || 'راهنمای هوشمند';
     if (body) body.textContent = String(text || '');
+    positionPanel();
+  }
+  function positionPanel() {
+    var panel = state.panel;
+    var target = state.target;
+    if (!panel || !target || !target.isConnected || !panel.classList.contains('is-open')) return;
+    var rect = target.getBoundingClientRect();
+    if (rect.bottom < 0 || rect.top > window.innerHeight || rect.right < 0 || rect.left > window.innerWidth) {
+      panel.style.visibility = 'hidden';
+      return;
+    }
+    panel.style.visibility = 'hidden';
+    panel.style.left = '0px';
+    panel.style.top = '0px';
+    var width = Math.min(330, Math.max(230, window.innerWidth - 24));
+    panel.style.width = width + 'px';
+    var panelHeight = Math.min(panel.scrollHeight || 150, 230);
+    var left = rect.left + rect.width / 2 - width / 2;
+    left = Math.max(8, Math.min(window.innerWidth - width - 8, left));
+    var below = rect.bottom + 9;
+    var top = below + panelHeight <= window.innerHeight - 8
+      ? below
+      : Math.max(8, rect.top - panelHeight - 9);
+    panel.style.left = left + 'px';
+    panel.style.top = top + 'px';
+    panel.style.visibility = 'visible';
   }
   function showLoading(desc) {
     state.panel.classList.add('is-open');
     byId('nezam636-field-guide-actions').innerHTML = '';
-    setBody('در حال بررسی وضعیت کنترل، پرونده فعال و جستجو در کتابخانه دانش دفتر...', desc.label);
+    var source = byId('nezam636-field-guide-source');
+    if (source) { source.hidden = true; source.textContent = ''; }
+    setBody('در حال بررسی…', desc.label);
   }
   function renderResult(desc, result, sources, sourceContext, context, fromCache) {
     var title = byId('nezam636-field-guide-title');
     var body = byId('nezam636-field-guide-body');
     var actions = byId('nezam636-field-guide-actions');
-    if (title) title.textContent = (desc.kind === 'field' ? 'راهنمای فیلد: ' : 'راهنمای عملیات: ') + desc.label;
+    var sourceBox = byId('nezam636-field-guide-source');
+    if (title) title.textContent = (desc.kind === 'field' ? 'فیلد: ' : 'دکمه: ') + desc.label;
     if (!body || !actions) return;
-    var explanation = String(result.explanation || 'توضیحی تولید نشد.');
-    var what = String(result.what_to_enter || '');
-    var why = String(result.why || '');
-    var next = String(result.next_step || '');
-    var caution = String(result.caution || '');
-    var html = '<div class="fg-block"><b>این قسمت چیست؟</b>' + esc(explanation) + '</div>';
-    if (what) html += '<div class="fg-block"><b>' + (desc.kind === 'field' ? 'چه چیزی وارد کنم؟' : 'پیش از اجرا چه کنم؟') + '</b>' + esc(what) + '</div>';
-    if (why) html += '<div class="fg-block"><b>چرا؟</b>' + esc(why) + '</div>';
-    if (next) html += '<div class="fg-block"><b>گام بعدی</b>' + esc(next) + '</div>';
-    if (caution) html += '<div class="fg-block"><b>نکته و هشدار</b>' + esc(caution) + '</div>';
-    html += '<div class="fg-muted">' + esc(result.confidence || 'راهنمای هوشمند') +
-      (fromCache ? ' · پاسخ ذخیره‌شده برای همین کنترل' : '') +
-      (!context.consent ? ' · بدون ارسال اطلاعات پرونده' : ' · با اجازه نشست برای استفاده از داده پرونده') + '</div>';
-    if (sources && sources.length) {
-      html += '<div class="fg-source"><b>منابع بازیابی‌شده از مخزن دانش</b>' +
-        sources.slice(0, 4).map(function (s) {
-          return '<div>[' + esc(s.ref || 'S') + '] ' + esc(s.source || 'سند بدون عنوان') +
-            (s.issuer ? ' · ' + esc(s.issuer) : '') +
-            (s.effectiveDate ? ' · ' + esc(s.effectiveDate) : '') + '</div>';
-        }).join('') + '</div>';
-    } else {
-      html += '<div class="fg-source">منبع مرتبطی از مخزن دانش برای این کنترل بازیابی نشد؛ بخش‌های عمومی، تفسیر رابط کاربری هستند.</div>';
+
+    var explanation = String(result.explanation || '').trim();
+    var what = String(result.what_to_enter || '').trim();
+    var why = String(result.why || '').trim();
+    var caution = String(result.caution || '').trim();
+    var compact = [];
+    if (explanation) compact.push('<div class="fg-line">' + esc(explanation) + '</div>');
+    if (what) compact.push('<div class="fg-line"><b>' +
+      (desc.kind === 'field' ? 'ورود اطلاعات: ' : 'اقدام: ') + '</b>' + esc(what) + '</div>');
+    if (why) compact.push('<div class="fg-line"><b>دلیل: </b>' + esc(why) + '</div>');
+    if (caution && !/منبع|مخزن دانش/.test(caution)) compact.push('<div class="fg-line"><b>توجه: </b>' + esc(caution) + '</div>');
+    body.innerHTML = compact.join('') || 'راهنمایی برای این کنترل موجود نیست.';
+
+    if (sourceBox) {
+      if (sources && sources.length) {
+        sourceBox.hidden = false;
+        sourceBox.textContent = 'منبع: ' + String(sources[0].source || 'سند مخزن دانش') +
+          (sources[0].effectiveDate ? ' · ' + String(sources[0].effectiveDate) : '');
+      } else {
+        sourceBox.hidden = false;
+        sourceBox.textContent = 'منبع مرتبطی در مخزن دانش پیدا نشد.';
+      }
     }
-    body.innerHTML = html;
     actions.innerHTML = '';
     if (desc.kind === 'field' && result.suggested_value != null &&
         String(result.suggested_value).trim() && state.target && !state.target.disabled &&
         !state.target.readOnly && !isSensitive(state.target)) {
-      actions.innerHTML = '<button type="button" id="nezam636-field-guide-apply">درج پیشنهاد در فیلد (با تأیید من)</button>';
+      actions.innerHTML = '<button type="button" id="nezam636-field-guide-apply">درج پیشنهاد</button>';
       byId('nezam636-field-guide-apply').addEventListener('click', function () {
         applySuggestion(state.target, String(result.suggested_value));
       });
     }
-    if (sourceContext && sourceContext.context && (!window.getStoredGeminiApiKey || !window.getStoredGeminiApiKey())) {
-      var preview = document.createElement('div');
-      preview.className = 'fg-block';
-      preview.innerHTML = '<b>قطعه مرتبط از متن سند</b>';
-      var excerpt = document.createElement('div');
-      excerpt.textContent = sourceContext.context.slice(0, 1150);
-      preview.appendChild(excerpt);
-      body.appendChild(preview);
-    }
+    positionPanel();
   }
   function applySuggestion(el, value) {
     if (!el || !el.isConnected || el.disabled || el.readOnly || isSensitive(el)) return;
@@ -406,7 +406,7 @@
     var retrieval = { context: '', sources: [], hits: [] };
     try {
       if (window.Nezaam636Knowledge && typeof window.Nezaam636Knowledge.buildContext === 'function') {
-        retrieval = await window.Nezaam636Knowledge.buildContext(retrievalQuery(desc, context), 5200);
+        retrieval = await window.Nezaam636Knowledge.buildContext(retrievalQuery(desc, context), 3000);
       }
     } catch (e) {
       console.warn('Field guide knowledge retrieval failed:', e);
@@ -419,7 +419,7 @@
       try {
         var generated = await window.fetchDirectGeminiWithFallback(apiKey, {
           contents: [{ parts: [{ text: buildPrompt(desc, context, retrieval) }] }],
-          generationConfig: { temperature: 0.15, maxOutputTokens: 1200, responseMimeType: 'application/json' }
+          generationConfig: { temperature: 0.15, maxOutputTokens: 650, responseMimeType: 'application/json' }
         }, typeof window.getStoredGeminiModel === 'function' ? window.getStoredGeminiModel() : '');
         if (requestId !== state.requestId || state.target !== el) return;
         result = parseJson(readGeminiText(generated));
@@ -433,7 +433,9 @@
     state.cache[cacheKey] = { at: Date.now(), result: result, sources: retrieval.sources || [], retrieval: retrieval };
     renderResult(desc, result, retrieval.sources || [], retrieval, context, false);
   }
-  function onMouseOver(event) {
+  function onMouseMove(event) {
+    if (state.touchMode || Date.now() < state.scrollLockUntil) return;
+    if (state.panel && state.panel.contains(event.target)) return;
     var el = findTarget(event.target);
     if (!el || el === state.target) return;
     clearTimeout(state.hoverTimer);
@@ -460,14 +462,26 @@
     state.armedKey = '';
     state.target = el;
   }
+  function markScroll() {
+    state.scrollLockUntil = Date.now() + 750;
+    clearTimeout(state.hoverTimer);
+    positionPanel();
+  }
   function init() {
     if (!document.body) return;
     makePanel();
-    document.addEventListener('mouseover', onMouseOver, true);
+    state.touchMode = Boolean(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+    document.addEventListener('mousemove', onMouseMove, true);
     document.addEventListener('focusin', onFocus, true);
     document.addEventListener('click', onMobileClick, true);
+    window.addEventListener('scroll', markScroll, true);
+    window.addEventListener('wheel', markScroll, { passive: true, capture: true });
     window.addEventListener('resize', function () {
       clearTimeout(state.hoverTimer);
+      positionPanel();
+    });
+    window.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape' && state.panel) state.panel.classList.remove('is-open');
     });
   }
 
@@ -479,6 +493,6 @@
   window.Nezaam636FieldGuide = {
     explain: function (element) { return explain(element); },
     close: function () { if (state.panel) state.panel.classList.remove('is-open'); },
-    version: '1.0.0'
+    version: '1.1.0'
   };
 })();
