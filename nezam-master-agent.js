@@ -15,6 +15,7 @@
     pendingTask: null,
     pendingFormFill: null,
     pendingLetterDraft: null,
+    pendingUiAction: null,
     currentQuestion: '',
     messages: 0
   };
@@ -52,7 +53,11 @@
   var SYSTEM_INSTRUCTION = [
     'تو عامل هوشمند مرکزی اتوماسیون دفتر خدمات غیردولتی کشاورزی و منابع طبیعی مرکز ۶۳۶ شهرستان خفر هستی.',
     'پاسخ‌ها فارسی، دقیق، کوتاه و عملی باشند.',
-    'تو فقط یک چت‌بات نیستی؛ برای فهم داده‌های واقعی اتوماسیون از ابزارهای تعریف‌شده استفاده کن.',
+    'تو فقط چت‌بات نیستی؛ باید گردش‌کار اداری را از ارتباط فیلدها، دکمه‌ها، پرونده، مدارک، استعلام‌ها و ضوابط بفهمی و کار را مرحله‌به‌مرحله جلو ببری.',
+    'وقتی کاربر می‌گوید بررسی، تکمیل، ادامه فرایند یا انجام کار: ابتدا get_active_workflow_context و در صورت اشاره به صفحه/فیلد/دکمه get_current_screen_controls را اجرا کن؛ سپس برای همان فعالیت در search_office_knowledge جستجو کن؛ بعد اختلاف اطلاعات پرونده با ضوابط و مرحله بعد را مشخص کن.',
+    'هیچ فیلد را منفرد تحلیل نکن: نوع فعالیت و گروه، ظرفیت، واحد ظرفیت، مساحت، آب، تفکیک زیربنا/محوطه، مختصات، مدارک، استعلام‌ها، کروکی، نامه‌ها و پیگیری‌ها به هم وابسته‌اند. تغییر یک جزء را در اثر آن بر سایر اجزا بررسی کن.',
+    'برای انجام کار از ابزارهای prepare_case_form_fill، prepare_letter_draft، propose_followup_task و prepare_safe_ui_action استفاده کن. وقتی چند مرحله مرتبط است، ابتدا طرح مرحله‌ای روشن بده و اقدام‌های مجاز را با تأیید کاربر انجام بده.',
+    'از روی دکمه یا فیلد فقط با عنوان و ساختار واقعی رابط نتیجه‌گیری کن؛ برای عملکرد نامعلوم حدس نزن. دکمه‌های حذف، ارسال، ثبت نهایی و عملیات برگشت‌ناپذیر را خودکار کلیک نکن.',
     'برای آمار از get_office_overview، برای یافتن متقاضی از search_cases، برای پرونده انتخاب‌شده از get_active_case و برای جزئیات از get_case_details استفاده کن.',
     'برای پیگیری‌ها از list_open_tasks و برای نامه‌های قبلی از list_recent_letters استفاده کن.',
     'برای رفتن به بخش‌ها از navigate_to_section و برای انتخاب پرونده از select_active_case استفاده کن. برای زیر‌بخش‌های پرونده از کلیدهای case_list، case_form، case_matrix و case_documents استفاده کن.',
@@ -259,6 +264,31 @@
         },
         required: ['case_id', 'recipient', 'body']
       }
+    },
+    {
+      name: 'get_active_workflow_context',
+      description: 'خواندن یکپارچه پرونده فعال و ارتباط اجزای فرایند: فعالیت، ضرایب محاسبات داخلی، فیلدهای ثبت‌شده، مدارک اجباری و دریافتی، وضعیت ۷ استعلام، کروکی‌ها، نامه‌ها، پیگیری‌ها و قطعه‌های مرتبط مخزن دانش. برای ممیزی یا ادامه هر فرایند پرونده استفاده شود. نیازمند اجازه پرونده است.',
+      parameters: { type: 'OBJECT', properties: {} }
+    },
+    {
+      name: 'get_current_screen_controls',
+      description: 'فهرست ساختاری فیلدها، دکمه‌ها و ارتباط آن‌ها در صفحه و زیرصفحه فعال؛ شامل عنوان، شناسه، گروه فرم و تابع متصل. مقدار شخصی فیلدها را برنمی‌گرداند.',
+      parameters: { type: 'OBJECT', properties: {} }
+    },
+    {
+      name: 'prepare_safe_ui_action',
+      description: 'آماده‌سازی یک اقدام مجاز روی رابط سامانه. اقدام فقط پس از تأیید صریح کاربر اجرا می‌شود. برای رفتن به بخش‌ها، بازکردن مخزن، تازه‌سازی چک‌لیست یا تمرکز روی فیلد استفاده کن؛ کلیک عمومی یا حذف/ارسال/ثبت نهایی پشتیبانی نمی‌شود.',
+      parameters: {
+        type: 'OBJECT',
+        properties: {
+          action: {
+            type: 'STRING',
+            enum: ['open_case_form','open_case_documents','open_inquiry_matrix','open_croquis','open_letters','open_knowledge','recalculate_case_fields','refresh_case_views','focus_capacity','focus_project','focus_land','focus_water','focus_utm','focus_location'],
+            description: 'اقدام مجاز موردنظر'
+          }
+        },
+        required: ['action']
+      }
     }
   ];
 
@@ -343,6 +373,210 @@
       result.mobile = String(c.mobile || '');
     }
     return result;
+  }
+
+
+
+  var INQUIRY_LABELS = {
+    water: 'امور آب', elec: 'اداره برق', road: 'راهداری',
+    gas: 'شرکت گاز', env: 'محیط زیست', natres: 'منابع طبیعی', vet: 'دامپزشکی'
+  };
+  function inquiryStatusLabel(value) {
+    var map = { OK: 'تأیید شده', WAIT: 'در انتظار پاسخ', NONE: 'اقدام نشده', NO: 'مخالفت', REVIEW: 'نیازمند بررسی' };
+    return map[String(value || '').toUpperCase()] || String(value || 'ثبت نشده');
+  }
+  function fieldPresence(c) {
+    var checks = [
+      ['نام متقاضی', c.name], ['نوع شخصیت', c.entityType], ['نوع فعالیت', c.actType],
+      ['ظرفیت', c.count || c.cap], ['عنوان طرح', c.project], ['مساحت زمین', c.land],
+      ['نیاز آبی', c.water], ['موقعیت', c.loc], ['مختصات UTM', c.utm],
+      ['تاریخ صدور', c.issueDate], ['تاریخ اعتبار', c.expDate]
+    ];
+    return checks.map(function (item) {
+      return { field: item[0], complete: Boolean(String(item[1] == null ? '' : item[1]).trim()) };
+    });
+  }
+  function labelForControl(el) {
+    if (!el) return '';
+    if (el.id) {
+      var labels = document.getElementsByTagName('label');
+      for (var i = 0; i < labels.length; i++) {
+        if (labels[i].htmlFor === el.id) return String(labels[i].innerText || labels[i].textContent || '').replace(/\s+/g, ' ').trim();
+      }
+    }
+    return String(el.getAttribute('aria-label') || el.getAttribute('title') ||
+      el.getAttribute('placeholder') || el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
+  }
+  function currentScreenContext() {
+    var pane = document.querySelector('.sec-pane.active');
+    var subpane = document.querySelector('.case-subpane.active');
+    var active = subpane || pane;
+    var heading = active && active.querySelector('h1,h2,h3,h4,h5,h6,strong');
+    var controls = [];
+    if (active) {
+      var nodes = active.querySelectorAll('input:not([type="hidden"]),select,textarea,button,[role="button"],a[href]');
+      for (var i = 0; i < nodes.length && controls.length < 70; i++) {
+        var el = nodes[i];
+        if (!el.getClientRects().length) continue;
+        var hiddenSub = el.closest('.case-subpane:not(.active)');
+        if (hiddenSub) continue;
+        var box = el.closest('.row,.card-clean,.workflow-law-strip,.inquiry-hub-banner,.input-group') || el.parentElement;
+        var groupTitle = box && box.querySelector('label,strong,h4,h5,h6');
+        var tag = el.tagName.toLowerCase();
+        var kind = /^(input|select|textarea)$/.test(tag) ? 'field' : 'action';
+        var handler = String(el.getAttribute('onclick') || el.getAttribute('onchange') || '');
+        var functionNames = handler.match(/[A-Za-z_$][\w$]*(?=\s*\()/g) || [];
+        controls.push({
+          kind: kind,
+          id: String(el.id || ''),
+          label: labelForControl(el).slice(0, 130),
+          group: String(groupTitle ? groupTitle.innerText || groupTitle.textContent : '').replace(/\s+/g, ' ').trim().slice(0, 100),
+          tag: tag,
+          type: String(el.type || ''),
+          action_functions: functionNames.slice(0, 5),
+          disabled: Boolean(el.disabled)
+        });
+      }
+    }
+    var nav = Array.prototype.slice.call(document.querySelectorAll('nav.app-navbar .nav-link.active')).map(function (el) {
+      return String(el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
+    });
+    return {
+      main_section_id: pane ? pane.id : '',
+      sub_section_id: subpane ? subpane.id : '',
+      section_title: heading ? String(heading.innerText || heading.textContent).trim().slice(0, 140) : '',
+      navigation: nav,
+      controls: controls,
+      control_count: controls.length,
+      note: 'مقادیر فیلدها عمداً در این نقشه رابط برگردانده نمی‌شوند؛ برای داده پرونده از ابزار مجاز پرونده استفاده کن.'
+    };
+  }
+  async function buildActiveWorkflowContext() {
+    var c = activeCase();
+    if (!c) return { found: false, message: 'هیچ پرونده فعالی انتخاب نشده است.' };
+    var specs = window.ACT_SPECS || {};
+    var spec = specs[c.actType] || {};
+    var docGroups = window.DOC_CHECKLISTS || {};
+    var requiredDocs = docGroups[spec.docGroup || 'LIVESTOCK'] || [];
+    var uploads = await getCaseUploads(c.id);
+    var documents = requiredDocs.map(function (doc) {
+      var upload = uploads[String(doc.code || '')];
+      return {
+        code: String(doc.code || ''),
+        title: String(doc.title || ''),
+        mandatory: Boolean(doc.mandatory),
+        configured_reference: String(doc.legalRef || ''),
+        received: Boolean(upload),
+        file_name: upload ? String(upload.fileName || '') : ''
+      };
+    });
+    var inquiries = c.inquiries && typeof c.inquiries === 'object' ? c.inquiries : {};
+    var inquiryRows = Object.keys(INQUIRY_LABELS).map(function (key) {
+      return { key: key, title: INQUIRY_LABELS[key], status: inquiryStatusLabel(inquiries[key]), code: String(inquiries[key] || 'NONE') };
+    });
+    var tasks = (Array.isArray(window.tasksDB) ? window.tasksDB : []).filter(function (t) {
+      return t && String(t.caseId || '') === String(c.id) && t.status !== 'انجام شده';
+    }).slice(0, 25).map(function (t) {
+      return { id: String(t.id || ''), title: String(t.title || ''), category: String(t.cat || ''), due: String(t.due || ''), status: String(t.status || '') };
+    });
+    var letters = (Array.isArray(window.lettersDB) ? window.lettersDB : []).filter(function (l) {
+      return l && String(l.caseId || '') === String(c.id);
+    }).slice(-15).reverse().map(function (l) {
+      return { number: String(l.number || ''), date: String(l.date || ''), type: String(l.type || ''), recipient: String(l.recipient || ''), subject: String(l.project || '') };
+    });
+    var fieldChecks = fieldPresence(c);
+    var knowledge = { context: '', sources: [], hits: [] };
+    if (window.Nezaam636Knowledge && typeof window.Nezaam636Knowledge.buildContext === 'function') {
+      try {
+        knowledge = await window.Nezaam636Knowledge.buildContext([
+          String(spec.title || c.project || '') + ' ضوابط مدارک مراحل صدور مجوز',
+          String(spec.title || c.project || '') + ' ظرفیت مساحت زمین نیاز آبی',
+          String(spec.title || c.project || '') + ' استعلام‌ها نقشه UTM مدارک'
+        ], 9500);
+      } catch (e) { console.warn('Workflow knowledge retrieval failed:', e); }
+    }
+    return {
+      found: true,
+      applicant: { id: String(c.id), code: String(c.code || ''), name: String(c.name || ''), status: String(c.caseStatus || '') },
+      activity: {
+        title: String(spec.title || c.project || ''),
+        type_key: String(c.actType || ''),
+        group: groupLabel(c.mainGroup),
+        capacity_unit: String(spec.unit || ''),
+        internal_formula_coefficients: {
+          water_per_unit: Number(spec.water || 0),
+          land_per_unit: Number(spec.land || 0),
+          min_land: Number(spec.minL || 0),
+          roof_per_unit: Number(spec.roof || 0),
+          open_area_per_unit: Number(spec.open || 0)
+        },
+        formula_note: 'این ضرایب، تنظیمات محاسبات داخلی سامانه‌اند و به‌تنهایی سند قانونی محسوب نمی‌شوند.'
+      },
+      registered_fields: {
+        entity_type: String(c.entityType || ''),
+        count: Number(c.count || 0),
+        project: String(c.project || ''),
+        capacity: String(c.cap || ''),
+        land: String(c.land || ''),
+        water: String(c.water || ''),
+        covered_and_open_area: String(c.subarea || ''),
+        location: String(c.loc || ''),
+        utm_zone: String(c.utmZone || ''),
+        utm_points: String(c.utm || ''),
+        issue_date: String(c.issueDate || ''),
+        expiry_date: String(c.expDate || '')
+      },
+      field_completeness: fieldChecks,
+      documents: {
+        required_count: documents.length,
+        received_count: documents.filter(function (d) { return d.received; }).length,
+        missing_mandatory: documents.filter(function (d) { return d.mandatory && !d.received; }),
+        items: documents
+      },
+      inquiries: {
+        completed_count: inquiryRows.filter(function (r) { return r.code === 'OK'; }).length,
+        pending_count: inquiryRows.filter(function (r) { return r.code !== 'OK'; }).length,
+        items: inquiryRows
+      },
+      croquis: {
+        map_count: Array.isArray(c.croquisMaps) ? c.croquisMaps.length : 0,
+        has_utm_text: Boolean(String(c.utm || '').trim()),
+        notes: Array.isArray(c.croquisMaps) ? c.croquisMaps.map(function (m) { return String(m.title || '') + ' (' + ((m.layers || []).length) + ' لایه)'; }) : []
+      },
+      open_tasks: tasks,
+      recent_letters: letters,
+      knowledge_sources: knowledge.sources || [],
+      knowledge_excerpts: knowledge.context || '',
+      current_screen: currentScreenContext()
+    };
+  }
+  async function buildOfflineWorkflowAudit() {
+    var context = await buildActiveWorkflowContext();
+    if (!context.found) return { text: context.message, sources: [] };
+    var lines = [];
+    lines.push('ممیزی پرونده ' + context.applicant.code + ' · ' + context.applicant.name);
+    lines.push('فعالیت: ' + context.activity.title + ' | وضعیت: ' + context.applicant.status);
+    var missingFields = context.field_completeness.filter(function (f) { return !f.complete; }).map(function (f) { return f.field; });
+    if (missingFields.length) lines.push('فیلدهای ناقص: ' + missingFields.join('، '));
+    else lines.push('فیلدهای اصلی پرونده: تکمیل‌شده');
+    var missingDocs = context.documents.missing_mandatory || [];
+    lines.push('مدارک الزامی: ' + context.documents.received_count + '/' + context.documents.required_count + ' دریافت شده');
+    if (missingDocs.length) lines.push('مدارک کسری: ' + missingDocs.map(function (d) { return d.title; }).join('؛ '));
+    var pendingInquiries = context.inquiries.items.filter(function (x) { return x.code !== 'OK'; });
+    if (pendingInquiries.length) lines.push('استعلام‌های باز: ' + pendingInquiries.map(function (x) { return x.title + ' (' + x.status + ')'; }).join('؛ '));
+    else lines.push('هر ۷ استعلام در پرونده تأیید شده‌اند.');
+    lines.push('کروکی: ' + context.croquis.map_count + ' نقشه | مختصات UTM: ' + (context.croquis.has_utm_text ? 'ثبت شده' : 'ثبت نشده'));
+    lines.push('پیگیری باز: ' + context.open_tasks.length + ' | نامه ثبت‌شده: ' + context.recent_letters.length);
+    var next = [];
+    if (missingFields.length) next.push('تکمیل فیلدهای اصلی فرم');
+    if (missingDocs.length) next.push('دریافت و بارگذاری مدارک کسری');
+    if (pendingInquiries.length) next.push('پیگیری استعلام‌های باز');
+    if (!context.croquis.has_utm_text) next.push('تهیه کروکی و مختصات UTM');
+    if (!next.length) next.push('کنترل نهایی اعتبار اسناد و انطباق ضوابط مخزن');
+    lines.push('اولویت بعدی: ' + next.join(' ← '));
+    if (context.knowledge_sources.length) lines.push('منابع مخزن دانش: ' + context.knowledge_sources.map(function (s) { return s.source + (s.effectiveDate ? ' (' + s.effectiveDate + ')' : ''); }).join('؛ '));
+    else lines.push('منبع قانونی مرتبط در مخزن قابل جستجو پیدا نشد؛ از این ممیزی حکم قانونی استخراج نشده است.');
+    return { text: lines.join('\n'), sources: context.knowledge_sources, context: context };
   }
 
   function overview() {
@@ -722,6 +956,46 @@
       };
     }
 
+    if (name === 'get_active_workflow_context') {
+      requireCaseConsent();
+      return await buildActiveWorkflowContext();
+    }
+
+    if (name === 'get_current_screen_controls') {
+      return currentScreenContext();
+    }
+
+    if (name === 'prepare_safe_ui_action') {
+      if (state.pendingUiAction) throw new Error('یک اقدام رابط هنوز تأیید یا لغو نشده است.');
+      var allowedActions = [
+        'open_case_form','open_case_documents','open_inquiry_matrix','open_croquis',
+        'open_letters','open_knowledge','recalculate_case_fields','refresh_case_views',
+        'focus_capacity','focus_project','focus_land','focus_water','focus_utm','focus_location'
+      ];
+      var uiAction = String(args.action || '');
+      if (allowedActions.indexOf(uiAction) < 0) throw new Error('این اقدام در فهرست عملیات امن قرار ندارد.');
+      if (/^(open_case_form|open_case_documents|open_inquiry_matrix|open_croquis|open_letters|recalculate_case_fields|refresh_case_views|focus_)/.test(uiAction) && !activeCase()) {
+        throw new Error('ابتدا یک پرونده فعال انتخاب کن.');
+      }
+      state.pendingUiAction = { action: uiAction, label: ({
+        open_case_form:'رفتن به فرم مشخصات پرونده',
+        open_case_documents:'بازکردن چک‌لیست مدارک',
+        open_inquiry_matrix:'بازکردن ماتریس استعلام‌ها',
+        open_croquis:'بازکردن کروکی UTM',
+        open_letters:'بازکردن دبیرخانه',
+        open_knowledge:'بازکردن مخزن قوانین',
+        recalculate_case_fields:'محاسبه مجدد فیلدهای وابسته از روی ظرفیت',
+        refresh_case_views:'به‌روزرسانی چک‌لیست، استعلام‌ها و سوابق',
+        focus_capacity:'رفتن به فیلد ظرفیت',
+        focus_project:'رفتن به فیلد عنوان طرح',
+        focus_land:'رفتن به فیلد مساحت زمین',
+        focus_water:'رفتن به فیلد نیاز آبی',
+        focus_utm:'رفتن به فیلد مختصات UTM',
+        focus_location:'رفتن به فیلد موقعیت'
+      })[uiAction] };
+      return { prepared: true, requires_user_confirmation: true, action: state.pendingUiAction.label };
+    }
+
     throw new Error('ابزار ناشناخته است: ' + name);
   }
 
@@ -1079,6 +1353,75 @@
     addMessage('system', 'پیشنهاد ثبت پیگیری لغو شد؛ هیچ اطلاعاتی ذخیره نشد.');
   }
 
+  function showPendingUiAction() {
+    var host = byId('nezam636-agent-messages');
+    if (!host || !state.pendingUiAction) return;
+    var p = state.pendingUiAction;
+    var old = byId('nezam636-agent-ui-action');
+    if (old) old.remove();
+    var card = document.createElement('div');
+    card.className = 'agent-pending';
+    card.id = 'nezam636-agent-ui-action';
+    card.innerHTML = '<b>اقدام آماده اجرا</b><div class="small mt-1">' + escapeHtml(p.label) +
+      '</div><button type="button" class="agent-confirm" id="nezam636-agent-ui-confirm">تأیید و اجرا</button>' +
+      '<button type="button" class="agent-cancel" id="nezam636-agent-ui-cancel">لغو</button>';
+    host.appendChild(card);
+    host.scrollTop = host.scrollHeight;
+    byId('nezam636-agent-ui-confirm').addEventListener('click', confirmPendingUiAction);
+    byId('nezam636-agent-ui-cancel').addEventListener('click', cancelPendingUiAction);
+  }
+  function confirmPendingUiAction() {
+    var p = state.pendingUiAction;
+    if (!p) return;
+    var action = p.action;
+    var paneMap = {
+      open_case_form: ['pane-cases','sub-info'],
+      open_case_documents: ['pane-cases','sub-docs'],
+      open_inquiry_matrix: ['pane-cases','sub-matrix'],
+      open_croquis: ['pane-croquis',''],
+      open_letters: ['pane-letters','']
+    };
+    if (paneMap[action]) {
+      if (typeof window.switchMainPane === 'function') window.switchMainPane(paneMap[action][0]);
+      if (paneMap[action][1] && typeof window.switchCaseSubTab === 'function') window.switchCaseSubTab(paneMap[action][1]);
+    } else if (action === 'open_knowledge') {
+      if (window.Nezaam636Knowledge && typeof window.Nezaam636Knowledge.open === 'function') window.Nezaam636Knowledge.open();
+      else { addMessage('system','مخزن دانش آماده نیست.'); return; }
+    } else if (action === 'recalculate_case_fields') {
+      if (typeof window.recalcCaseSpecsFromHeadcount !== 'function') { addMessage('system','موتور محاسبات ظرفیت در دسترس نیست.'); return; }
+      if (!confirm('فیلدهای عنوان طرح، ظرفیت، مساحت، آب و تفکیک مسقف/محوطه بر اساس ضرایب داخلی سامانه بازنویسی شوند؟')) return;
+      window.recalcCaseSpecsFromHeadcount();
+      addMessage('system','فیلدهای وابسته محاسبه شدند. ضرایب داخلی جایگزین تأیید قانونی نیستند؛ قبل از ذخیره با منبع مخزن تطبیق بده.');
+    } else if (action === 'refresh_case_views') {
+      ['renderActiveCaseDocsChecklist','renderUnifiedCasesMatrix','renderActiveCaseHistory'].forEach(function (fn) {
+        if (typeof window[fn] === 'function') window[fn]();
+      });
+      addMessage('system','نماهای چک‌لیست مدارک، ماتریس استعلام و سوابق به‌روزرسانی شدند.');
+    } else {
+      var focusMap = {
+        focus_capacity:'c-count', focus_project:'c-project', focus_land:'c-land',
+        focus_water:'c-water', focus_utm:'c-utm', focus_location:'c-loc'
+      };
+      var field = byId(focusMap[action] || '');
+      if (field) {
+        if (typeof window.switchMainPane === 'function') window.switchMainPane('pane-cases');
+        if (typeof window.switchCaseSubTab === 'function') window.switchCaseSubTab('sub-info');
+        field.scrollIntoView({ behavior:'smooth', block:'center' });
+        field.focus();
+      } else { addMessage('system','فیلد موردنظر در صفحه پیدا نشد.'); }
+    }
+    var card = byId('nezam636-agent-ui-action');
+    if (card) card.remove();
+    state.pendingUiAction = null;
+    if (paneMap[action] || /^focus_/.test(action) || action === 'open_knowledge') addMessage('system','اقدام رابط اجرا شد.');
+  }
+  function cancelPendingUiAction() {
+    state.pendingUiAction = null;
+    var card = byId('nezam636-agent-ui-action');
+    if (card) card.remove();
+    addMessage('system','اقدام رابط لغو شد؛ تغییری در اطلاعات ذخیره‌شده ایجاد نشد.');
+  }
+
   function buildUi() {
     if (byId('nezam636-agent-panel')) return;
     addStyles();
@@ -1098,8 +1441,8 @@
       '<div class="agent-head"><div><b>🤖 عامل هوشمند مرکز ۶۳۶</b><small id="nezam636-agent-status">آماده به کار · ابزارهای کنترل‌شده اتوماسیون</small></div>' +
       '<div><button type="button" id="nezam636-agent-reset" title="گفتگوی جدید">↺</button> <button type="button" id="nezam636-agent-close" title="بستن">✕</button></div></div>' +
       '<div class="agent-consent"><label><input type="checkbox" id="nezam636-agent-consent"> <span><b>اجازه استفاده از اطلاعات پرونده‌ها در این نشست</b><br>فقط برای جستجو و تحلیل، اطلاعات مرتبط پرونده به Gemini ارسال می‌شود. پیش‌فرض خاموش است؛ اطلاعات تماس و کدملی نیز فقط با درخواست صریح ارسال می‌شوند.</span></label></div>' +
-      '<div class="agent-messages" id="nezam636-agent-messages"><div class="agent-msg assistant"><b>سلام، من کارمند هوشمند مرکز ۶۳۶ هستم.</b><br>می‌توانم آمار دفتر را بخوانم، پرونده‌ها را جستجو کنم، پیگیری‌ها و نامه‌های قبلی را بررسی کنم، به بخش‌های مختلف بروم و پیگیری جدید را پس از تأیید شما ثبت کنم.<br><small>برای کارهای هوشمند آنلاین، کلید Gemini باید در بخش «دستیار هوشمند» تنظیم شده باشد.</small></div></div>' +
-      '<div class="agent-quick"><button type="button" data-agent-prompt="آمار کلی دفتر را از اطلاعات ثبت‌شده استخراج کن.">آمار دفتر</button><button type="button" data-agent-prompt="پرونده فعال فعلی را بررسی کن.">پرونده فعال</button><button type="button" data-agent-prompt="پیگیری‌های باز دفتر را فهرست کن.">پیگیری‌های باز</button><button type="button" id="nezam636-agent-open-knowledge">📚 مخزن قوانین</button></div>' +
+      '<div class="agent-messages" id="nezam636-agent-messages"><div class="agent-msg assistant"><b>کارمند هوشمند مرکز ۶۳۶</b><br>پرونده، فیلدها، مدارک، استعلام‌ها، کروکی و دکمه‌های مرتبط را یکجا بررسی می‌کنم؛ سپس از مخزن قوانین مسیر اقدام می‌سازم.<br><small>برای تحلیل قوانین و اجرای ابزارهای هوشمند، Gemini باید متصل باشد. ممیزی داده‌های محلی بدون Gemini نیز در دسترس است.</small></div></div>' +
+      '<div class="agent-quick"><button type="button" data-agent-prompt="ممیزی کامل پرونده فعال را انجام بده؛ فیلدها، مدارک، استعلام‌ها، کروکی، نامه‌ها و پیگیری‌ها را یکجا بررسی کن.">ممیزی پرونده</button><button type="button" data-agent-prompt="ارتباط فیلدها و دکمه‌های صفحه فعلی را تحلیل کن و مراحل مرتبط را توضیح بده.">تحلیل این صفحه</button><button type="button" data-agent-prompt="آمار کلی دفتر را از اطلاعات ثبت‌شده استخراج کن.">آمار دفتر</button><button type="button" data-agent-prompt="پیگیری‌های باز دفتر را فهرست کن.">پیگیری‌ها</button><button type="button" id="nezam636-agent-open-knowledge">📚 مخزن قوانین</button></div>' +
       '<div class="agent-compose"><textarea id="nezam636-agent-input" placeholder="درخواستت را بنویس؛ مثلاً پرونده علی احمدی را پیدا کن و وضعیت استعلام‌هایش را بگو..."></textarea>' +
       '<div class="agent-actions"><button type="button" class="agent-send" id="nezam636-agent-send">ارسال درخواست ↵</button><button type="button" class="agent-clear" id="nezam636-agent-clear">پاک‌کردن گفتگو</button></div></div>';
     document.body.appendChild(panel);
@@ -1163,6 +1506,7 @@
     state.pendingTask = null;
     state.pendingFormFill = null;
     state.pendingLetterDraft = null;
+    state.pendingUiAction = null;
     var host = byId('nezam636-agent-messages');
     if (host) {
       host.innerHTML = '<div class="agent-msg assistant"><b>گفتگوی جدید آغاز شد.</b><br>چه کاری برای دفتر انجام بدهم؟</div>';
@@ -1239,6 +1583,34 @@
 
     var localResult = localOfflineAction(question);
     var apiKey = typeof window.getStoredGeminiApiKey === 'function' ? window.getStoredGeminiApiKey() : '';
+    var workflowAuditRequested = /(ممیزی|بررسی کامل|ارزیابی کامل|نواقص پرونده|وضعیت پرونده فعال|پرونده فعال را بررسی|کنترل پرونده)/.test(normalizeText(question));
+    var screenAuditRequested = /(تحلیل این صفحه|ارتباط فیلدها|دکمه.?های صفحه|کنترل.?های صفحه)/.test(normalizeText(question));
+    if (!apiKey && (workflowAuditRequested || screenAuditRequested)) {
+      setBusy(true);
+      try {
+        if (workflowAuditRequested) {
+          var audit = await buildOfflineWorkflowAudit();
+          addMessage('assistant', '<b>ممیزی پرونده از داده‌های محلی</b><br>' + formatText(audit.text) + renderKnowledgeSources(audit.sources));
+        } else {
+          var uiMap = currentScreenContext();
+          var controlLines = (uiMap.controls || []).map(function (x) {
+            return (x.kind === 'field' ? 'فیلد' : 'دکمه') + ': ' + (x.label || x.id || x.tag) +
+              (x.group ? ' | گروه: ' + x.group : '') +
+              (x.action_functions && x.action_functions.length ? ' | عملیات: ' + x.action_functions.join('، ') : '');
+          });
+          addMessage('assistant', '<b>' + escapeHtml(uiMap.section_title || uiMap.main_section_id || 'صفحه فعلی') + '</b><br>' +
+            formatText(controlLines.length ? controlLines.join('\n') : 'کنترل قابل مشاهده‌ای در صفحه فعال پیدا نشد.') +
+            '<br><small>برای تحلیل ارتباط قانونی و پیشنهاد مقدار مستند، Gemini و مخزن قابل جستجو لازم است.</small>');
+        }
+      } catch (auditError) {
+        addMessage('system', 'ممیزی اجرا نشد: ' + escapeHtml(auditError && auditError.message ? auditError.message : String(auditError)));
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+
+
     if (!apiKey) {
       if (localResult) {
         addMessage('assistant', '<b>پاسخ از داده‌های محلی اتوماسیون</b><br>' + formatText(localResult));
@@ -1278,6 +1650,7 @@
       if (state.pendingTask) showPendingTask();
       if (state.pendingFormFill) showPendingFormFill();
       if (state.pendingLetterDraft) showPendingLetterDraft();
+      if (state.pendingUiAction) showPendingUiAction();
       if (result.usedModel) updateStatus('پاسخ با ' + result.usedModel + ' · عملیات حساس با تأیید شما');
     } catch (err) {
       if (loading) loading.remove();
@@ -1392,6 +1765,9 @@
         if (panel) panel.classList.remove('is-open');
       },
       runLocalOverview: overview,
+      getWorkflowContext: buildActiveWorkflowContext,
+      getScreenControls: currentScreenContext,
+      runWorkflowAudit: buildOfflineWorkflowAudit,
       getFieldGuideContext: function () {
         var c = activeCase();
         return {
@@ -1400,7 +1776,7 @@
           case: state.allowCaseData === true && c ? safeCaseSummary(c, false) : null
         };
       },
-      version: '1.1.0'
+      version: '1.2.0'
     };
   }
 
