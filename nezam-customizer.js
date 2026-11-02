@@ -249,6 +249,7 @@ function applyDynamicPrintPageSizeCSS(size) {
     "@page { size: " + width + " " + height + "; margin: 0; }",
     "@media print {",
     "html, body { width: " + width + " !important; min-width: 0 !important; max-width: " + width + " !important; margin: 0 !important; padding: 0 !important; background: #fff !important; overflow: visible !important; }",
+    "main { width: 100% !important; max-width: none !important; margin: 0 !important; padding: 0 !important; }",
     "#pane-print, .a4-stage-bg, #a4-preview-stage { display: block !important; position: static !important; width: " + width + " !important; min-width: " + width + " !important; max-width: " + width + " !important; margin: 0 !important; padding: 0 !important; overflow: visible !important; background: transparent !important; box-shadow: none !important; }",
     "#a4-preview-stage .a4-page { box-sizing: border-box !important; width: " + width + " !important; min-width: " + width + " !important; max-width: " + width + " !important; height: " + height + " !important; min-height: " + height + " !important; max-height: " + height + " !important; margin: 0 !important; transform: none !important; animation: none !important; transition: none !important; overflow: hidden !important; page-break-inside: avoid !important; break-inside: avoid !important; page-break-after: always !important; break-after: page !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }",
     "#a4-preview-stage .a4-page[data-page-kind='binder-label'] { padding: 15mm !important; }",
