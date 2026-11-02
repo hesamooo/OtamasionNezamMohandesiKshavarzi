@@ -193,6 +193,12 @@ function sanitizeOfficeRichHtml(input) {
       var align = String(node.getAttribute("align") || "").toLowerCase();
       if (["left","right","center"].indexOf(align) !== -1) clean.setAttribute("align", align);
     }
+    if (tag === "TABLE") {
+      var tableClasses = String(node.getAttribute("class") || "").split(/\s+/).filter(function (cls) {
+        return ["utm-table-print","table","table-bordered","my-2"].indexOf(cls) !== -1;
+      });
+      if (tableClasses.length) clean.setAttribute("class", tableClasses.join(" "));
+    }
     if (tag === "FONT") {
       var fontColor = node.getAttribute("color") || "";
       var fontSize = node.getAttribute("size") || "";
@@ -897,56 +903,74 @@ window.savePaperEditsToSecretariat = function(options) {
   return true;
 };
 
-/* دانلود فایل مستقل برگه A4 یا A5 جهت بایگانی یا چاپ در هر سیستم */
-window.downloadPaperSheetFile = function(forcedSize) {
-  if (forcedSize === "A4" || forcedSize === "A5") {
-    setPaperSize(forcedSize, true);
-  }
-  autoFitPaperContent();
-  window.savePaperEditsToSecretariat();
-  var stage = document.getElementById("a4-preview-stage");
-  if (!stage) return;
-  var c = getActiveCase();
-  var pSize = currentPaperSize || "A4";
-  var wMm = pSize === "A5" ? "148mm" : "210mm";
-  var hMm = pSize === "A5" ? "210mm" : "297mm";
-  var docHtml = '<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="UTF-8">' +
-    '<title>برگه رسمی ' + pSize + ' - مرکز خدمات ۶۳۶ خفر</title>' +
-    '<style>' +
-    '*{box-sizing:border-box;font-family:Vazirmatn,Tahoma,sans-serif;}' +
-    'body{margin:0;padding:10mm;background:#334155;display:flex;flex-direction:column;align-items:center;gap:16px;direction:rtl;}' +
-    '.a4-page{width:210mm;height:297mm;max-height:297mm;background:#fff;color:#000;display:flex;flex-direction:column;justify-content:space-between;box-shadow:0 8px 25px rgba(0,0,0,0.4);overflow:hidden;page-break-after:always;break-after:page;}' +
-    '.a4-page.paper-a5{width:148mm !important;height:210mm !important;max-height:210mm !important;}' +
-    '.lh-top{color:#fff;padding:5mm 8mm;display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #f3e06b;}' +
-    '.lh-r{width:42%;text-align:right;}.lh-sub{font-size:8.5pt;font-weight:700;}.lh-main{font-size:10.5pt;font-weight:900;color:#f3e06b;}' +
-    '.lh-c{width:20%;text-align:center;font-size:12pt;font-weight:900;}' +
-    '.lh-l{width:34%;font-size:9pt;background:rgba(0,0,0,0.18);padding:2.5mm 3.5mm;border-radius:6px;}' +
-    '.m-row{display:flex;justify-content:space-between;margin-bottom:1mm;}' +
-    '.lh-body{padding:7mm 10mm;flex:1;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;min-height:0;}' +
-    '.lh-content-wrap{flex:1;overflow:hidden;}' +
-    '.l-rec{font-size:11pt;font-weight:900;margin-bottom:2mm;}' +
-    '.l-txt{font-size:10.2pt;line-height:1.95;text-align:justify;white-space:pre-line;}' +
-    '.paper-a5 .lh-body{padding:4mm 6mm;}.paper-a5 .l-rec{font-size:9.5pt;}.paper-a5 .l-txt{font-size:8.8pt;line-height:1.65;}' +
-    '.utm-table-print{width:96%;margin:2.5mm auto;border-collapse:collapse;table-layout:fixed;font-size:8.2pt;direction:rtl;}' +
-    '.utm-table-print th,.utm-table-print td{border:1.2px solid #000;padding:1mm 1.8mm;text-align:center;overflow-wrap:anywhere;}' +
-    '.paper-a5 .utm-table-print{width:100%;font-size:6.8pt;margin:1.5mm auto;}' +
-    '.paper-a5 .utm-table-print th,.paper-a5 .utm-table-print td{padding:0.6mm 0.9mm;}' +
-    '.utm-table-print th{background:#e2e8f0;font-weight:900;}' +
-    '.sign-area{display:flex;justify-content:flex-end;margin-top:3mm;padding-left:6mm;flex-shrink:0;}' +
-    '.sign-box{text-align:center;font-weight:800;font-size:9.8pt;line-height:1.7;min-width:55mm;}' +
-    '.lh-foot{color:#fff;padding:3.5mm 8mm;border-top:2.5px solid #f3e06b;font-size:8pt;flex-shrink:0;}' +
-    '.f-warn{text-align:center;font-weight:800;color:#f3e06b;margin-bottom:1mm;}' +
-    '.f-info{display:flex;justify-content:space-between;align-items:center;}' +
-    '@page{size:' + wMm + ' ' + hMm + ';margin:0;}' +
-    '.no-print{display:none !important;}' +
-    '@media print{*{print-color-adjust:exact !important;-webkit-print-color-adjust:exact !important;}html,body{width:' + wMm + ' !important;height:auto !important;padding:0 !important;margin:0 !important;background:#fff;display:block;}.a4-page,.a4-page.paper-a5{box-shadow:none !important;margin:0 !important;width:' + wMm + ' !important;min-width:' + wMm + ' !important;max-width:' + wMm + ' !important;height:' + hMm + ' !important;min-height:' + hMm + ' !important;max-height:' + hMm + ' !important;page-break-inside:avoid !important;break-inside:avoid !important;page-break-after:always !important;break-after:page !important;}.a4-page:last-child,.a4-page.paper-a5:last-child{page-break-after:auto !important;break-after:auto !important;}}' +
-    '</style></head><body>' + stage.innerHTML + '</body></html>';
+function buildPaperExportCss(paperSize, wordMode) {
+  var size = paperSize === "A5" ? "A5" : "A4";
+  var w = size === "A5" ? "148mm" : "210mm";
+  var h = size === "A5" ? "210mm" : "297mm";
+  var previewBody = wordMode
+    ? "body{margin:0;padding:0;background:#fff;direction:rtl;}"
+    : "body{margin:0;padding:12mm;background:#334155;display:flex;flex-direction:column;align-items:center;gap:10mm;direction:rtl;}";
+  return [
+    "*{box-sizing:border-box;font-family:'B Nazanin',Vazirmatn,Tahoma,sans-serif;}",
+    "html,body{margin:0;min-height:100%;}",
+    previewBody,
+    ".a4-page{width:210mm;height:297mm;max-height:297mm;background:#fff;color:#000;display:flex;flex-direction:column;justify-content:space-between;position:relative;overflow:hidden;margin:0 auto 8mm;box-shadow:0 8px 25px rgba(0,0,0,.22);page-break-after:always;break-after:page;}",
+    ".a4-page.paper-a5{width:148mm;height:210mm;max-height:210mm;}",
+    ".lh-top{color:#fff;padding:5mm 8mm;display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #f3e06b;flex-shrink:0;}",
+    ".lh-r{width:42%;text-align:right;}.lh-sub{font-size:8.5pt;font-weight:700;}.lh-main{font-size:10.5pt;font-weight:900;color:#f3e06b;}",
+    ".lh-c{width:20%;text-align:center;font-size:12pt;font-weight:900;}.lh-l{width:34%;font-size:9pt;background:rgba(0,0,0,.18);padding:2.5mm 3.5mm;border-radius:6px;}",
+    ".m-row{display:flex;justify-content:space-between;margin-bottom:1mm;gap:2mm;}",
+    ".lh-body{padding:7mm 10mm;flex:1;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;min-height:0;}",
+    ".lh-content-wrap{flex:1;min-height:0;overflow:hidden;}.l-rec{font-size:11pt;font-weight:900;margin-bottom:2mm;}.l-txt{font-size:10.2pt;line-height:1.95;text-align:justify;white-space:pre-line;overflow-wrap:anywhere;}",
+    ".paper-a5 .lh-top{padding:3.5mm 6mm;}.paper-a5 .lh-sub{font-size:7.5pt;}.paper-a5 .lh-main{font-size:9.2pt;}.paper-a5 .lh-c{font-size:10.5pt;}.paper-a5 .lh-l{font-size:8pt;padding:1.8mm 2.8mm;}",
+    ".paper-a5 .lh-body{padding:4.5mm 7mm;}.paper-a5 .l-rec{font-size:9.8pt;}.paper-a5 .l-txt{font-size:8.8pt;line-height:1.65;}",
+    ".utm-table-print{width:96%;margin:2.5mm auto;border-collapse:collapse;table-layout:fixed;font-size:8.2pt;direction:rtl;}",
+    ".utm-table-print th,.utm-table-print td{border:1px solid #000;padding:1mm 1.8mm;text-align:center;overflow-wrap:anywhere;}",
+    ".utm-table-print th{background:#e2e8f0;font-weight:900;}.paper-a5 .utm-table-print{width:100%;font-size:6.8pt;margin:1.5mm auto;}.paper-a5 .utm-table-print th,.paper-a5 .utm-table-print td{padding:.6mm .9mm;}",
+    ".sign-area{display:flex;justify-content:flex-end;margin-top:3mm;padding-left:6mm;flex-shrink:0;}.sign-box{text-align:center;font-weight:800;font-size:9.8pt;line-height:1.7;min-width:55mm;}",
+    ".lh-foot{color:#fff;padding:3.5mm 8mm;border-top:2.5px solid #f3e06b;font-size:8pt;flex-shrink:0;}.f-warn{text-align:center;font-weight:800;color:#f3e06b;margin-bottom:1mm;}.f-info{display:flex;justify-content:space-between;align-items:center;gap:4mm;}",
+    ".qr-verify-box{background:#fff;padding:2px;text-align:center;margin-top:2px;}",
+    "@page{size:" + w + " " + h + ";margin:0;}",
+    "@media print{*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}html,body{width:" + w + "!important;margin:0!important;padding:0!important;background:#fff!important;display:block!important;}.a4-page,.a4-page.paper-a5{width:" + w + "!important;min-width:" + w + "!important;max-width:" + w + "!important;height:" + h + "!important;min-height:" + h + "!important;max-height:" + h + "!important;margin:0!important;box-shadow:none!important;page-break-inside:avoid!important;break-inside:avoid!important;page-break-after:always!important;break-after:page!important;}.a4-page:last-child,.a4-page.paper-a5:last-child{page-break-after:auto!important;break-after:auto!important;}}"
+  ].join("\n");
+}
 
+function safePaperFileBase(value) {
+  var name = String(value || "Markaz636").replace(/[\\/:*?"<>|]+/g, "_").replace(/\s+/g, "_");
+  return name.replace(/^_+|_+$/g, "").slice(0, 72) || "Markaz636";
+}
+
+/* خروجی HTML مستقل از همان قالب و ابعاد پیش‌نمایش */
+window.downloadPaperSheetFile = function(forcedSize) {
+  if (forcedSize === "A4" || forcedSize === "A5") window.setPaperSize(forcedSize, true);
+  var stage = document.getElementById("a4-preview-stage");
+  if (!stage || !stage.querySelector(".a4-page")) {
+    showToastMsg("ابتدا یک نامه، فرم یا کروکی را پیش‌نمایش بگیرید.", true);
+    return false;
+  }
+  if (currentPreviewMode === "LETTER" || currentPreviewMode === "LETTER_DRAFT") {
+    if (!window.savePaperEditsToSecretariat({ silent: true, log: false })) {
+      showToastMsg("فایل ساخته نشد؛ ذخیره نامه با خطا مواجه شد.", true);
+      return false;
+    }
+  }
+  autoFitPaperContent(stage);
+  var pSize = currentPaperSize || "A4";
+  var c = getActiveCase();
+  var title = "برگه رسمی " + pSize + " - مرکز خدمات ۶۳۶ خفر";
+  var docHtml = '<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<title>' + safeHtmlText(title) + '</title><style>' + buildPaperExportCss(pSize, false) +
+    '</style></head><body>' + stage.innerHTML + '</body></html>';
+  var objectUrl = URL.createObjectURL(new Blob([docHtml], { type: "text/html;charset=utf-8" }));
   var a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([docHtml], { type: "text/html;charset=utf-8" }));
-  a.download = "Sheet_" + pSize + "_" + (c ? c.name.replace(/\s+/g, "_") : "Markaz636") + ".html";
+  a.href = objectUrl;
+  a.download = "Sheet_" + pSize + "_" + safePaperFileBase(c && c.name) + ".html";
+  document.body.appendChild(a);
   a.click();
-  showToastMsg("📥 فایل مستقل کاغذ " + pSize + " با متن ذخیره‌شده دانلود شد.");
+  a.remove();
+  setTimeout(function () { URL.revokeObjectURL(objectUrl); }, 1500);
+  showToastMsg("فایل HTML مستقل با قالب و اندازه " + pSize + " آماده شد.");
+  return true;
 };
 
 function activatePaneForArchivedLetter(paneId) {
@@ -1527,14 +1551,32 @@ function issueDeficiencyLetterForActiveCase() {
     }
     if (!missing.length) { alert("پرونده کامل است و نقصی ندارد."); return; }
 
-    var rec = "متقاضی محترم، " + c.name + " (کد ملی/شناسه: " + toFa(c.nid) + ")";
+    var recipient = "متقاضی محترم، " + c.name + " (کد ملی/شناسه: " + toFa(c.nid) + ")";
     var body = "احتراماً پیرو تشکیل پرونده جنابعالی/سرکار عالی در مرکز خدمات کشاورزی و منابع طبیعی غیردولتی شماره ۶۳۶ شهرستان خفر جهت «" + c.project + "» واقع در اراضی " + c.loc + "، پس از بررسی مدارک مشخص گردید پرونده شما دارای نواقص زیر می‌باشد:\n\n" +
       missing.join("\n") + "\n\nلذا مستند به ضوابط اجرایی صدور مجوزها، خواهشمند است حداکثر ظرف مهلت قانونی ۱۰ روز نسبت به تحویل مدارک ناقص فوق به این مرکز اقدام فرمایید.";
 
-    currentPreviewMode = "LETTER";
-    var stage = document.getElementById("a4-preview-stage");
-    stage.innerHTML = buildSingleA4HTML(rec, body, "۱۴۰۵۰۲۱۳۹۹", todayShamsi(), "ندارد", "", false, false, currentPaperSize);
-    switchMainPane("pane-print");
+    editingLetterId = null;
+    currentPreviewLetterId = null;
+    currentPreviewDraft = null;
+    letterDraftCaseId = c.id;
+    letterDraftDirty = false;
+    var recipientEl = document.getElementById("l-recipient");
+    var rich = document.getElementById("l-body-rich");
+    var bodyField = document.getElementById("l-body");
+    if (recipientEl) recipientEl.value = recipient;
+    if (rich) rich.innerHTML = sanitizeOfficeRichHtml(body.replace(/\n/g, "<br>"));
+    if (bodyField) bodyField.value = body;
+    var numberEl = document.getElementById("l-number");
+    var dateEl = document.getElementById("l-date");
+    var attachEl = document.getElementById("l-attach");
+    var directionEl = document.getElementById("l-direction");
+    var includeEl = document.getElementById("l-include-utm");
+    if (numberEl) numberEl.value = getNextSecretariatNumber();
+    if (dateEl) dateEl.value = todayShamsi();
+    if (attachEl) attachEl.value = "ندارد";
+    if (directionEl) directionEl.value = "OUT";
+    if (includeEl) includeEl.checked = false;
+    saveLetterToSecretariat(true, currentPaperSize);
   });
 }
 
@@ -1542,6 +1584,9 @@ function printOfficialForm(formType) {
   var c = requireActiveCase("چاپ فرم رسمی برای پرونده");
   if (!c) return;
   currentPreviewMode = "FORM";
+  currentPreviewLetterId = null;
+  currentPreviewDraft = null;
+  updatePaperActionButtons();
   window.currentActiveFormKey = formType;
   applyDynamicPrintPageSizeCSS(currentPaperSize);
   var d = window.getInquiryDataObject();
@@ -3621,6 +3666,9 @@ function printUtmSketchSheet() {
   var m = getActiveCroquisMap();
   if (!m) return;
   currentPreviewMode = "CROQUIS";
+  currentPreviewLetterId = null;
+  currentPreviewDraft = null;
+  updatePaperActionButtons();
   applyDynamicPrintPageSizeCSS(currentPaperSize);
   var d = window.getInquiryDataObject();
 
@@ -3815,6 +3863,7 @@ function printUtmSketchSheet() {
   var page2Html = buildSingleA4HTML("", sheet2Content, d.num + "/۲", d.date, "جداول UTM (شیت ۲)", "", false, true, currentPaperSize, false, "شیت ۲ از ۲ (جداول)");
 
   document.getElementById("a4-preview-stage").innerHTML = mapModeControls + page1Html + page2Html;
+  updatePaperActionButtons();
   attachPrintedMapCropInteractions();
   setTimeout(autoFitPaperContent, 50);
   logCaseAction(c, "تهیه نسخه چاپی کروکی دو شیت (شیت ۱: نقشه + شیت ۲: جداول) در کاغذ " + currentPaperSize);
@@ -4066,12 +4115,36 @@ function toggleQrVerificationOnSheets() {
 
 function exportStageToWordDoc() {
   var stage = document.getElementById("a4-preview-stage");
-  if (!stage) return;
-  var html = '<html dir="rtl" lang="fa"><head><meta charset="utf-8"></head><body style="font-family:B Nazanin,Tahoma;font-size:13pt;">' + stage.innerHTML + '</body></html>';
+  if (!stage || !stage.querySelector(".a4-page")) {
+    showToastMsg("ابتدا یک برگه را پیش‌نمایش بگیرید.", true);
+    return false;
+  }
+  if (currentPreviewMode === "LETTER" || currentPreviewMode === "LETTER_DRAFT") {
+    if (!window.savePaperEditsToSecretariat({ silent: true, log: false })) {
+      showToastMsg("خروجی Word ساخته نشد؛ ذخیره نامه با خطا مواجه شد.", true);
+      return false;
+    }
+  }
+  autoFitPaperContent(stage);
+  var pSize = currentPaperSize || "A4";
+  var c = getActiveCase();
+  var firstPage = stage.querySelector(".a4-page");
+  var numberEl = firstPage && firstPage.querySelector(".paper-meta-num");
+  var number = numberEl ? numberEl.innerText.trim() : "Letter";
+  var html = '<!DOCTYPE html><html dir="rtl" lang="fa"><head><meta charset="utf-8">' +
+    '<meta http-equiv="Content-Type" content="text/html; charset=utf-8">' +
+    '<title>نامه ' + safeHtmlText(toFa(number)) + '</title><style>' + buildPaperExportCss(pSize, true) +
+    '</style></head><body>' + stage.innerHTML + '</body></html>';
+  var objectUrl = URL.createObjectURL(new Blob(["\ufeff", html], { type: "application/msword;charset=utf-8" }));
   var a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob(['\ufeff', html], { type: "application/msword;charset=utf-8" }));
-  a.download = "Nameh_Markaz636.doc";
+  a.href = objectUrl;
+  a.download = "Nameh_" + pSize + "_" + safePaperFileBase(c && c.name) + "_" + safePaperFileBase(number) + ".doc";
+  document.body.appendChild(a);
   a.click();
+  a.remove();
+  setTimeout(function () { URL.revokeObjectURL(objectUrl); }, 1500);
+  showToastMsg("فایل Word با قالب سربرگ و ابعاد " + pSize + " آماده شد.");
+  return true;
 }
 
 function initBrandingAndTemplatesUI() {
@@ -4106,8 +4179,13 @@ function initBrandingAndTemplatesUI() {
   }
   setPaperSize(currentPaperSize, true);
   renderTemplateButtonsInLettersPane();
-  syncLetterEditorWithActiveCase();
-  renderSinglePreviewSheet();
+  syncLetterEditorWithActiveCase(true);
+  var previewStage = document.getElementById("a4-preview-stage");
+  if (previewStage) previewStage.innerHTML = "";
+  currentPreviewMode = "EDITOR";
+  currentPreviewLetterId = null;
+  currentPreviewDraft = null;
+  updatePaperActionButtons();
   if (typeof window.initCroquisWorkspaceForActiveCase === "function") {
     window.initCroquisWorkspaceForActiveCase();
   }
