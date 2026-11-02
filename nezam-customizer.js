@@ -499,7 +499,7 @@ function updatePaperActionButtons() {
   var utmBtn = document.getElementById("btn-toggle-print-utm");
   if (saveBtn) {
     saveBtn.disabled = !supported;
-    saveBtn.title = supported ? "ذخیره تغییرات متن و پیوست نامه در دبیرخانه" : "این دکمه فقط برای نامه‌ها فعال است؛ فرم و کروکی را با خروجی چاپ یا فایل ذخیره کنید.";
+    saveBtn.title = supported ? "ثبت پیش‌نویس جدید یا ذخیره تغییرات نامه و پیوست در دفتر اندیکاتور" : "این دکمه فقط برای نامه‌ها فعال است؛ فرم و کروکی را با خروجی چاپ یا فایل ذخیره کنید.";
   }
   if (previewDraftBtn) {
     previewDraftBtn.disabled = !previewDraftSupported;
@@ -572,19 +572,18 @@ window.setPaperSize = function(size, skipSave) {
       } else if (currentPreviewMode === "FORM" && window.currentActiveFormKey) {
         printOfficialForm(window.currentActiveFormKey);
       } else {
-        // تغییر A4/A5 نباید پیش‌نمایش ویرایش‌شده را از روی نسخه بایگانی بازسازی کند.
+        // تغییر اندازه کاغذ فقط پیش‌نمایش را تغییر می‌دهد؛ ثبت در دبیرخانه نیازمند فرمان جداگانه است.
         if (currentPreviewMode === "LETTER" && currentPreviewLetterId) {
-          var savedLetter = findSecretariatLetter(currentPreviewLetterId);
-          if (savedLetter) {
-            var oldSize = savedLetter.paperSize;
-            savedLetter.paperSize = currentPaperSize;
-            if (!persistLetterAndCaseData()) {
-              savedLetter.paperSize = oldSize;
-              showToastMsg("اندازه کاغذ تغییر کرد، اما ذخیره آن در بایگانی ناموفق بود.", true);
-            }
+          var archivedLetter = findSecretariatLetter(currentPreviewLetterId);
+          if (archivedLetter) {
+            var paperDraft = JSON.parse(JSON.stringify(archivedLetter));
+            paperDraft.paperSize = currentPaperSize;
+            renderLetterPreviewObject(paperDraft, currentPaperSize, "LETTER_DRAFT");
+            paperPreviewDirty = true;
           }
         } else if (currentPreviewMode === "LETTER_DRAFT" && currentPreviewDraft) {
           currentPreviewDraft.paperSize = currentPaperSize;
+          paperPreviewDirty = true;
         }
         setTimeout(function () {
           var fit = autoFitPaperContent();
@@ -657,14 +656,7 @@ window.doPrintPaperSheet = function() {
       return;
     }
 
-    // تغییرات پیش‌نمایش فقط پس از موفقیت کنترل چیدمان در دبیرخانه ثبت می‌شوند.
-    if (currentPreviewMode === "LETTER_DRAFT" || (currentPreviewMode === "LETTER" && paperPreviewDirty)) {
-      var saved = window.savePaperEditsToSecretariat({ silent: true, log: false });
-      if (!saved) {
-        showToastMsg("چاپ متوقف شد؛ ذخیره نامه یا پیوست آن موفق نبود.", true);
-        return;
-      }
-    }
+    // چاپ فقط خروجی می‌گیرد؛ ایجاد یا ویرایش سابقه دبیرخانه با دکمه ثبت جداگانه انجام می‌شود.
 
     printRequestActive = true;
     if (window.__nezam636PrintFailsafe) clearTimeout(window.__nezam636PrintFailsafe);
@@ -1198,11 +1190,7 @@ window.downloadPaperSheetFile = function(forcedSize) {
     showToastMsg("خروجی HTML ساخته نشد؛ صفحه هنوز کامل قابل اندازه‌گیری نیست یا محتوا از محدوده بیرون می‌زند.", true);
     return false;
   }
-  if ((currentPreviewMode === "LETTER" || currentPreviewMode === "LETTER_DRAFT") &&
-      !window.savePaperEditsToSecretariat({ silent: true, log: false })) {
-    showToastMsg("فایل ساخته نشد؛ ذخیره نامه با خطا مواجه شد.", true);
-    return false;
-  }
+  // دانلود HTML به‌تنهایی هیچ رکوردی در دفتر اندیکاتور ایجاد یا ویرایش نمی‌کند.
   var pSize = currentPaperSize || "A4";
   var c = getActiveCase();
   var title = "برگه رسمی " + pSize + " - مرکز خدمات ۶۳۶ خفر";
@@ -1329,10 +1317,19 @@ function previewCurrentLetterDraft(forcedPaperSize) {
   letterDraftDirty = false;
   paperPreviewDirty = false;
   if (typeof window.switchMainPane === "function") window.switchMainPane("pane-print");
-  showToastMsg("پیش‌نمایش پیش‌نویس آماده است؛ با ذخیره یا چاپ، نامه در دبیرخانه ثبت می‌شود.");
+  showToastMsg("پیش‌نمایش آماده است؛ چاپ و دانلود به‌تنهایی نامه را در دبیرخانه ثبت نمی‌کند.");
   return true;
 }
 window.previewCurrentLetterDraft = previewCurrentLetterDraft;
+
+/* چاپ مستقیم پیش‌نویس؛ عمداً بدون ثبت در دفتر اندیکاتور */
+window.printCurrentLetterDraft = function(forcedPaperSize) {
+  if (!previewCurrentLetterDraft(forcedPaperSize)) return false;
+  setTimeout(function() {
+    if (typeof window.doPrintPaperSheet === "function") window.doPrintPaperSheet();
+  }, 180);
+  return true;
+};
 
 function renderSinglePreviewSheet(letterObj, forcedPaperSize) {
   if (letterObj) return renderLetterPreviewObject(letterObj, forcedPaperSize, "LETTER");
@@ -1740,14 +1737,16 @@ window.toggleUtmInPreviewSheet = function() {
     return false;
   }
   var isDraft = currentPreviewMode === "LETTER_DRAFT" && !!currentPreviewDraft;
-  var letter = isDraft
+  var sourceLetter = isDraft
     ? currentPreviewDraft
     : (currentPreviewMode === "LETTER" ? findSecretariatLetter(currentPreviewLetterId) : null);
-  if (!letter) {
+  if (!sourceLetter) {
     showToastMsg("ابتدا یک نامه را پیش‌نمایش بگیرید.", true);
     return false;
   }
 
+  // روی نسخه موقت کار می‌کنیم؛ رکورد بایگانی فقط با دکمه ثبت نهایی تغییر می‌کند.
+  var letter = JSON.parse(JSON.stringify(sourceLetter));
   var original = JSON.parse(JSON.stringify(letter));
   var stage = document.getElementById("a4-preview-stage");
   var firstPage = stage && stage.querySelector(".a4-page");
@@ -1803,22 +1802,11 @@ window.toggleUtmInPreviewSheet = function() {
   }
   letter.attach = getLetterAttachmentLabel(letter.attach, hasCoordinates);
 
-  if (!isDraft && !persistLetterAndCaseData()) {
-    Object.keys(letter).forEach(function (key) { delete letter[key]; });
-    Object.assign(letter, original);
-    showToastMsg("ذخیره تغییر وضعیت پیوست مختصات ناموفق بود.", true);
-    return false;
-  }
-
-  renderLetterPreviewObject(letter, currentPaperSize, isDraft ? "LETTER_DRAFT" : "LETTER");
-  if (isDraft) {
-    letterDraftDirty = false;
-    paperPreviewDirty = true;
-  } else {
-    letterDraftDirty = false;
-    paperPreviewDirty = false;
-  }
-  showToastMsg(hasCoordinates ? "برگه پیوست مختصات به نامه اضافه شد." : "پیوست مختصات از نامه حذف شد.");
+  renderLetterPreviewObject(letter, currentPaperSize, "LETTER_DRAFT");
+  letterDraftDirty = false;
+  paperPreviewDirty = true;
+  showToastMsg((hasCoordinates ? "پیوست مختصات آماده شد." : "پیوست مختصات از پیش‌نمایش حذف شد.") +
+    " برای ثبت این تغییر در دفتر اندیکاتور، دکمه ذخیره در دبیرخانه را بزنید.");
   return true;
 };
 
@@ -4503,11 +4491,7 @@ function exportStageToWordDoc() {
     showToastMsg("خروجی Word ساخته نشد؛ صفحه هنوز کامل قابل اندازه‌گیری نیست یا محتوا از محدوده بیرون می‌زند.", true);
     return false;
   }
-  if ((currentPreviewMode === "LETTER" || currentPreviewMode === "LETTER_DRAFT") &&
-      !window.savePaperEditsToSecretariat({ silent: true, log: false })) {
-    showToastMsg("خروجی Word ساخته نشد؛ ذخیره نامه با خطا مواجه شد.", true);
-    return false;
-  }
+  // خروجی Word فقط فایل می‌سازد؛ ثبت رسمی نامه باید جداگانه تأیید شود.
   var pSize = currentPaperSize || "A4";
   var c = getActiveCase();
   var firstPage = stage.querySelector(".a4-page");
