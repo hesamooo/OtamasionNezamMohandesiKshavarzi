@@ -555,6 +555,10 @@ window.doPrintPaperSheet = function() {
     return false;
   }
 
+  if ((currentPreviewMode === "LETTER" || currentPreviewMode === "LETTER_DRAFT") && letterDraftDirty) {
+    showToastMsg("فرم نامه بعد از آخرین پیش‌نمایش تغییر کرده است؛ ابتدا دوباره پیش‌نمایش بگیرید.", true);
+    return false;
+  }
   var stage = document.getElementById("a4-preview-stage");
   if (!stage || !stage.querySelector(".a4-page")) {
     showToastMsg("هیچ برگه‌ای برای چاپ آماده نیست؛ ابتدا نامه، فرم یا کروکی را پیش‌نمایش بگیرید.", true);
@@ -946,8 +950,8 @@ window.savePaperEditsToSecretariat = function(options) {
     if (!silent) showToastMsg("این عملیات فقط برای نامه‌ها فعال است؛ فرم‌ها و کروکی‌ها را از مسیر خروجی چاپ ذخیره کنید.", true);
     return false;
   }
-  if (letterDraftDirty && paperPreviewDirty) {
-    if (!silent) showToastMsg("هم متن فرم و هم خود برگه تغییر کرده‌اند؛ ابتدا پیش‌نمایش را دوباره بسازید تا دو نسخه با هم تداخل نکنند.", true);
+  if (letterDraftDirty) {
+    if (!silent) showToastMsg("فرم نامه بعد از آخرین پیش‌نمایش تغییر کرده است؛ ابتدا دوباره پیش‌نمایش بگیرید تا نسخه قدیمی ذخیره نشود.", true);
     return false;
   }
 
@@ -1120,6 +1124,10 @@ window.downloadPaperSheetFile = function(forcedSize) {
   var stage = document.getElementById("a4-preview-stage");
   if (!stage || !stage.querySelector(".a4-page") || currentPreviewMode === "EDITOR") {
     showToastMsg("ابتدا پیش‌نمایش نامه، فرم یا کروکی را آماده کنید.", true);
+    return false;
+  }
+  if ((currentPreviewMode === "LETTER" || currentPreviewMode === "LETTER_DRAFT") && letterDraftDirty) {
+    showToastMsg("فرم نامه بعد از آخرین پیش‌نمایش تغییر کرده است؛ ابتدا دوباره پیش‌نمایش بگیرید.", true);
     return false;
   }
   var fitResult = autoFitPaperContent(stage);
@@ -1646,6 +1654,10 @@ function splitUtmAttachmentTableHtml(tableHtml, paperSize) {
 }
 
 window.toggleUtmInPreviewSheet = function() {
+  if (letterDraftDirty) {
+    showToastMsg("فرم نامه بعد از آخرین پیش‌نمایش تغییر کرده است؛ ابتدا دوباره پیش‌نمایش بگیرید.", true);
+    return false;
+  }
   var isDraft = currentPreviewMode === "LETTER_DRAFT" && !!currentPreviewDraft;
   var letter = isDraft
     ? currentPreviewDraft
@@ -1675,6 +1687,13 @@ window.toggleUtmInPreviewSheet = function() {
     }
     letter.attach = getLetterAttachmentLabel(attachEl ? attachEl.innerText.trim() : letter.attach,
       !!(appendixBeforeToggle || letter.includeUtm === true));
+  }
+  if (!(letter.recipient || "").trim() || !String(letter.body || "").replace(/<[^>]*>/g, "").trim() ||
+      !letter.number || !letter.date || !isSecretariatNumberAvailable(letter.number, letter.id || null)) {
+    Object.keys(letter).forEach(function (key) { delete letter[key]; });
+    Object.assign(letter, original);
+    showToastMsg("پیش از تغییر پیوست، گیرنده، متن، تاریخ و شماره یکتای نامه را بررسی کنید.", true);
+    return false;
   }
 
   letter.includeUtm = letter.includeUtm !== true;
@@ -1710,9 +1729,14 @@ window.toggleUtmInPreviewSheet = function() {
     return false;
   }
 
-  paperPreviewDirty = isDraft;
-  if (isDraft) letterDraftDirty = true;
   renderLetterPreviewObject(letter, currentPaperSize, isDraft ? "LETTER_DRAFT" : "LETTER");
+  if (isDraft) {
+    letterDraftDirty = false;
+    paperPreviewDirty = true;
+  } else {
+    letterDraftDirty = false;
+    paperPreviewDirty = false;
+  }
   showToastMsg(hasCoordinates ? "برگه پیوست مختصات به نامه اضافه شد." : "پیوست مختصات از نامه حذف شد.");
   return true;
 };
@@ -4376,6 +4400,10 @@ function exportStageToWordDoc() {
   var stage = document.getElementById("a4-preview-stage");
   if (!stage || !stage.querySelector(".a4-page") || currentPreviewMode === "EDITOR") {
     showToastMsg("ابتدا یک نامه، فرم یا کروکی را پیش‌نمایش بگیرید.", true);
+    return false;
+  }
+  if ((currentPreviewMode === "LETTER" || currentPreviewMode === "LETTER_DRAFT") && letterDraftDirty) {
+    showToastMsg("فرم نامه بعد از آخرین پیش‌نمایش تغییر کرده است؛ ابتدا دوباره پیش‌نمایش بگیرید.", true);
     return false;
   }
   var fitResult = autoFitPaperContent(stage);
