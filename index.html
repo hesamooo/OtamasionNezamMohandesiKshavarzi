@@ -2473,8 +2473,8 @@
             </div>
 
             <div class="d-flex flex-wrap gap-2">
-              <button type="button" class="btn btn-success" onclick="saveLetterToSecretariat(true, 'A4')">چاپ A4</button>
-              <button type="button" class="btn btn-primary" onclick="saveLetterToSecretariat(true, 'A5')">چاپ A5</button>
+              <button type="button" class="btn btn-success" onclick="printCurrentLetterDraft('A4')">چاپ A4</button>
+              <button type="button" class="btn btn-primary" onclick="printCurrentLetterDraft('A5')">چاپ A5</button>
               <button type="button" class="btn btn-outline-success" onclick="saveLetterToSecretariat(false)">ثبت در دبیرخانه</button>
             </div>
           </div>
@@ -2486,7 +2486,7 @@
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 pb-1 border-bottom">
               <div>
                 <strong class="text-primary" style="font-size:1rem;">📚 بایگانی دیجیتال: دفتر اندیکاتور و سوابق مکاتبات</strong>
-                <div class="small text-muted">ثبت خودکار با شماره و تاریخ یکتا و بازیابی جهت چاپ مجدد روی A4 و A5</div>
+                <div class="small text-muted">فقط نامه‌های ثبت‌شده نمایش داده می‌شوند؛ چاپ و دانلود به‌تنهایی سابقه ایجاد نمی‌کند.</div>
               </div>
               <div class="d-flex gap-1">
                 <input type="text" id="sec-search-q" class="form-control form-control-sm" placeholder="جستجو در نامه‌ها..." oninput="renderSecretariatTable()" />
@@ -2547,7 +2547,7 @@
           </div>
 
           <div class="d-flex flex-wrap gap-2">
-            <button type="button" id="btn-save-print-edits" class="btn btn-sm btn-warning fw-bold" onclick="savePaperEditsToSecretariat()">💾 ذخیره تغییرات نامه در دبیرخانه</button>
+            <button type="button" id="btn-save-print-edits" class="btn btn-sm btn-warning fw-bold" onclick="savePaperEditsToSecretariat()">💾 ثبت / ذخیره در دبیرخانه</button>
             <button type="button" class="btn btn-sm btn-outline-primary fw-bold" onclick="downloadPaperSheetFile()">📥 دانلود فایل مستقل این کاغذ</button>
             <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleQrVerificationOnSheets()">🔳 درج QR اصالت</button>
             <button type="button" class="btn btn-sm btn-primary" onclick="exportStageToWordDoc()">📝 خروجی Word (.doc)</button>
@@ -2930,7 +2930,7 @@
             <div class="guide-card h-100" style="border-right-color:#263849;">
               <h6 class="fw-bold text-dark mb-2">۶. بایگانی دیجیتال، عملکرد ۱۰۰٪ آفلاین و پشتیبان‌گیری امن</h6>
               <ul class="small pe-3 mb-0" style="line-height:1.9;">
-                <li><b>دفتر اندیکاتور:</b> ثبت خودکار هر نامه پس از صدور با شماره و تاریخ یکتا جهت چاپ مجدد روی فرمت‌های A4 و A5.</li>
+                <li><b>دفتر اندیکاتور:</b> نامه فقط پس از انتخاب «ثبت در دبیرخانه» با شماره و تاریخ یکتا ذخیره می‌شود.</li>
                 <li><b>اجرای مستقل روی ویندوز:</b> دانلود نسخه تک‌فایلی ویندوز بدون نیاز به اینترنت.</li>
                 <li><b>پشتیبان‌گیری امن (JSON) و همگام‌سازی ابری:</b> دریافت خروجی کامل از اطلاعات پرونده‌ها با یک کلیک و اتصال خودکار به گوگل درایو.</li>
               </ul>
