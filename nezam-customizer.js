@@ -385,13 +385,15 @@ function getLetterDraftFromEditor() {
   try { if (typeof getActiveCroquisMap === "function") map = getActiveCroquisMap(); } catch (mapError) {
     console.warn("Could not resolve current UTM map:", mapError);
   }
-  var includeUtm = !!(includeEl && includeEl.checked);
+  var requestedUtm = !!(includeEl && includeEl.checked);
   var isNat = rec.indexOf("منابع طبیعی") !== -1;
-  var coordinateHtml = includeUtm ? buildAllSelectedFeaturesUtmTableHTML(c, c.utm || "", isNat) : "";
-  var hasUtm = !!(coordinateHtml && coordinateHtml.trim());
+  var freshUtmSnapshot = requestedUtm ? buildAllSelectedFeaturesUtmTableHTML(c, c.utm || "", isNat) : "";
   var existingLetter = editingLetterId ? findSecretariatLetter(editingLetterId) : null;
   var preservedUtmSnapshot = existingLetter && typeof existingLetter.utmAttachmentHtml === "string"
     ? existingLetter.utmAttachmentHtml : "";
+  var coordinateHtml = freshUtmSnapshot && freshUtmSnapshot.trim() ? freshUtmSnapshot : (requestedUtm ? preservedUtmSnapshot : "");
+  var hasUtm = !!(coordinateHtml && coordinateHtml.trim());
+  var includeUtm = requestedUtm && hasUtm;
   return {
     id: editingLetterId || null,
     caseId: c.id,
@@ -410,7 +412,7 @@ function getLetterDraftFromEditor() {
     loc: c.loc || "",
     utm: c.utm || "",
     croquisMapId: map && map.id ? map.id : (activeCroquisMapId || ""),
-    utmAttachmentHtml: includeUtm ? coordinateHtml : preservedUtmSnapshot,
+    utmAttachmentHtml: coordinateHtml,
     body: body,
     paperSize: paperEl && paperEl.value === "A5" ? "A5" : (currentPaperSize || "A4"),
     includeUtm: includeUtm
@@ -1193,7 +1195,6 @@ function cancelLetterEditing() {
 window.cancelLetterEditing = cancelLetterEditing;
 
 function editLetterFromSecretariat(letterId) {
-  if (!confirmDiscardLetterChanges("با باز کردن نامهٔ بایگانی، ویرایش فعلی کنار گذاشته می‌شود.")) return false;
   var letter = findSecretariatLetter(letterId);
   if (!letter) {
     showToastMsg("نامه انتخاب‌شده در دفتر اندیکاتور پیدا نشد.", true);
@@ -1206,6 +1207,7 @@ function editLetterFromSecretariat(letterId) {
     showToastMsg("پرونده مرتبط با این نامه پیدا نشد؛ ویرایش برای جلوگیری از اتصال اشتباه متوقف شد.", true);
     return false;
   }
+  if (!confirmDiscardLetterChanges("با باز کردن نامهٔ بایگانی، ویرایش فعلی کنار گذاشته می‌شود.")) return false;
 
   activeCaseId = linkedCase.id;
   activeCroquisMapId = letter.croquisMapId || "";
@@ -1292,7 +1294,6 @@ function renderSinglePreviewSheet(letterObj, forcedPaperSize) {
 window.renderSinglePreviewSheet = renderSinglePreviewSheet;
 
 function previewSavedLetter(letterId, forcedPaperSize) {
-  if (!confirmDiscardLetterChanges("با باز کردن نامهٔ بایگانی، ویرایش فعلی کنار گذاشته می‌شود.")) return false;
   var letter = findSecretariatLetter(letterId);
   if (!letter) {
     showToastMsg("نامه انتخاب‌شده در دفتر اندیکاتور پیدا نشد.", true);
@@ -1305,6 +1306,7 @@ function previewSavedLetter(letterId, forcedPaperSize) {
     showToastMsg("پرونده مرتبط با نامه پیدا نشد؛ پیش‌نمایش برای جلوگیری از نمایش مختصات پرونده اشتباه متوقف شد.", true);
     return false;
   }
+  if (!confirmDiscardLetterChanges("با باز کردن نامهٔ بایگانی، ویرایش فعلی کنار گذاشته می‌شود.")) return false;
   if (linkedCase) {
     activeCaseId = linkedCase.id;
     activeCroquisMapId = letter.croquisMapId || "";
