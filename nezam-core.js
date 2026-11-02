@@ -765,7 +765,8 @@ function openMandatoryApplicantModal(reasonText) {
   var modal = document.getElementById("mandatory-applicant-modal");
   var reasonEl = document.getElementById("guard-modal-reason");
   if (reasonEl) {
-    reasonEl.textContent = "عملیات درخواستی: «" + (reasonText || "شروع فرایند اداری") + "» — طبق قانون اجباری سامانه، هیچ فرایند اداری (صدور نامه، ترسیم کروکی، بارگذاری مدرک یا چاپ فرم) بدون انتخاب متقاضی مجاز نیست.";
+    reasonEl.textContent = "عملیات درخواستی: «" + (reasonText || "شروع فرایند اداری") +
+      "» — برای کارهای مرتبط با پرونده، انتخاب متقاضی الزامی است. مکاتبات مستقل دفتر را می‌توان از مسیر «نامه اداری مستقل دفتر» در دبیرخانه انجام داد.";
   }
   if (modal) {
     modal.style.display = "flex";
@@ -870,14 +871,14 @@ function switchMainPane(paneId) {
   if (paneId === "pane-preview") paneId = "pane-print";
   if (paneId === "pane-ai-center") paneId = "pane-ai";
 
-  // تب‌هایی که طبق قانون بخش سوم بدون انتخاب متقاضی نباید اجرا شوند
+  // ورود به دبیرخانه آزاد است؛ فقط عملیات پرونده‌محور همچنان به انتخاب متقاضی نیاز دارند.
   var guardedPanes = {
     "pane-croquis": "ورود به ابزار تخصصی کروکی زمین و نقشه UTM",
-    "pane-letters": "ورود به دبیرخانه و صدور نامه اداری برای متقاضی",
     "pane-print": "مشاهده و چاپ سربرگ و فرم‌های رسمی متقاضی"
   };
+  var independentOfficeLetterFlow = window.__nezamOfficeLetterDraftMode === true;
 
-  if (guardedPanes[paneId] && !getActiveCase()) {
+  if (guardedPanes[paneId] && !getActiveCase() && !(paneId === "pane-print" && independentOfficeLetterFlow)) {
     requireActiveCase(guardedPanes[paneId], function() {
       switchMainPane(paneId);
     });
@@ -1848,7 +1849,11 @@ function renderSecretariatTable() {
     html += "<tr>" +
       "<td><b>" + escapeHtmlCore(toFa(l.number)) + "</b><br><small class='text-muted'>" + escapeHtmlCore(toFa(l.date)) + "</small></td>" +
       "<td><span class='badge " + (l.type === "OUT" ? "bg-success" : "bg-primary") + "'>" + letterType + "</span><br><span class='badge bg-dark mt-1'>کاغذ " + pSize + "</span></td>" +
-      "<td><b>" + escapeHtmlCore(l.recipient) + "</b><br><small class='text-success fw-bold'>متقاضی: " + escapeHtmlCore(l.appName || "---") + " (" + escapeHtmlCore(toFa(l.cap || "")) + ")</small></td>" +
+      "<td><b>" + escapeHtmlCore(l.recipient) + "</b><br>" +
+        (l.officeLetter === true
+          ? "<small class='text-primary fw-bold'>نامه اداری مستقل دفتر</small>"
+          : "<small class='text-success fw-bold'>متقاضی: " + escapeHtmlCore(l.appName || "---") + " (" + escapeHtmlCore(toFa(l.cap || "")) + ")</small>") +
+      "</td>" +
       "<td><div class='d-flex gap-1 justify-content-center flex-wrap'>" +
         "<button type='button' class='btn btn-sm btn-warning py-0 px-2 fw-bold' data-letter-action='edit' data-letter-id='" + safeLetterId + "' data-tip='ویرایش متن، شماره یا مشخصات این نامه'>✏️</button>" +
         "<button type='button' class='btn btn-sm btn-success py-0 px-2 fw-bold' data-letter-action='a4' data-letter-id='" + safeLetterId + "' data-tip='مشاهده و چاپ روی کاغذ A4'>🖨️ A4</button>" +
