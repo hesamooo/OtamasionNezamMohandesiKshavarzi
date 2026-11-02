@@ -225,3 +225,19 @@ test('OCR fallback does not invent an area or a location', () => {
   assert.doesNotMatch(fallback, /:\s*'1000'/);
   assert.doesNotMatch(fallback, /فارس، شهرستان خفر، مرکزی/);
 });
+
+
+test('form and secretariat print engine keeps paper geometry, binder padding, and appendix state consistent', () => {
+  const customizer = read('nezam-customizer.js');
+  const html = read('index.html');
+
+  assert.ok(customizer.includes('@page { size: '));
+  assert.ok(customizer.includes('#a4-preview-stage .a4-page { box-sizing: border-box !important; width: '));
+  assert.ok(customizer.includes("data-page-kind='binder-label'"));
+  assert.ok(customizer.includes('data-page-kind="binder-label"'));
+  assert.ok(customizer.includes('genericOverflow = page.scrollHeight > page.clientHeight'));
+  assert.ok(customizer.includes('utmAttachmentHtml: includeUtm ? appendixHtml : ""'));
+  assert.ok(customizer.includes('letterPageIndex === 0 ? "letter" : "letter-appendix"'));
+  assert.ok(html.includes('.a4-page[data-page-kind="binder-label"] {\n        padding: 15mm !important;'));
+  assert.ok(html.includes('nezam-customizer.js?v=20261102-print-engine-r6'));
+});
