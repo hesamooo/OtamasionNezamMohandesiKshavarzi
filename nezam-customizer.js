@@ -394,7 +394,10 @@ window.onToggleLetterIncludeUtm = onToggleLetterIncludeUtm;
 function getLetterAttachmentLabel(baseValue, hasUtmAttachment) {
   var base = String(baseValue || "").trim();
   var label = "جدول مختصات UTM";
-  if (!hasUtmAttachment) return base || "ندارد";
+  if (!hasUtmAttachment) {
+    base = base.replace(/،?\s*جدول مختصات UTM/g, "").replace(/^[،,\s]+|[،,\s]+$/g, "").trim();
+    return base || "ندارد";
+  }
   if (!base || /^ندارد$/i.test(base)) return label;
   if (base.indexOf(label) !== -1) return base;
   return base + "، " + label;
@@ -657,6 +660,8 @@ function editLetterFromSecretariat(letterId) {
     var el = document.getElementById(id);
     if (el) el.value = fields[id];
   });
+  var includeUtmEl = document.getElementById("l-include-utm");
+  if (includeUtmEl) includeUtmEl.checked = l.includeUtm !== false;
   if (typeof window.syncTextareaToRichEditor === "function") window.syncTextareaToRichEditor();
   if (l.paperSize && typeof window.setPaperSize === "function") window.setPaperSize(l.paperSize, true);
 
@@ -1227,7 +1232,7 @@ function printOfficialForm(formType) {
   }
 
   var stageEl = document.getElementById("a4-preview-stage");
-  stageEl.innerHTML = buildSingleA4HTML("", innerHtml, d.num, d.date, "دارد", "", false, true, currentPaperSize);
+  stageEl.innerHTML = buildSingleA4HTML("", innerHtml, d.num, d.date, "دارد", "", false, true, currentPaperSize, false);
   switchMainPane("pane-print");
 }
 
