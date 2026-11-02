@@ -96,6 +96,7 @@ var currentPreviewDraft = null;
 var currentPreviewMode = "EDITOR"; // EDITOR | LETTER_DRAFT | LETTER | CROQUIS | FORM
 var letterDraftCaseId = "";
 var letterDraftDirty = false;
+var paperPreviewDirty = false;
 var printRequestActive = false;
 
 try {
@@ -244,6 +245,29 @@ function applyDynamicPrintPageSizeCSS(size) {
   styleEl.textContent = "@page { size: " + width + " " + height + "; margin: 0; }";
 }
 
+function hasUnsavedLetterChanges() {
+  return !!(editingLetterId || letterDraftDirty || paperPreviewDirty);
+}
+
+function confirmDiscardLetterChanges(actionLabel) {
+  if (!hasUnsavedLetterChanges()) return true;
+  return confirm("تغییرات نامه یا پیش‌نمایش چاپ هنوز ذخیره نشده است. " +
+    (actionLabel || "با ادامه، تغییرات ذخیره‌نشده کنار گذاشته می‌شوند.") +
+    "\n\nآیا ادامه می‌دهید؟");
+}
+
+function bindLetterPreviewDirtyTracking(stage) {
+  if (!stage || stage.dataset.letterPreviewDirtyBound === "1") return;
+  stage.dataset.letterPreviewDirtyBound = "1";
+  stage.addEventListener("input", function (event) {
+    if (currentPreviewMode !== "LETTER" && currentPreviewMode !== "LETTER_DRAFT") return;
+    var target = event.target;
+    if (!target || !target.closest || !target.closest('[contenteditable="true"]')) return;
+    paperPreviewDirty = true;
+    if (currentPreviewMode === "LETTER_DRAFT") letterDraftDirty = true;
+  });
+}
+
 function findSecretariatLetter(letterId) {
   if (!letterId || !Array.isArray(lettersDB)) return null;
   for (var i = 0; i < lettersDB.length; i++) {
@@ -382,6 +406,8 @@ function renderLetterPreviewObject(letter, forcedPaperSize, mode) {
   currentPreviewMode = isDraft ? "LETTER_DRAFT" : "LETTER";
   currentPreviewLetterId = isDraft ? null : letter.id;
   currentPreviewDraft = isDraft ? letter : null;
+  paperPreviewDirty = false;
+  bindLetterPreviewDirtyTracking(stage);
   if (letter.croquisMapId) activeCroquisMapId = letter.croquisMapId;
   window.setPaperSize(pSize, true);
   var isNat = (letter.recipient || "").indexOf("منابع طبیعی") !== -1;
@@ -608,7 +634,7 @@ function selectInquiryTemplate(key) {
     requireActiveCase("انتخاب قالب نامه استعلام", function () { selectInquiryTemplate(key); });
     return false;
   }
-  if ((editingLetterId || letterDraftDirty) && !confirm("با انتخاب قالب جدید، متن فعلی ویرایشگر جایگزین می‌شود. ادامه می‌دهید؟")) return false;
+  if (hasUnsavedLetterChanges() && !confirmDiscardLetterChanges("با انتخاب قالب جدید، متن فعلی ویرایشگر جایگزین می‌شود.")) return false;
   currentTemplateKey = key;
   editingLetterId = null;
   currentPreviewLetterId = null;
@@ -771,6 +797,7 @@ function saveLetterToSecretariat(goToPrint, forcedPaperSize) {
   currentPreviewDraft = null;
   currentPreviewMode = "LETTER";
   currentPreviewLetterId = letterObj.id;
+  paperPreviewDirty = false;
   letterDraftCaseId = c.id;
   letterDraftDirty = false;
   var alertBox = document.getElementById("letter-edit-alert");
@@ -923,6 +950,7 @@ window.savePaperEditsToSecretariat = function(options) {
   currentPreviewMode = "LETTER";
   currentPreviewLetterId = updated.id;
   currentPreviewDraft = null;
+  paperPreviewDirty = false;
   editingLetterId = null;
   letterDraftCaseId = caseObj.id;
   letterDraftDirty = false;
@@ -1055,7 +1083,7 @@ function cancelLetterEditing() {
 window.cancelLetterEditing = cancelLetterEditing;
 
 function editLetterFromSecretariat(letterId) {
-  if ((editingLetterId || letterDraftDirty) && !confirm("تغییرات پیش‌نویس فعلی ذخیره نشده است. با باز کردن نامه دیگر، این تغییرات کنار گذاشته می‌شود. ادامه می‌دهید؟")) return false;
+  if (!confirmDiscardLetterChanges("با باز کردن نامهٔ بایگانی، ویرایش فعلی کنار گذاشته می‌شود.")) return false;
   var letter = findSecretariatLetter(letterId);
   if (!letter) {
     showToastMsg("نامه انتخاب‌شده در دفتر اندیکاتور پیدا نشد.", true);
@@ -1151,7 +1179,7 @@ function renderSinglePreviewSheet(letterObj, forcedPaperSize) {
 window.renderSinglePreviewSheet = renderSinglePreviewSheet;
 
 function previewSavedLetter(letterId, forcedPaperSize) {
-  if ((editingLetterId || letterDraftDirty) && !confirm("پیش‌نویس ویرایشگر ذخیره نشده است. با باز کردن نامه بایگانی، پیش‌نویس کنار گذاشته می‌شود. ادامه می‌دهید؟")) return false;
+  if (!confirmDiscardLetterChanges("با باز کردن نامهٔ بایگانی، ویرایش فعلی کنار گذاشته می‌شود.")) return false;
   var letter = findSecretariatLetter(letterId);
   if (!letter) {
     showToastMsg("نامه انتخاب‌شده در دفتر اندیکاتور پیدا نشد.", true);
@@ -1512,6 +1540,12 @@ window.toggleUtmInPreviewSheet = function() {
     showToastMsg("ذخیره تغییر وضعیت پیوست مختصات ناموفق بود.", true);
     return false;
   }
+  if (isDraft) {
+    paperPreviewDirty = true;
+    letterDraftDirty = true;
+  } else {
+    paperPreviewDirty = false;
+  }
   renderLetterPreviewObject(letter, currentPaperSize, isDraft ? "LETTER_DRAFT" : "LETTER");
   showToastMsg(hasCoordinates ? "برگه پیوست مختصات به نامه اضافه شد." : "پیوست مختصات از نامه حذف شد.");
   return true;
@@ -1624,6 +1658,7 @@ function issueDeficiencyLetterForActiveCase() {
 }
 
 function printOfficialForm(formType) {
+  if (!confirmDiscardLetterChanges("با آماده‌سازی فرم رسمی، پیش‌نمایش یا ویرایش نامه جایگزین می‌شود.")) return false;
   var c = getActiveCase();
   if (!c) {
     requireActiveCase("چاپ فرم رسمی برای پرونده", function () { printOfficialForm(formType); });
@@ -3707,6 +3742,7 @@ window.setCroquisPrintFocusLayer = function(layerId) {
 
 /* چاپ رسمی کروکی چندلایه زمین به تفکیک ۲ برگه مجزا (برگه اول: نقشه ماهواره‌ای با ابزار تعاملی برش کادر و برگه دوم: جداول مساحت و مختصات کامل X, Y, ارتفاع, Zone) */
 function printUtmSketchSheet() {
+  if (currentPreviewMode !== "CROQUIS" && !confirmDiscardLetterChanges("با آماده‌سازی کروکی، پیش‌نمایش یا ویرایش نامه جایگزین می‌شود.")) return false;
   var c = getActiveCase();
   if (!c) {
     requireActiveCase("چاپ برگه کروکی مهندسی زمین", function () { printUtmSketchSheet(); });
