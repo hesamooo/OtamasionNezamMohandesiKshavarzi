@@ -870,6 +870,13 @@
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
       }
+      /* عناصر شناور دستیار هرگز نباید وارد پیش‌نمایش یا خروجی چاپ نامه شوند. */
+      #nezam636-agent-launch,
+      #nezam636-agent-v2-panel,
+      #nezam636-field-guide-toggle,
+      #nezam636-field-guide-panel {
+        display: none !important;
+      }
     }
   </style>
   <style id="nezam-visual-refresh-2026">
@@ -4919,7 +4926,7 @@
 </style>
 
   <script src="./nezam-operations.js?v=20261101-security-r1"></script>
-  <script src="./nezam-agent-engine.js?v=20261102-agent-v2-r4"></script>
+  <script src="./nezam-agent-engine.js?v=20261102-agent-v2-r5"></script>
   <script src="./nezam-agent-knowledge.js?v=20261101-agent-knowledge-r4"></script>
   <script src="./nezam-rule-advisor.js?v=20261101-rule-advisor-r2"></script>
   <script src="./nezam-agent-field-guide.js?v=20261102-field-guide-r3"></script>
