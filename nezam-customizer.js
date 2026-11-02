@@ -860,6 +860,8 @@ window.startIndependentOfficeLetter = function() {
   if (alertEl) alertEl.style.display = "none";
   updateLetterScopeUI();
   updatePaperActionButtons();
+  var recipientInput = document.getElementById("l-recipient");
+  if (recipientInput) recipientInput.focus();
   showToastMsg("فرم نامه مستقل دفتر آماده است؛ نام ارگان مقصد و متن نامه را وارد کنید.");
   return true;
 };
@@ -1183,7 +1185,7 @@ window.savePaperEditsToSecretariat = function(options) {
     includeUtm: includeUtm,
     // وقتی پیوست از برگه حذف شده، HTML قدیمی نباید به‌عنوان پیوست مخفی در رکورد بماند.
     utmAttachmentHtml: includeUtm ? appendixHtml : "",
-    croquisMapId: base.croquisMapId || activeCroquisMapId || ""
+    croquisMapId: officeLetter ? "" : (base.croquisMapId || activeCroquisMapId || "")
   });
   var wasNew = draftMode && !existingId;
   if (wasNew) updated.id = "L-" + Date.now() + "-" + Math.random().toString(36).slice(2, 7);
@@ -1303,7 +1305,7 @@ window.downloadPaperSheetFile = function(forcedSize) {
   }
   // دانلود HTML به‌تنهایی هیچ رکوردی در دفتر اندیکاتور ایجاد یا ویرایش نمی‌کند.
   var pSize = currentPaperSize || "A4";
-  var c = getActiveCase();
+  var c = window.__nezamOfficeLetterDraftMode === true ? null : getActiveCase();
   var title = "برگه رسمی " + pSize + " - مرکز خدمات ۶۳۶ خفر";
   var docHtml = '<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
     '<title>' + safeHtmlText(title) + '</title><style>' + buildPaperExportCss(pSize, false) +
@@ -1311,7 +1313,7 @@ window.downloadPaperSheetFile = function(forcedSize) {
   var objectUrl = URL.createObjectURL(new Blob([docHtml], { type: "text/html;charset=utf-8" }));
   var a = document.createElement("a");
   a.href = objectUrl;
-  a.download = "Sheet_" + pSize + "_" + safePaperFileBase(c && c.name) + ".html";
+  a.download = "Sheet_" + pSize + "_" + safePaperFileBase(c && c.name || (window.__nezamOfficeLetterDraftMode === true ? "Daftar" : "")) + ".html";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -4633,7 +4635,7 @@ function exportStageToWordDoc() {
   }
   // خروجی Word فقط فایل می‌سازد؛ ثبت رسمی نامه باید جداگانه تأیید شود.
   var pSize = currentPaperSize || "A4";
-  var c = getActiveCase();
+  var c = window.__nezamOfficeLetterDraftMode === true ? null : getActiveCase();
   var firstPage = stage.querySelector(".a4-page");
   var numberEl = firstPage && firstPage.querySelector(".paper-meta-num");
   var number = numberEl ? numberEl.innerText.trim() : "Letter";
@@ -4644,7 +4646,7 @@ function exportStageToWordDoc() {
   var objectUrl = URL.createObjectURL(new Blob(["\ufeff", html], { type: "application/msword;charset=utf-8" }));
   var a = document.createElement("a");
   a.href = objectUrl;
-  a.download = "Nameh_" + pSize + "_" + safePaperFileBase(c && c.name) + "_" + safePaperFileBase(number) + ".doc";
+  a.download = "Nameh_" + pSize + "_" + safePaperFileBase(c && c.name || (window.__nezamOfficeLetterDraftMode === true ? "Daftar" : "")) + "_" + safePaperFileBase(number) + ".doc";
   document.body.appendChild(a);
   a.click();
   a.remove();
