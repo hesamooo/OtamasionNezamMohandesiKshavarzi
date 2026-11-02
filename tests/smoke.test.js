@@ -241,7 +241,7 @@ test('form and secretariat print engine keeps paper geometry, binder padding, an
   assert.ok(customizer.includes('letterPageIndex === 0 ? "letter" : "letter-appendix"'));
   assert.ok(html.includes('main {\n        width: 100% !important;\n        max-width: none !important;\n        margin: 0 !important;\n        padding: 0 !important;'));
   assert.ok(html.includes('.a4-page[data-page-kind="binder-label"] {\n        padding: 15mm !important;'));
-  assert.ok(html.includes('nezam-customizer.js?v=20261102-print-engine-r8'));
+  assert.ok(html.includes('nezam-customizer.js?v=20261102-print-engine-r10'));
 });
 
 
@@ -269,4 +269,34 @@ test('letter printing and exports do not silently register archive entries', () 
   assert.match(html, /onclick="printCurrentLetterDraft\('A5'\)"/);
   assert.match(html, /onclick="saveLetterToSecretariat\(false\)">ثبت در دبیرخانه/);
   assert.match(html, /فقط نامه‌های ثبت‌شده نمایش داده می‌شوند؛ چاپ و دانلود به‌تنهایی سابقه ایجاد نمی‌کند/);
+});
+
+
+test('standalone office correspondence is available without an applicant', () => {
+  const customizer = read('nezam-customizer.js');
+  const core = read('nezam-core.js');
+  const html = read('index.html');
+
+  assert.match(customizer, /window\.startIndependentOfficeLetter = function\(\)/);
+  assert.match(customizer, /window\.__nezamOfficeLetterDraftMode === true/);
+  assert.match(customizer, /if \(!c && !officeMode\) return null/);
+  assert.match(customizer, /caseId: officeMode \? "" : c\.id/);
+  assert.match(customizer, /officeLetter: officeMode/);
+  assert.match(customizer, /var c = officeMode \? null : getActiveCase\(\)/);
+  assert.match(customizer, /if \(c\) \{\s*logCaseAction\(c,/);
+  assert.match(customizer, /var officeLetter = base\.officeLetter === true/);
+  assert.match(customizer, /var caseObj = officeLetter \? null/);
+  assert.match(customizer, /var isOfficeLetter = letter\.officeLetter === true/);
+
+  const switcher = core.slice(core.indexOf('function switchMainPane'), core.indexOf('\nfunction switchCaseSubTab'));
+  assert.doesNotMatch(switcher, /"pane-letters"\s*:/);
+  assert.match(switcher, /paneId === "pane-print" && independentOfficeLetterFlow/);
+  assert.match(core, /l\.officeLetter === true[\s\S]*نامه اداری مستقل دفتر/);
+  assert.match(core, /مکاتبات مستقل دفتر را می‌توان از مسیر «نامه اداری مستقل دفتر»/);
+
+  assert.match(html, /id="btn-letter-case-mode"[^>]*onclick="startCaseLinkedLetter\(\)"/);
+  assert.match(html, /id="btn-letter-office-mode"[^>]*onclick="startIndependentOfficeLetter\(\)"/);
+  assert.match(html, /<th>گیرنده \/ ارتباط با پرونده<\/th>/);
+  assert.match(html, /nezam-core\.js\?v=20261102-parcel-r4/);
+  assert.match(html, /nezam-customizer\.js\?v=20261102-print-engine-r10/);
 });
