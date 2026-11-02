@@ -1740,11 +1740,15 @@
               <input type="text" id="c-water" class="form-control form-control-sm" />
             </div>
 
-            <div class="col-md-4 mb-2">
+            <div class="col-md-3 mb-2">
               <label class="small fw-bold" for="c-loc">موقعیت اراضی (شهرستان / بخش / روستا):</label>
               <input type="text" id="c-loc" class="form-control form-control-sm" />
             </div>
-            <div class="col-md-4 mb-2">
+            <div class="col-md-2 mb-2">
+              <label class="small fw-bold" for="c-land-parcel">پلاک ثبتی زمین (اصلی / فرعی):</label>
+              <input type="text" id="c-land-parcel" class="form-control form-control-sm" placeholder="مثال: ۱۸۴ فرعی از ۱۲ اصلی" />
+            </div>
+            <div class="col-md-3 mb-2">
               <label class="small fw-bold" for="c-subarea">تفکیک زیربنای مسقف و محوطه:</label>
               <input type="text" id="c-subarea" class="form-control form-control-sm" />
             </div>
@@ -2966,8 +2970,8 @@
   <div id="smart-mouse-tooltip"></div>
 
   <!-- ماژول‌های اصلی اتوماسیون مرکز خدمات ۶۳۶ خفر -->
-  <script src="./nezam-core.js?v=20261101-security-r3"></script>
-  <script src="./nezam-customizer.js?v=20261101-security-r3"></script>
+  <script src="./nezam-core.js?v=20261102-parcel-r1"></script>
+  <script src="./nezam-customizer.js?v=20261102-archive-print-r1"></script>
   <script src="./nezam-ai-assistant.js?v=20261101-security-r3"></script>
 
   <!-- ماژول اصلاح‌شده و دوطرفه اتصال سامانه ۶۳۶ خفر به گوگل درایو (ذخیره و بازخوانی ۱۰۰٪ اطلاعات) -->
@@ -3214,6 +3218,7 @@
         project: val('c-project'),
         cap: val('c-cap'),
         land: val('c-land'),
+        landParcel: val('c-land-parcel'),
         water: val('c-water'),
         loc: val('c-loc'),
         subarea: val('c-subarea'),
@@ -3234,6 +3239,7 @@
         'عنوان طرح: ' + (val('c-project') || completeCaseObject.project || '---'),
         'ظرفیت: ' + (val('c-cap') || completeCaseObject.cap || '---'),
         'مساحت زمین (مترمربع): ' + (val('c-land') || completeCaseObject.land || '---'),
+        'پلاک ثبتی زمین: ' + (val('c-land-parcel') || completeCaseObject.landParcel || '---'),
         'نیاز آبی (لیتر/شبانه‌روز): ' + (val('c-water') || completeCaseObject.water || '---'),
         'تفکیک عرصه: ' + (val('c-subarea') || completeCaseObject.subarea || '---'),
         'موقعیت اراضی: ' + (val('c-loc') || completeCaseObject.loc || '---'),
@@ -3267,6 +3273,7 @@
         projectTitle: val('c-project') || completeCaseObject.project,
         capacity: val('c-cap') || completeCaseObject.cap,
         landArea: val('c-land') || completeCaseObject.land,
+        landParcel: val('c-land-parcel') || completeCaseObject.landParcel,
         waterNeed: val('c-water') || completeCaseObject.water,
         location: val('c-loc') || completeCaseObject.loc,
         subArea: val('c-subarea') || completeCaseObject.subarea,
@@ -4925,8 +4932,8 @@
 }
 </style>
 
-  <script src="./nezam-operations.js?v=20261101-security-r1"></script>
-  <script src="./nezam-agent-engine.js?v=20261102-agent-v2-r5"></script>
+  <script src="./nezam-operations.js?v=20261102-parcel-r1"></script>
+  <script src="./nezam-agent-engine.js?v=20261102-agent-v2-r6"></script>
   <script src="./nezam-agent-knowledge.js?v=20261101-agent-knowledge-r4"></script>
   <script src="./nezam-rule-advisor.js?v=20261101-rule-advisor-r2"></script>
   <script src="./nezam-agent-field-guide.js?v=20261102-field-guide-r3"></script>
