@@ -16,6 +16,7 @@
     pendingFormFill: null,
     pendingLetterDraft: null,
     pendingUiAction: null,
+    controlTargets: Object.create(null),
     currentQuestion: '',
     messages: 0
   };
@@ -266,6 +267,27 @@
       }
     },
     {
+      name: 'prepare_control_value',
+      description: 'پیشنهاد تغییر مقدار هر فیلد قابل ویرایش در صفحه فعال بر اساس شناسه‌ای که get_current_screen_controls داده است. فیلدهای رمز، کدملی، تلفن، کلید API و فایل قابل تغییر نیستند. تغییر فقط پس از تأیید کاربر انجام می‌شود و خودکار ذخیره نمی‌شود.',
+      parameters: {
+        type: 'OBJECT',
+        properties: {
+          control_id: { type: 'STRING', description: 'شناسه واقعی فیلد از نقشه صفحه' },
+          value: { type: 'STRING', description: 'مقدار پیشنهادی دقیق' }
+        },
+        required: ['control_id','value']
+      }
+    },
+    {
+      name: 'prepare_control_action',
+      description: 'آماده‌سازی کلیک روی یک دکمه امن در صفحه فعال، با استفاده از شناسه آن در نقشه صفحه. عملیات حذف، ذخیره/ثبت نهایی، ارسال، چاپ، آپلود و همگام‌سازی از این مسیر مجاز نیستند. اجرا فقط پس از تأیید صریح کاربر است.',
+      parameters: {
+        type: 'OBJECT',
+        properties: { control_id: { type: 'STRING', description: 'شناسه دکمه از نقشه صفحه' } },
+        required: ['control_id']
+      }
+    },
+    {
       name: 'get_active_workflow_context',
       description: 'خواندن یکپارچه پرونده فعال و ارتباط اجزای فرایند: فعالیت، ضرایب محاسبات داخلی، فیلدهای ثبت‌شده، مدارک اجباری و دریافتی، وضعیت ۷ استعلام، کروکی‌ها، نامه‌ها، پیگیری‌ها و قطعه‌های مرتبط مخزن دانش. برای ممیزی یا ادامه هر فرایند پرونده استفاده شود. نیازمند اجازه پرونده است.',
       parameters: { type: 'OBJECT', properties: {} }
@@ -413,13 +435,17 @@
     var active = subpane || pane;
     var heading = active && active.querySelector('h1,h2,h3,h4,h5,h6,strong');
     var controls = [];
+    state.controlTargets = Object.create(null);
     if (active) {
       var nodes = active.querySelectorAll('input:not([type="hidden"]),select,textarea,button,[role="button"],a[href]');
-      for (var i = 0; i < nodes.length && controls.length < 70; i++) {
+      for (var i = 0; i < nodes.length && controls.length < 90; i++) {
         var el = nodes[i];
         if (!el.getClientRects().length) continue;
         var hiddenSub = el.closest('.case-subpane:not(.active)');
         if (hiddenSub) continue;
+        if (!el.id && !el.getAttribute('data-agent-control-id')) el.setAttribute('data-agent-control-id', 'AGENT-CONTROL-' + controls.length);
+        var controlId = String(el.id || el.getAttribute('data-agent-control-id') || '');
+        state.controlTargets[controlId] = el;
         var box = el.closest('.row,.card-clean,.workflow-law-strip,.inquiry-hub-banner,.input-group') || el.parentElement;
         var groupTitle = box && box.querySelector('label,strong,h4,h5,h6');
         var tag = el.tagName.toLowerCase();
@@ -428,13 +454,15 @@
         var functionNames = handler.match(/[A-Za-z_$][\w$]*(?=\s*\()/g) || [];
         controls.push({
           kind: kind,
-          id: String(el.id || ''),
+          id: controlId,
           label: labelForControl(el).slice(0, 130),
           group: String(groupTitle ? groupTitle.innerText || groupTitle.textContent : '').replace(/\s+/g, ' ').trim().slice(0, 100),
           tag: tag,
           type: String(el.type || ''),
           action_functions: functionNames.slice(0, 5),
-          disabled: Boolean(el.disabled)
+          data_actions: Array.prototype.slice.call(el.attributes || []).filter(function (a) { return /^data-/.test(a.name) && a.name !== 'data-agent-control-id'; }).slice(0, 8).map(function (a) { return a.name + '=' + String(a.value).slice(0, 60); }),
+          disabled: Boolean(el.disabled),
+          current_value_present: /^(input|select|textarea)$/.test(tag) && !/(nid|mobile|phone|password|api.?key|token)/i.test(String(el.id || el.name || '')) ? Boolean(String(el.value || '').trim()) : undefined
         });
       }
     }
@@ -643,6 +671,79 @@
       clean[key] = str;
     });
     return clean;
+  }
+
+  function getControlByAgentId(controlId) {
+    var id = String(controlId || '');
+    return document.getElementById(id) || state.controlTargets[id] || null;
+  }
+  function isControlInActiveScreen(el) {
+    if (!el || !el.isConnected || !el.getClientRects().length) return false;
+    var activePane = document.querySelector('.sec-pane.active');
+    if (!activePane || !activePane.contains(el)) return false;
+    var inactiveSub = el.closest('.case-subpane:not(.active)');
+    if (inactiveSub) return false;
+    var inactiveCaseTab = el.closest('.case-subpane');
+    if (inactiveCaseTab && !inactiveCaseTab.classList.contains('active')) return false;
+    return true;
+  }
+  function isProtectedControl(el) {
+    return /(nid|national|mobile|phone|tel|password|api.?key|token|secret|file)/i.test(
+      String(el && (el.id || el.name || el.type) || '')
+    );
+  }
+  function prepareControlValue(controlId, value) {
+    if (state.pendingUiAction) throw new Error('یک اقدام رابط هنوز تعیین تکلیف نشده است.');
+    var el = getControlByAgentId(controlId);
+    if (!isControlInActiveScreen(el)) throw new Error('فیلد در صفحه فعال پیدا نشد؛ ابتدا نقشه صفحه را دوباره دریافت کن.');
+    if (el.disabled || el.readOnly || isProtectedControl(el)) throw new Error('این فیلد غیرفعال، فقط‌خواندنی یا حساس است و از طریق عامل تغییر نمی‌کند.');
+    if (!/^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName)) throw new Error('کنترل انتخاب‌شده فیلد متنی یا انتخابی نیست.');
+    if (el.tagName === 'INPUT' && /^(hidden|password|file|radio|submit|button|reset|image|checkbox)$/i.test(el.type || '')) {
+      throw new Error('نوع این فیلد برای تغییر مستقیم پشتیبانی نمی‌شود.');
+    }
+    var nextValue = String(value == null ? '' : value).trim();
+    if (nextValue.length > 5000) throw new Error('مقدار پیشنهادی بیش از حد طولانی است.');
+    if (el.required && !nextValue) throw new Error('این فیلد اجباری است و نمی‌تواند خالی شود.');
+    if (el.tagName === 'SELECT') {
+      var option = Array.prototype.find.call(el.options || [], function (o) {
+        return normalizeText(o.value) === normalizeText(nextValue) || normalizeText(o.text) === normalizeText(nextValue);
+      });
+      if (!option) throw new Error('مقدار انتخابی باید دقیقاً با یکی از گزینه‌های فهرست مطابقت داشته باشد.');
+      nextValue = option.value;
+    }
+    state.pendingUiAction = {
+      kind: 'set_value',
+      controlId: String(controlId),
+      value: nextValue,
+      oldValue: String(el.value || '').slice(0, 250),
+      label: labelForControl(el) || String(el.id || controlId),
+      controlType: el.tagName.toLowerCase()
+    };
+    return { prepared: true, requires_user_confirmation: true, field: state.pendingUiAction.label, proposed_value: nextValue };
+  }
+  function prepareControlAction(controlId) {
+    if (state.pendingUiAction) throw new Error('یک اقدام رابط هنوز تعیین تکلیف نشده است.');
+    var el = getControlByAgentId(controlId);
+    if (!isControlInActiveScreen(el)) throw new Error('دکمه در صفحه فعال پیدا نشد؛ ابتدا نقشه صفحه را دوباره دریافت کن.');
+    if (el.disabled || el.getAttribute('aria-disabled') === 'true') throw new Error('این دکمه غیرفعال است.');
+    if (!(el.tagName === 'BUTTON' || el.tagName === 'A' || el.getAttribute('role') === 'button')) {
+      throw new Error('کنترل انتخاب‌شده دکمه یا عملیات قابل کلیک نیست.');
+    }
+    if (el.tagName === 'BUTTON' && String(el.type || '').toLowerCase() === 'submit') {
+      throw new Error('کلیک مستقیم روی دکمه ارسال فرم مجاز نیست.');
+    }
+    var label = labelForControl(el) || String(el.id || controlId);
+    var handler = String(el.getAttribute('onclick') || '') + ' ' + String(el.getAttribute('data-action') || '') + ' ' + String(el.id || '');
+    var dangerous = /(delete|remove|save|submit|send|issue|print|upload|sync|archive|approve|confirm|clear|reset|export|حذف|پاک|ذخیره|ثبت|ارسال|صدور|چاپ|بارگذاری|آپلود|همگام|بایگانی|تأیید)/i;
+    if (dangerous.test(label) || dangerous.test(handler)) {
+      throw new Error('این دکمه عملیات حساس یا نهایی دارد؛ از تأیید مستقیم آن توسط عامل جلوگیری شد.');
+    }
+    state.pendingUiAction = {
+      kind: 'click_control',
+      controlId: String(controlId),
+      label: label
+    };
+    return { prepared: true, requires_user_confirmation: true, button: label };
   }
 
   async function executeTool(name, args) {
@@ -954,6 +1055,13 @@
         due_date: state.pendingTask.due || 'تعیین نشده',
         message: 'پیشنهاد آماده شد؛ هنوز در سامانه ذخیره نشده است. کاربر باید در پنجره عامل روی تأیید ثبت پیگیری کلیک کند.'
       };
+    }
+
+    if (name === 'prepare_control_value') {
+      return prepareControlValue(args.control_id, args.value);
+    }
+    if (name === 'prepare_control_action') {
+      return prepareControlAction(args.control_id);
     }
 
     if (name === 'get_active_workflow_context') {
@@ -1362,7 +1470,8 @@
     var card = document.createElement('div');
     card.className = 'agent-pending';
     card.id = 'nezam636-agent-ui-action';
-    card.innerHTML = '<b>اقدام آماده اجرا</b><div class="small mt-1">' + escapeHtml(p.label) +
+    var detail = p.kind === 'set_value' ? '<div><b>مقدار قبلی:</b> ' + escapeHtml(p.oldValue || 'خالی') + '</div><div><b>مقدار پیشنهادی:</b> ' + escapeHtml(p.value) + '</div>' : (p.kind === 'click_control' ? '<div>اجرای دکمه انتخاب‌شده پس از تأیید.</div>' : '');
+    card.innerHTML = '<b>اقدام آماده اجرا</b><div class="small mt-1">' + escapeHtml(p.label) + detail +
       '</div><button type="button" class="agent-confirm" id="nezam636-agent-ui-confirm">تأیید و اجرا</button>' +
       '<button type="button" class="agent-cancel" id="nezam636-agent-ui-cancel">لغو</button>';
     host.appendChild(card);
@@ -1373,6 +1482,44 @@
   function confirmPendingUiAction() {
     var p = state.pendingUiAction;
     if (!p) return;
+    if (p.kind === 'set_value') {
+      var targetField = getControlByAgentId(p.controlId);
+      if (!isControlInActiveScreen(targetField) || targetField.disabled || targetField.readOnly || isProtectedControl(targetField)) {
+        addMessage('system','فیلد دیگر معتبر یا در دسترس نیست؛ تغییری اعمال نشد.');
+        cancelPendingUiAction();
+        return;
+      }
+      if (targetField.tagName === 'SELECT') {
+        var exactOption = Array.prototype.find.call(targetField.options || [], function (o) { return o.value === p.value; });
+        if (!exactOption) { addMessage('system','گزینه پیشنهادی دیگر در فهرست نیست؛ تغییری اعمال نشد.'); cancelPendingUiAction(); return; }
+        targetField.value = p.value;
+      } else {
+        targetField.value = p.value;
+      }
+      targetField.dispatchEvent(new Event('input', { bubbles:true }));
+      targetField.dispatchEvent(new Event('change', { bubbles:true }));
+      if (targetField.id === 'c-main-group' && typeof window.onMainGroupChangedInForm === 'function') window.onMainGroupChangedInForm();
+      else if (targetField.id === 'c-entity-type' && typeof window.onEntityTypeChangedInForm === 'function') window.onEntityTypeChangedInForm();
+      else if ((targetField.id === 'c-count' || targetField.id === 'c-act-type') && typeof window.recalcCaseSpecsFromHeadcount === 'function') window.recalcCaseSpecsFromHeadcount();
+      addMessage('system','مقدار فیلد در صفحه قرار گرفت؛ هنوز ذخیره نهایی نشده است.');
+      var valueCard = byId('nezam636-agent-ui-action'); if (valueCard) valueCard.remove();
+      state.pendingUiAction = null;
+      return;
+    }
+    if (p.kind === 'click_control') {
+      var targetButton = getControlByAgentId(p.controlId);
+      if (!isControlInActiveScreen(targetButton) || targetButton.disabled) {
+        addMessage('system','دکمه دیگر در دسترس نیست؛ اجرا نشد.');
+        cancelPendingUiAction();
+        return;
+      }
+      targetButton.click();
+      var actionCard = byId('nezam636-agent-ui-action'); if (actionCard) actionCard.remove();
+      state.pendingUiAction = null;
+      addMessage('system','کلیک روی دکمه انجام شد؛ نتیجه عملیات را در خود سامانه بررسی کن.');
+      return;
+    }
+
     var action = p.action;
     var paneMap = {
       open_case_form: ['pane-cases','sub-info'],
