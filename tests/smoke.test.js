@@ -300,5 +300,5 @@ test('standalone office correspondence is available without an applicant', () =>
   assert.match(html, /id="btn-letter-office-mode"[^>]*onclick="startIndependentOfficeLetter\(\)"/);
   assert.match(html, /<th>گیرنده \/ ارتباط با پرونده<\/th>/);
   assert.match(html, /nezam-core\.js\?v=20261102-parcel-r4/);
-  assert.match(html, /nezam-customizer\.js\?v=20261102-print-engine-r10/);
+  assert.match(html, /nezam-customizer\.js\?v=20261102-print-engine-r11/);
 });
