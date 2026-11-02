@@ -529,6 +529,16 @@
         parameters: { type: 'OBJECT', properties: { case_id: { type: 'STRING' } }, required: ['case_id'] }
       },
       {
+        name: 'prepare_inquiry_status',
+        description: 'پیشنهاد تغییر وضعیت یکی از هفت استعلام پرونده به ارسال نشده، منتظر پاسخ، موافقت یا مخالفت/نقص. با تأیید کاربر ذخیره می‌شود و سوابق ثبت می‌گردد.',
+        parameters: { type: 'OBJECT', properties: {
+          case_id: { type: 'STRING' },
+          agency: { type: 'STRING', enum: ['water','elec','road','gas','env','natres','vet'] },
+          status: { type: 'STRING', enum: ['NONE','WAIT','OK','REJ'] },
+          note: { type: 'STRING' }
+        }, required: ['case_id','agency','status'] }
+      },
+      {
         name: 'get_case_checklist',
         description: 'دریافت چک‌لیست مدارک موردنیاز و وضعیت دریافت آن برای پرونده مشخص. به اجازه پرونده نیاز دارد.',
         parameters: { type: 'OBJECT', properties: { case_id: { type: 'STRING' } }, required: ['case_id'] }
@@ -701,6 +711,26 @@
       if (typeof window.selectActiveCase !== 'function') throw new Error('تابع انتخاب پرونده در سامانه موجود نیست.');
       window.selectActiveCase(selected.id);
       return { success: true, selected_case_id: String(selected.id), applicant: String(selected.name || '') };
+    }
+    if (name === 'prepare_inquiry_status') {
+      requireConsent();
+      var ic = findCase(args.case_id);
+      if (!ic) throw new Error('پرونده موردنظر پیدا نشد.');
+      var agency = String(args.agency || '');
+      var desired = String(args.status || '').toUpperCase();
+      var order = ['NONE','WAIT','OK','REJ'];
+      if (!Object.prototype.hasOwnProperty.call(INQUIRIES, agency)) throw new Error('کلید اداره برای استعلام معتبر نیست.');
+      if (order.indexOf(desired) < 0) throw new Error('وضعیت استعلام معتبر نیست.');
+      var current = String((ic.inquiries || {})[agency] || 'NONE').toUpperCase();
+      if (order.indexOf(current) < 0) current = 'NONE';
+      var agencyNames = { water:'امور آب', elec:'اداره برق', road:'راهداری', gas:'شرکت گاز', env:'محیط زیست', natres:'منابع طبیعی', vet:'دامپزشکی' };
+      var statusNames = { NONE:'ارسال نشده', WAIT:'منتظر پاسخ', OK:'موافقت شد', REJ:'مخالفت/نقص' };
+      return setPending({
+        type: 'inquiry', caseId: ic.id, agency: agency, status: desired,
+        label: 'تغییر وضعیت استعلام ' + agencyNames[agency],
+        summary: 'پرونده: ' + String(ic.name || ic.code || ic.id) + '\nوضعیت فعلی: ' + statusNames[current] + '\nوضعیت پیشنهادی: ' + statusNames[desired] +
+          (trim(args.note) ? '\nیادداشت: ' + trim(args.note).slice(0,300) : '')
+      });
     }
     if (name === 'get_case_checklist') {
       requireConsent();
@@ -1135,6 +1165,30 @@
         window.recalcCaseSpecsFromHeadcount();
         refreshCaseViews();
         addMessage('system', 'محاسبات داخلی اجرا شد. مقدارهای محاسبه‌شده باید با ضوابط موجود در مخزن دانش تطبیق داده شوند؛ این محاسبات به‌تنهایی مبنای قانونی نیستند.');
+      } else if (p.type === 'inquiry') {
+        var inquiryCase = findCase(p.caseId);
+        if (!inquiryCase) throw new Error('پرونده مربوط به استعلام دیگر موجود نیست.');
+        if (!inquiryCase.inquiries) inquiryCase.inquiries = {};
+        var inquiryOrder = ['NONE','WAIT','OK','REJ'];
+        var currentStatus = String(inquiryCase.inquiries[p.agency] || 'NONE').toUpperCase();
+        var currentIndex = inquiryOrder.indexOf(currentStatus);
+        var targetIndex = inquiryOrder.indexOf(p.status);
+        if (targetIndex < 0) throw new Error('وضعیت پیشنهادی استعلام نامعتبر است.');
+        if (currentIndex < 0) currentIndex = 0;
+        var steps = 0;
+        while (currentIndex !== targetIndex && steps < 4) {
+          if (typeof window.toggleCaseInquiryStatus !== 'function') throw new Error('تابع ثبت وضعیت استعلام در سامانه موجود نیست.');
+          window.toggleCaseInquiryStatus(inquiryCase.id, p.agency);
+          inquiryCase = findCase(p.caseId);
+          currentStatus = String((inquiryCase.inquiries || {})[p.agency] || 'NONE').toUpperCase();
+          currentIndex = inquiryOrder.indexOf(currentStatus);
+          if (currentIndex < 0) throw new Error('وضعیت استعلام پس از اجرا قابل تشخیص نیست.');
+          steps++;
+        }
+        if (currentIndex !== targetIndex) throw new Error('وضعیت استعلام به مقدار درخواستی تغییر نکرد.');
+        if (typeof window.renderUnifiedCasesMatrix === 'function') window.renderUnifiedCasesMatrix();
+        if (typeof window.renderActiveCaseHistory === 'function') window.renderActiveCaseHistory();
+        addMessage('system', 'وضعیت استعلام ' + esc(INQUIRIES[p.agency]) + ' به‌روزرسانی شد: ' + esc(p.status) + ' .');
       } else if (p.type === 'task') {
         if (!findCase(p.caseId)) throw new Error('پرونده پیگیری دیگر وجود ندارد.');
         if (!Array.isArray(window.tasksDB)) window.tasksDB = [];
