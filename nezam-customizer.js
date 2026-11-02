@@ -981,7 +981,11 @@ window.downloadPaperSheetFile = function(forcedSize) {
       return false;
     }
   }
-  autoFitPaperContent(stage);
+  var fitResult = autoFitPaperContent(stage);
+  if ((currentPreviewMode === "LETTER" || currentPreviewMode === "LETTER_DRAFT") && fitResult.overflowCount) {
+    showToastMsg("خروجی HTML ساخته نشد؛ بخشی از نامه در محدوده صفحه جا نمی‌شود. متن را کوتاه یا A4 انتخاب کنید.", true);
+    return false;
+  }
   var pSize = currentPaperSize || "A4";
   var c = getActiveCase();
   var title = "برگه رسمی " + pSize + " - مرکز خدمات ۶۳۶ خفر";
@@ -1127,6 +1131,10 @@ function previewSavedLetter(letterId, forcedPaperSize) {
   var linkedCase = (Array.isArray(window.casesDB) ? window.casesDB : []).find(function (item) {
     return item && String(item.id) === String(letter.caseId);
   });
+  if (!linkedCase) {
+    showToastMsg("پرونده مرتبط با نامه پیدا نشد؛ پیش‌نمایش برای جلوگیری از نمایش مختصات پرونده اشتباه متوقف شد.", true);
+    return false;
+  }
   if (linkedCase) {
     activeCaseId = linkedCase.id;
     activeCroquisMapId = letter.croquisMapId || "";
@@ -4135,7 +4143,11 @@ function exportStageToWordDoc() {
       return false;
     }
   }
-  autoFitPaperContent(stage);
+  var fitResult = autoFitPaperContent(stage);
+  if ((currentPreviewMode === "LETTER" || currentPreviewMode === "LETTER_DRAFT") && fitResult.overflowCount) {
+    showToastMsg("خروجی Word ساخته نشد؛ بخشی از نامه در محدوده صفحه جا نمی‌شود. متن را کوتاه یا A4 انتخاب کنید.", true);
+    return false;
+  }
   var pSize = currentPaperSize || "A4";
   var c = getActiveCase();
   var firstPage = stage.querySelector(".a4-page");
