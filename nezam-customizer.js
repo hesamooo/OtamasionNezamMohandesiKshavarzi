@@ -246,7 +246,7 @@ function applyDynamicPrintPageSizeCSS(size) {
 }
 
 function hasUnsavedLetterChanges() {
-  return !!(editingLetterId || letterDraftDirty || paperPreviewDirty);
+  return !!(letterDraftDirty || paperPreviewDirty);
 }
 
 function confirmDiscardLetterChanges(actionLabel) {
@@ -1652,13 +1652,13 @@ window.insertLetterTable = function() {
 };
 
 function issueDeficiencyLetterForActiveCase() {
-  if (!confirmDiscardLetterChanges("با ساخت اخطاریه جدید، پیش‌نویس یا ویرایش فعلی کنار گذاشته می‌شود.")) return false;
-  clearUnsavedLetterStateAfterConfirmation();
   var c = getActiveCase();
   if (!c) {
     requireActiveCase("صدور ابلاغیه نواقص مدارک", function () { issueDeficiencyLetterForActiveCase(); });
     return;
   }
+  if (!confirmDiscardLetterChanges("با ساخت اخطاریه جدید، پیش‌نویس یا ویرایش فعلی کنار گذاشته می‌شود.")) return false;
+  clearUnsavedLetterStateAfterConfirmation();
   var sp = ACT_SPECS[c.actType] || ACT_SPECS.sheep_high;
   var reqDocs = DOC_CHECKLISTS[sp.docGroup || "LIVESTOCK"] || DOC_CHECKLISTS.LIVESTOCK;
 
@@ -1699,13 +1699,13 @@ function issueDeficiencyLetterForActiveCase() {
 }
 
 function printOfficialForm(formType) {
-  if (!confirmDiscardLetterChanges("با آماده‌سازی فرم رسمی، پیش‌نمایش یا ویرایش نامه جایگزین می‌شود.")) return false;
-  clearUnsavedLetterStateAfterConfirmation();
   var c = getActiveCase();
   if (!c) {
     requireActiveCase("چاپ فرم رسمی برای پرونده", function () { printOfficialForm(formType); });
     return;
   }
+  if (!confirmDiscardLetterChanges("با آماده‌سازی فرم رسمی، پیش‌نمایش یا ویرایش نامه جایگزین می‌شود.")) return false;
+  clearUnsavedLetterStateAfterConfirmation();
   currentPreviewMode = "FORM";
   currentPreviewLetterId = null;
   currentPreviewDraft = null;
@@ -3784,14 +3784,14 @@ window.setCroquisPrintFocusLayer = function(layerId) {
 
 /* چاپ رسمی کروکی چندلایه زمین به تفکیک ۲ برگه مجزا (برگه اول: نقشه ماهواره‌ای با ابزار تعاملی برش کادر و برگه دوم: جداول مساحت و مختصات کامل X, Y, ارتفاع, Zone) */
 function printUtmSketchSheet() {
-  if (currentPreviewMode !== "CROQUIS") {
-    if (!confirmDiscardLetterChanges("با آماده‌سازی کروکی، پیش‌نمایش یا ویرایش نامه جایگزین می‌شود.")) return false;
-    clearUnsavedLetterStateAfterConfirmation();
-  }
   var c = getActiveCase();
   if (!c) {
     requireActiveCase("چاپ برگه کروکی مهندسی زمین", function () { printUtmSketchSheet(); });
     return;
+  }
+  if (currentPreviewMode !== "CROQUIS") {
+    if (!confirmDiscardLetterChanges("با آماده‌سازی کروکی، پیش‌نمایش یا ویرایش نامه جایگزین می‌شود.")) return false;
+    clearUnsavedLetterStateAfterConfirmation();
   }
   var m = getActiveCroquisMap();
   if (!m) return;
