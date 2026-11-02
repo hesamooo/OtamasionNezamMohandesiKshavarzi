@@ -479,6 +479,10 @@ window.setPaperSize = function(size, skipSave) {
 
 window.doPrintPaperSheet = function() {
   if (printRequestActive) return false;
+  if (currentPreviewMode === "EDITOR") {
+    showToastMsg("پیش‌نویس هنوز پیش‌نمایش نشده است؛ ابتدا «پیش‌نمایش پیش‌نویس نامه» را بزنید.", true);
+    return false;
+  }
   var stage = document.getElementById("a4-preview-stage");
   if (!stage || !stage.querySelector(".a4-page")) {
     showToastMsg("هیچ برگه‌ای برای چاپ آماده نیست؛ ابتدا نامه، فرم یا کروکی را پیش‌نمایش بگیرید.", true);
@@ -967,8 +971,8 @@ function safePaperFileBase(value) {
 window.downloadPaperSheetFile = function(forcedSize) {
   if (forcedSize === "A4" || forcedSize === "A5") window.setPaperSize(forcedSize, true);
   var stage = document.getElementById("a4-preview-stage");
-  if (!stage || !stage.querySelector(".a4-page")) {
-    showToastMsg("ابتدا یک نامه، فرم یا کروکی را پیش‌نمایش بگیرید.", true);
+  if (!stage || !stage.querySelector(".a4-page") || currentPreviewMode === "EDITOR") {
+    showToastMsg("ابتدا پیش‌نمایش نامه، فرم یا کروکی را آماده کنید.", true);
     return false;
   }
   if (currentPreviewMode === "LETTER" || currentPreviewMode === "LETTER_DRAFT") {
@@ -1435,6 +1439,44 @@ function splitUtmAttachmentTableHtml(tableHtml, paperSize) {
     return [String(tableHtml)];
   }
 }
+
+window.toggleUtmInPreviewSheet = function() {
+  var isDraft = currentPreviewMode === "LETTER_DRAFT" && !!currentPreviewDraft;
+  var letter = isDraft
+    ? currentPreviewDraft
+    : (currentPreviewMode === "LETTER" ? findSecretariatLetter(currentPreviewLetterId) : null);
+  if (!letter) {
+    showToastMsg("ابتدا یک نامه را پیش‌نمایش بگیرید.", true);
+    return false;
+  }
+  var original = JSON.parse(JSON.stringify(letter));
+  letter.includeUtm = letter.includeUtm !== true;
+  if (letter.includeUtm && !(letter.utmAttachmentHtml || "").trim()) {
+    var caseObj = (Array.isArray(window.casesDB) ? window.casesDB : []).find(function (item) {
+      return item && String(item.id) === String(letter.caseId);
+    }) || getActiveCase();
+    if (letter.croquisMapId) activeCroquisMapId = letter.croquisMapId;
+    letter.utmAttachmentHtml = caseObj
+      ? buildAllSelectedFeaturesUtmTableHTML(caseObj, letter.utm || caseObj.utm || "", (letter.recipient || "").indexOf("منابع طبیعی") !== -1)
+      : "";
+  }
+  var hasCoordinates = letter.includeUtm === true && !!(letter.utmAttachmentHtml && letter.utmAttachmentHtml.trim());
+  if (letter.includeUtm && !hasCoordinates) {
+    Object.assign(letter, original);
+    showToastMsg("برای این پرونده مختصات قابل پیوست پیدا نشد.", true);
+    return false;
+  }
+  letter.attach = getLetterAttachmentLabel(letter.attach, hasCoordinates);
+  if (!isDraft && !persistLetterAndCaseData()) {
+    Object.keys(letter).forEach(function (key) { delete letter[key]; });
+    Object.assign(letter, original);
+    showToastMsg("ذخیره تغییر وضعیت پیوست مختصات ناموفق بود.", true);
+    return false;
+  }
+  renderLetterPreviewObject(letter, currentPaperSize, isDraft ? "LETTER_DRAFT" : "LETTER");
+  showToastMsg(hasCoordinates ? "برگه پیوست مختصات به نامه اضافه شد." : "پیوست مختصات از نامه حذف شد.");
+  return true;
+};
 
 function updatePrintUtmBtnState(isOn) {
   var btn = document.getElementById("btn-toggle-print-utm");
@@ -4083,8 +4125,8 @@ function toggleQrVerificationOnSheets() {
 
 function exportStageToWordDoc() {
   var stage = document.getElementById("a4-preview-stage");
-  if (!stage || !stage.querySelector(".a4-page")) {
-    showToastMsg("ابتدا یک برگه را پیش‌نمایش بگیرید.", true);
+  if (!stage || !stage.querySelector(".a4-page") || currentPreviewMode === "EDITOR") {
+    showToastMsg("ابتدا یک نامه، فرم یا کروکی را پیش‌نمایش بگیرید.", true);
     return false;
   }
   if (currentPreviewMode === "LETTER" || currentPreviewMode === "LETTER_DRAFT") {
