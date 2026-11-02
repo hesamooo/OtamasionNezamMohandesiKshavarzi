@@ -1877,10 +1877,11 @@ function renderSecretariatTable() {
         else showToastMsg("ماژول ویرایش نامه بارگذاری نشده است.", true);
       } else if (action === "a4" || action === "a5") {
         var size = action === "a5" ? "A5" : "A4";
-        if (typeof window.printArchivedLetter === "function") window.printArchivedLetter(id, size);
-        else if (typeof window.previewSavedLetter === "function") {
-          window.previewSavedLetter(id, size);
-          showToastMsg("پیش‌نمایش نامه آماده شد؛ از دکمه چاپ مستقیم استفاده کنید.");
+        if (typeof window.previewSavedLetter === "function") {
+          window.previewSavedLetter(id, size, false);
+          showToastMsg("پیش‌نمایش نامه آماده شد؛ برای حفظ اندازه و مقیاس از دکمه «چاپ مستقیم کاغذ» در صفحه چاپ استفاده کنید.");
+        } else if (typeof window.printArchivedLetter === "function") {
+          window.printArchivedLetter(id, size);
         } else showToastMsg("موتور چاپ نامه بارگذاری نشده است.", true);
       } else if (action === "delete") {
         if (!confirm("آیا از حذف این نامه از دفتر اندیکاتور اطمینان دارید؟")) return;
