@@ -615,6 +615,23 @@ function selectInquiryTemplate(key) {
   return true;
 }
 
+function bindLetterEditorDirtyTracking() {
+  var ids = ["l-direction","l-number","l-date","l-attach","l-recipient","l-include-utm","l-paper-size","l-body"];
+  ids.forEach(function (id) {
+    var el = document.getElementById(id);
+    if (!el || el.dataset.letterDirtyTrackingBound === "1") return;
+    el.dataset.letterDirtyTrackingBound = "1";
+    var markDirty = function () {
+      letterDraftDirty = true;
+      var c = getActiveCase();
+      if (c && !letterDraftCaseId) letterDraftCaseId = c.id;
+    };
+    el.addEventListener("input", markDirty);
+    el.addEventListener("change", markDirty);
+  });
+}
+window.bindLetterEditorDirtyTracking = bindLetterEditorDirtyTracking;
+
 function syncLetterEditorWithActiveCase(force) {
   if (editingLetterId) return true;
   var c = getActiveCase();
@@ -4205,6 +4222,7 @@ function initBrandingAndTemplatesUI() {
   }
   setPaperSize(currentPaperSize, true);
   renderTemplateButtonsInLettersPane();
+  bindLetterEditorDirtyTracking();
   if (currentPreviewMode === "EDITOR") syncLetterEditorWithActiveCase();
   updatePaperActionButtons();
   if (typeof window.initCroquisWorkspaceForActiveCase === "function") {
