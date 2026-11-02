@@ -279,8 +279,8 @@ function bindLetterPreviewDirtyTracking(stage) {
     if (currentPreviewMode !== "LETTER" && currentPreviewMode !== "LETTER_DRAFT") return;
     var target = event.target;
     if (!target || !target.closest || !target.closest('[contenteditable="true"]')) return;
+    // ویرایش داخل پیش‌نمایش فقط وضعیت خود برگه را تغییر می‌دهد؛ فرم اصلی از قبل در Draft snapshot شده است.
     paperPreviewDirty = true;
-    if (currentPreviewMode === "LETTER_DRAFT") letterDraftDirty = true;
   });
 }
 
@@ -645,7 +645,13 @@ window.addEventListener("beforeprint", function() {
   var pages = document.querySelectorAll("#a4-preview-stage .a4-page");
   for (var i = 0; i < pages.length; i++) pages[i].classList.toggle("paper-a5", currentPaperSize === "A5");
 });
-window.addEventListener("afterprint", function() { printRequestActive = false; });
+window.addEventListener("afterprint", function() {
+  printRequestActive = false;
+  if (window.__nezam636PrintFailsafe) {
+    clearTimeout(window.__nezam636PrintFailsafe);
+    window.__nezam636PrintFailsafe = null;
+  }
+});
 
 window.triggerSmartPrint = function(forcedSize) {
   if (forcedSize === "A4" || forcedSize === "A5") window.setPaperSize(forcedSize, true);
@@ -1571,9 +1577,14 @@ window.autoFitPaperContent = autoFitPaperContent;
 
 window.autoFitCurrentPaper = function() {
   var result = autoFitPaperContent();
+  if (result.pendingCount) {
+    showToastMsg("صفحه هنوز در حال آماده‌سازی است؛ پیش‌نمایش را باز نگه دارید و دوباره تنظیم خودکار را بزنید.", true);
+    return false;
+  }
   showToastMsg(result.overflowCount
     ? "برخی صفحات هنوز جا نمی‌شوند؛ اندازه کاغذ را بزرگ‌تر یا متن را کوتاه‌تر کنید."
     : "✨ اندازه قلم و فاصله‌ها برای جا شدن محتوا تنظیم شد.", !!result.overflowCount);
+  return result.overflowCount === 0;
 };
 
 window.adjustPaperFontSize = function(delta) {
@@ -1594,6 +1605,10 @@ window.adjustPaperFontSize = function(delta) {
     page.setAttribute("data-user-font-pt", nextPt.toFixed(2));
   });
   var result = autoFitPaperContent(stage);
+  if (result.pendingCount) {
+    showToastMsg("صفحه هنوز آماده اندازه‌گیری نیست؛ دوباره تلاش کنید.", true);
+    return false;
+  }
   showToastMsg(result.overflowCount
     ? "اندازه قلم تغییر کرد، اما بخشی از محتوا هنوز جا نمی‌شود."
     : (delta > 0 ? "اندازه قلم بزرگ‌تر شد (A+)." : "اندازه قلم کوچک‌تر شد (A-)."),
