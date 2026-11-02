@@ -233,11 +233,13 @@ test('form and secretariat print engine keeps paper geometry, binder padding, an
 
   assert.ok(customizer.includes('@page { size: '));
   assert.ok(customizer.includes('#a4-preview-stage .a4-page { box-sizing: border-box !important; width: '));
+  assert.ok(customizer.includes('main { width: 100% !important; max-width: none !important; margin: 0 !important; padding: 0 !important; }'));
   assert.ok(customizer.includes("data-page-kind='binder-label'"));
   assert.ok(customizer.includes('data-page-kind="binder-label"'));
   assert.ok(customizer.includes('genericOverflow = page.scrollHeight > page.clientHeight'));
   assert.ok(customizer.includes('utmAttachmentHtml: includeUtm ? appendixHtml : ""'));
   assert.ok(customizer.includes('letterPageIndex === 0 ? "letter" : "letter-appendix"'));
+  assert.ok(html.includes('main {\n        width: 100% !important;\n        max-width: none !important;\n        margin: 0 !important;\n        padding: 0 !important;'));
   assert.ok(html.includes('.a4-page[data-page-kind="binder-label"] {\n        padding: 15mm !important;'));
-  assert.ok(html.includes('nezam-customizer.js?v=20261102-print-engine-r6'));
+  assert.ok(html.includes('nezam-customizer.js?v=20261102-print-engine-r7'));
 });
