@@ -1889,8 +1889,10 @@ function renderSecretariatTable() {
         showToastMsg("نامه از دفتر اندیکاتور حذف شد.");
       }
     } catch (error) {
-      console.error("Secretariat action failed:", error);
-      showToastMsg("اجرای عملیات بایگانی ناموفق بود: " + (error && error.message ? error.message : "خطای نامشخص"), true);
+      window.__nezam636LastSecretariatError = error;
+      console.error("Secretariat action failed:", error && error.stack ? error.stack : error);
+      var reason = error && error.message ? error.message : String(error || "خطای نامشخص");
+      showToastMsg("عملیات «" + (action === "edit" ? "ویرایش" : (action === "a4" ? "چاپ A4" : "چاپ A5")) + "» ناموفق بود: " + reason, true);
     }
   };
 }
