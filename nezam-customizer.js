@@ -242,7 +242,25 @@ function applyDynamicPrintPageSizeCSS(size) {
     styleEl.id = "dynamic-print-page-style";
     document.head.appendChild(styleEl);
   }
-  styleEl.textContent = "@page { size: " + width + " " + height + "; margin: 0; }";
+
+  // یک منبع واحد برای اندازه فیزیکی صفحه و ابعاد خود برگه در خروجی چاپ.
+  // این قوانین بعد از CSS اصلی تزریق می‌شوند تا A4/A5 با هم تداخل نکنند.
+  styleEl.textContent = [
+    "@page { size: " + width + " " + height + "; margin: 0; }",
+    "@media print {",
+    "html, body { width: " + width + " !important; min-width: 0 !important; max-width: " + width + " !important; margin: 0 !important; padding: 0 !important; background: #fff !important; overflow: visible !important; }",
+    "#pane-print, .a4-stage-bg, #a4-preview-stage { display: block !important; position: static !important; width: " + width + " !important; min-width: " + width + " !important; max-width: " + width + " !important; margin: 0 !important; padding: 0 !important; overflow: visible !important; background: transparent !important; box-shadow: none !important; }",
+    "#a4-preview-stage .a4-page { box-sizing: border-box !important; width: " + width + " !important; min-width: " + width + " !important; max-width: " + width + " !important; height: " + height + " !important; min-height: " + height + " !important; max-height: " + height + " !important; margin: 0 !important; transform: none !important; animation: none !important; transition: none !important; overflow: hidden !important; page-break-inside: avoid !important; break-inside: avoid !important; page-break-after: always !important; break-after: page !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }",
+    "#a4-preview-stage .a4-page[data-page-kind='binder-label'] { padding: 15mm !important; }",
+    "#a4-preview-stage .a4-page:last-child { page-break-after: auto !important; break-after: auto !important; }",
+    "}"
+  ].join("\n");
+
+  var pages = document.querySelectorAll("#a4-preview-stage .a4-page");
+  for (var i = 0; i < pages.length; i++) {
+    pages[i].setAttribute("data-paper-size", s);
+    pages[i].classList.toggle("paper-a5", s === "A5");
+  }
 }
 
 function hasUnsavedLetterChanges() {
@@ -450,6 +468,11 @@ function renderLetterPreviewObject(letter, forcedPaperSize, mode) {
   var attachmentLabel = getLetterAttachmentLabel(letter.attach, hasUtm);
 
   stage.innerHTML = buildSingleA4HTML(letter.recipient, sanitizeOfficeRichHtml(letter.body), letter.number, letter.date, attachmentLabel, letter.utm, isNat, true, pSize, false, "");
+  var letterPages = stage.querySelectorAll(".a4-page");
+  for (var letterPageIndex = 0; letterPageIndex < letterPages.length; letterPageIndex++) {
+    letterPages[letterPageIndex].setAttribute("data-page-kind", letterPageIndex === 0 ? "letter" : "letter-appendix");
+    letterPages[letterPageIndex].setAttribute("data-paper-size", pSize);
+  }
   if (hasUtm) {
     var sheets = splitUtmAttachmentTableHtml(coordinateHtml, pSize);
     var intro = "جدول مختصات UTM مربوط به زمین و عوارض پرونده «" +
@@ -1057,7 +1080,8 @@ window.savePaperEditsToSecretariat = function(options) {
     attach: attachmentLabel,
     paperSize: currentPaperSize,
     includeUtm: includeUtm,
-    utmAttachmentHtml: includeUtm ? appendixHtml : (base.utmAttachmentHtml || ""),
+    // وقتی پیوست از برگه حذف شده، HTML قدیمی نباید به‌عنوان پیوست مخفی در رکورد بماند.
+    utmAttachmentHtml: includeUtm ? appendixHtml : "",
     croquisMapId: base.croquisMapId || activeCroquisMapId || ""
   });
   var wasNew = draftMode && !existingId;
@@ -1548,8 +1572,18 @@ function autoFitPaperContent(container) {
     var wrap = page.querySelector(".lh-content-wrap");
     var txt = page.querySelector(".l-txt");
     if (!body || !txt) {
-      page.removeAttribute("data-content-overflow");
+      // فرم‌های مستقل مانند لیبل زونکن بدنه سربرگ ندارند؛ سرریز خود صفحه را کنترل کن.
+      var genericRect = page.getBoundingClientRect();
+      if (!genericRect.width || !genericRect.height || !page.clientHeight) {
+        page.setAttribute("data-fit-pending", "true");
+        pendingCount++;
+        continue;
+      }
       page.removeAttribute("data-fit-pending");
+      var genericOverflow = page.scrollHeight > page.clientHeight + 2 ||
+        page.scrollWidth > page.clientWidth + 2;
+      page.setAttribute("data-content-overflow", genericOverflow ? "true" : "false");
+      if (genericOverflow) overflowCount++;
       continue;
     }
 
@@ -1973,7 +2007,7 @@ function printOfficialForm(formType) {
   } else if (formType === "BINDER_LABEL") {
     var stage = document.getElementById("a4-preview-stage");
     stage.innerHTML =
-      '<div class="a4-page' + (currentPaperSize === "A5" ? " paper-a5" : "") + '" style="padding:15mm;">' +
+      '<div class="a4-page' + (currentPaperSize === "A5" ? " paper-a5" : "") + '" data-page-kind="binder-label" data-paper-size="' + currentPaperSize + '" style="padding:15mm;">' +
         '<div style="border:3px double #1b5e20;border-radius:12px;padding:8mm;margin-bottom:12mm;">' +
           '<div style="display:flex;justify-content:space-between;border-bottom:2px solid #2e7d32;padding-bottom:4mm;margin-bottom:4mm;">' +
             '<div><b>سازمان نظام مهندسی کشاورزی و منابع طبیعی استان فارس</b><br>' + brandCfg.officeName + '</div>' +
@@ -1999,8 +2033,19 @@ function printOfficialForm(formType) {
   }
 
   var stageEl = document.getElementById("a4-preview-stage");
+  if (!stageEl) {
+    showToastMsg("محل پیش‌نمایش چاپ در صفحه پیدا نشد؛ صفحه را تازه‌سازی کنید.", true);
+    return false;
+  }
   stageEl.innerHTML = buildSingleA4HTML("", innerHtml, d.num, d.date, "دارد", "", false, true, currentPaperSize, false);
+  var formPage = stageEl.querySelector(".a4-page");
+  if (formPage) {
+    formPage.setAttribute("data-page-kind", "official-form-" + String(formType || "unknown").toLowerCase());
+    formPage.setAttribute("data-paper-size", currentPaperSize);
+  }
+  applyDynamicPrintPageSizeCSS(currentPaperSize);
   switchMainPane("pane-print");
+  return true;
 }
 
 /* =========================================================================
