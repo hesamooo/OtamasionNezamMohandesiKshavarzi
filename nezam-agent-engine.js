@@ -673,7 +673,7 @@
   function dangerousControl(el) {
     var label = labelFor(el);
     var clues = label + ' ' + String(el.id || '') + ' ' + String(el.getAttribute('onclick') || '') + ' ' + String(el.getAttribute('data-action') || '');
-    return /(حذف|پاک.?کردن|پاکسازی|بازنشانی|بایگانی|ارسال.?بیرونی|ارسال.?واقعی|delete|remove|clear|reset|archive|external.?send)/i.test(clues);
+    return /(حذف|پاک.?کردن|پاکسازی|بازنشانی|بایگانی|ارسال|فرستادن|delete|remove|clear|reset|archive|send|submit|external.?send)/i.test(clues);
   }
   function isSensitiveField(el) {
     return isSensitive(el) || /(password|token|secret|api.?key|authorization)/i.test(String(el.name || ''));
