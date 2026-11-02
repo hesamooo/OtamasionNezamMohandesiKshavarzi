@@ -962,111 +962,142 @@ function activatePaneForArchivedLetter(paneId) {
   return true;
 }
 
+function cancelLetterEditing() {
+  editingLetterId = null;
+  currentPreviewLetterId = null;
+  currentPreviewDraft = null;
+  var alertEl = document.getElementById("letter-edit-alert");
+  if (alertEl) alertEl.style.display = "none";
+  letterDraftDirty = false;
+  syncLetterEditorWithActiveCase(true);
+  showToastMsg("ویرایش نامه لغو شد؛ قالب پیش‌نویس پرونده دوباره بارگذاری شد.");
+}
+window.cancelLetterEditing = cancelLetterEditing;
+
 function editLetterFromSecretariat(letterId) {
-  var l = null;
-  for (var i = 0; i < lettersDB.length; i++) {
-    if (String(lettersDB[i].id) === String(letterId)) { l = lettersDB[i]; break; }
-  }
-  if (!l) {
+  var letter = findSecretariatLetter(letterId);
+  if (!letter) {
     showToastMsg("نامه انتخاب‌شده در دفتر اندیکاتور پیدا نشد.", true);
     return false;
   }
-
-  // پرونده مرتبط را بدون اجرای زنجیره جانبی selectActiveCase فعال می‌کنیم.
-  var linkedCase = (Array.isArray(window.casesDB) ? window.casesDB : []).find(function (c) {
-    return c && String(c.id) === String(l.caseId);
+  var linkedCase = (Array.isArray(window.casesDB) ? window.casesDB : []).find(function (item) {
+    return item && String(item.id) === String(letter.caseId);
   });
-  if (linkedCase) {
-    activeCaseId = linkedCase.id;
-    activeCroquisMapId = l.croquisMapId || "";
-    activeCroquisLayerId = "";
-    try { localStorage.setItem("nezam636_active_case_id", String(linkedCase.id)); } catch (storageError) {}
-    try {
-      if (typeof populateGlobalCaseSelector === "function") populateGlobalCaseSelector();
-      if (typeof loadActiveCaseIntoForm === "function") loadActiveCaseIntoForm();
-      if (typeof window.initCroquisWorkspaceForActiveCase === "function") window.initCroquisWorkspaceForActiveCase();
-    } catch (caseUiError) {
-      console.warn("Could not refresh linked case form before editing archived letter:", caseUiError);
-    }
+  if (!linkedCase) {
+    showToastMsg("پرونده مرتبط با این نامه پیدا نشد؛ ویرایش برای جلوگیری از اتصال اشتباه متوقف شد.", true);
+    return false;
   }
 
-  // شناسه ویرایش بعد از بارگذاری پرونده تنظیم می‌شود؛ بارگذاری نباید آن را پاک کند.
-  editingLetterId = l.id;
+  activeCaseId = linkedCase.id;
+  activeCroquisMapId = letter.croquisMapId || "";
+  activeCroquisLayerId = "";
+  try { localStorage.setItem("nezam636_active_case_id", String(linkedCase.id)); } catch (e) {}
+  try {
+    if (typeof populateGlobalCaseSelector === "function") populateGlobalCaseSelector();
+    if (typeof loadActiveCaseIntoForm === "function") loadActiveCaseIntoForm();
+    if (typeof window.initCroquisWorkspaceForActiveCase === "function") window.initCroquisWorkspaceForActiveCase();
+  } catch (caseError) {
+    console.warn("Could not load the case for letter editing:", caseError);
+  }
+
+  editingLetterId = letter.id;
+  currentPreviewLetterId = null;
+  currentPreviewDraft = null;
+  currentPreviewMode = "EDITOR";
+  letterDraftCaseId = linkedCase.id;
+  letterDraftDirty = false;
   var fields = {
-    "l-direction": l.type || "OUT",
-    "l-number": l.number || "",
-    "l-date": l.date || "",
-    "l-attach": l.attach || "ندارد",
-    "l-recipient": l.recipient || "",
-    "l-body": l.body || ""
+    "l-direction": letter.type || "OUT",
+    "l-number": letter.number || "",
+    "l-date": letter.date || "",
+    "l-attach": letter.attach || "ندارد",
+    "l-recipient": letter.recipient || "",
+    "l-body": letter.body || ""
   };
   Object.keys(fields).forEach(function (id) {
     var el = document.getElementById(id);
     if (el) el.value = fields[id];
   });
-  var includeUtmEl = document.getElementById("l-include-utm");
-  if (includeUtmEl) includeUtmEl.checked = l.includeUtm === true;
+  var includeEl = document.getElementById("l-include-utm");
+  if (includeEl) includeEl.checked = letter.includeUtm === true;
   if (typeof window.syncTextareaToRichEditor === "function") window.syncTextareaToRichEditor();
-  if (l.paperSize && typeof window.setPaperSize === "function") window.setPaperSize(l.paperSize, true);
+  if (letter.paperSize) window.setPaperSize(letter.paperSize, true);
 
   var alertEl = document.getElementById("letter-edit-alert");
   if (alertEl) {
     alertEl.style.display = "flex";
     alertEl.className = "alert alert-warning py-2 px-3 small fw-bold mb-3 d-flex justify-content-between align-items-center";
-    alertEl.innerHTML = '<span>✏️ در حال ویرایش نامه شماره «' + safeHtmlText(toFa(l.number)) + '» (' + safeHtmlText(l.appName) + ' - کاغذ ' + (l.paperSize === "A5" ? "A5" : "A4") + ')</span>' +
-      '<button class="btn btn-sm btn-outline-dark py-0" onclick="editingLetterId=null;document.getElementById(&quot;letter-edit-alert&quot;).style.display=&quot;none&quot;;syncLetterEditorWithActiveCase();">لغو ویرایش</button>';
+    alertEl.innerHTML = '<span>✏️ در حال ویرایش نامه شماره «' + safeHtmlText(toFa(letter.number)) + '» (' +
+      safeHtmlText(letter.appName || linkedCase.name) + ' - کاغذ ' + (letter.paperSize === "A5" ? "A5" : "A4") + ')</span>' +
+      '<button type="button" class="btn btn-sm btn-outline-dark py-0" onclick="cancelLetterEditing()">لغو ویرایش</button>';
   }
-
-  if (linkedCase && typeof window.switchMainPane === "function") window.switchMainPane("pane-letters");
-  else activatePaneForArchivedLetter("pane-letters");
-  showToastMsg("نامه شماره " + toFa(l.number || "") + " برای ویرایش بارگذاری شد.");
+  updatePaperActionButtons();
+  if (typeof window.switchMainPane === "function") window.switchMainPane("pane-letters");
+  showToastMsg("نامه شماره " + toFa(letter.number || "") + " برای ویرایش بارگذاری شد.");
   return true;
 }
 window.editLetterFromSecretariat = editLetterFromSecretariat;
 
-function previewSavedLetter(letterId, forcedPaperSize, printNow) {
-  var l = null;
-  for (var i = 0; i < lettersDB.length; i++) {
-    if (String(lettersDB[i].id) === String(letterId)) { l = lettersDB[i]; break; }
+function previewCurrentLetterDraft(forcedPaperSize) {
+  var draft = getLetterDraftFromEditor();
+  if (!draft) return false;
+  draft.id = editingLetterId || null;
+  currentPreviewDraft = draft;
+  currentPreviewLetterId = null;
+  var pSize = forcedPaperSize || draft.paperSize || currentPaperSize;
+  if (!renderLetterPreviewObject(draft, pSize, "LETTER_DRAFT")) return false;
+  if (typeof window.switchMainPane === "function") window.switchMainPane("pane-print");
+  showToastMsg("پیش‌نمایش پیش‌نویس آماده است؛ با ذخیره یا چاپ، نامه در دبیرخانه ثبت می‌شود.");
+  return true;
+}
+window.previewCurrentLetterDraft = previewCurrentLetterDraft;
+
+function renderSinglePreviewSheet(letterObj, forcedPaperSize) {
+  if (letterObj) return renderLetterPreviewObject(letterObj, forcedPaperSize, "LETTER");
+  if (currentPreviewMode === "LETTER_DRAFT" && currentPreviewDraft) {
+    return renderLetterPreviewObject(currentPreviewDraft, forcedPaperSize, "LETTER_DRAFT");
   }
-  if (!l) {
+  if (currentPreviewMode === "LETTER" && currentPreviewLetterId) {
+    var currentLetter = findSecretariatLetter(currentPreviewLetterId);
+    if (currentLetter) return renderLetterPreviewObject(currentLetter, forcedPaperSize, "LETTER");
+  }
+  return previewCurrentLetterDraft(forcedPaperSize);
+}
+window.renderSinglePreviewSheet = renderSinglePreviewSheet;
+
+function previewSavedLetter(letterId, forcedPaperSize) {
+  var letter = findSecretariatLetter(letterId);
+  if (!letter) {
     showToastMsg("نامه انتخاب‌شده در دفتر اندیکاتور پیدا نشد.", true);
     return false;
   }
-
-  var linkedCase = (Array.isArray(window.casesDB) ? window.casesDB : []).find(function (c) {
-    return c && String(c.id) === String(l.caseId);
+  var linkedCase = (Array.isArray(window.casesDB) ? window.casesDB : []).find(function (item) {
+    return item && String(item.id) === String(letter.caseId);
   });
   if (linkedCase) {
     activeCaseId = linkedCase.id;
-    activeCroquisMapId = l.croquisMapId || "";
+    activeCroquisMapId = letter.croquisMapId || "";
     activeCroquisLayerId = "";
-    try { localStorage.setItem("nezam636_active_case_id", String(linkedCase.id)); } catch (storageError) {}
+    try { localStorage.setItem("nezam636_active_case_id", String(linkedCase.id)); } catch (e) {}
     try {
       if (typeof populateGlobalCaseSelector === "function") populateGlobalCaseSelector();
+      if (typeof loadActiveCaseIntoForm === "function") loadActiveCaseIntoForm();
       if (typeof window.initCroquisWorkspaceForActiveCase === "function") window.initCroquisWorkspaceForActiveCase();
-    } catch (caseUiError) {
-      console.warn("Could not refresh active applicant/croquis context for archived print:", caseUiError);
+    } catch (caseError) {
+      console.warn("Could not refresh the case before letter preview:", caseError);
     }
   }
-
-  var targetSize = forcedPaperSize === "A5" ? "A5" : (forcedPaperSize === "A4" ? "A4" : (l.paperSize || currentPaperSize || "A4"));
-  currentPreviewMode = "LETTER";
-  currentPreviewLetterId = l.id;
-  // تغییر سایز بدون اجرای عملیات جانبی؛ چاپ کروکی/ذخیره ناخواسته نباید فعال شود.
-  window.setPaperSize(targetSize, true);
-  renderSinglePreviewSheet(l, targetSize);
-
-  if (linkedCase && typeof window.switchMainPane === "function") window.switchMainPane("pane-print");
-  else activatePaneForArchivedLetter("pane-print");
-
-  showToastMsg("پیش‌نمایش نامه شماره " + toFa(l.number || "") + " روی کاغذ " + targetSize + " آماده شد؛ برای حفظ مقیاس، از دکمه چاپ اصلی استفاده کنید.");
+  editingLetterId = null;
+  currentPreviewDraft = null;
+  var targetSize = forcedPaperSize === "A5" ? "A5" : (forcedPaperSize === "A4" ? "A4" : (letter.paperSize || currentPaperSize || "A4"));
+  if (!renderLetterPreviewObject(letter, targetSize, "LETTER")) return false;
+  if (typeof window.switchMainPane === "function") window.switchMainPane("pane-print");
+  showToastMsg("پیش‌نمایش نامه شماره " + toFa(letter.number || "") + " روی کاغذ " + targetSize + " آماده شد.");
   return true;
 }
 window.previewSavedLetter = previewSavedLetter;
 window.printArchivedLetter = function(letterId, paperSize) {
-  // نام سازگار با نسخه‌های قبل؛ فقط پیش‌نمایش را آماده می‌کند تا چاپ از مسیر استاندارد انجام شود.
-  return previewSavedLetter(letterId, paperSize, false);
+  return previewSavedLetter(letterId, paperSize);
 };
 
 function quickIssueSingleInquiry(tplKey) {
@@ -1385,16 +1416,41 @@ function renderSinglePreviewSheet(letterObj, forcedPaperSize) {
 }
 
 window.toggleUtmInPreviewSheet = function() {
-  if (currentPreviewMode !== "LETTER") return;
-  for (var i = 0; i < lettersDB.length; i++) {
-    if (lettersDB[i].id === currentPreviewLetterId) {
-      lettersDB[i].includeUtm = lettersDB[i].includeUtm === true ? false : true;
-      renderSinglePreviewSheet(lettersDB[i]);
-      saveAllDB();
-      showToastMsg(lettersDB[i].includeUtm ? "✅ برگه پیوست مختصات به نامه اضافه شد." : "❌ برگه پیوست مختصات از نامه حذف شد.");
-      break;
+  var isDraft = currentPreviewMode === "LETTER_DRAFT" && currentPreviewDraft;
+  var letter = isDraft ? currentPreviewDraft : (currentPreviewMode === "LETTER" ? findSecretariatLetter(currentPreviewLetterId) : null);
+  if (!letter) {
+    showToastMsg("ابتدا یک نامه را پیش‌نمایش بگیرید.", true);
+    return false;
+  }
+  var oldLetter = JSON.parse(JSON.stringify(letter));
+  letter.includeUtm = letter.includeUtm !== true;
+  if (letter.includeUtm && !(letter.utmAttachmentHtml || "").trim()) {
+    var caseObj = (Array.isArray(window.casesDB) ? window.casesDB : []).find(function (item) {
+      return item && String(item.id) === String(letter.caseId);
+    }) || getActiveCase();
+    if (letter.croquisMapId) activeCroquisMapId = letter.croquisMapId;
+    letter.utmAttachmentHtml = caseObj
+      ? buildAllSelectedFeaturesUtmTableHTML(caseObj, letter.utm || caseObj.utm || "", (letter.recipient || "").indexOf("منابع طبیعی") !== -1)
+      : "";
+  }
+  var hasCoordinates = letter.includeUtm && !!(letter.utmAttachmentHtml && letter.utmAttachmentHtml.trim());
+  if (letter.includeUtm && !hasCoordinates) {
+    letter.includeUtm = false;
+    showToastMsg("برای این پرونده مختصات قابل پیوست پیدا نشد.", true);
+    return false;
+  }
+  letter.attach = getLetterAttachmentLabel(letter.attach, hasCoordinates);
+  if (!isDraft) {
+    if (!persistLetterAndCaseData()) {
+      Object.keys(letter).forEach(function (key) { delete letter[key]; });
+      Object.assign(letter, oldLetter);
+      showToastMsg("ذخیره تغییر وضعیت پیوست مختصات ناموفق بود.", true);
+      return false;
     }
   }
+  renderLetterPreviewObject(letter, currentPaperSize, isDraft ? "LETTER_DRAFT" : "LETTER");
+  showToastMsg(hasCoordinates ? "برگه پیوست مختصات به نامه اضافه شد." : "پیوست مختصات از نامه حذف شد.");
+  return true;
 };
 
 function updatePrintUtmBtnState(isOn) {
