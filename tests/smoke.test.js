@@ -279,6 +279,7 @@ test('standalone office correspondence is available without an applicant', () =>
 
   assert.match(customizer, /window\.startIndependentOfficeLetter = function\(\)/);
   assert.match(customizer, /window\.__nezamOfficeLetterDraftMode === true/);
+  assert.match(customizer, /function getNextSecretariatNumber\(\)[\s\S]*lettersDB/);
   assert.match(customizer, /if \(!c && !officeMode\) return null/);
   assert.match(customizer, /caseId: officeMode \? "" : c\.id/);
   assert.match(customizer, /officeLetter: officeMode/);
