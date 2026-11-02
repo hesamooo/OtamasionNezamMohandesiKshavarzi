@@ -314,8 +314,11 @@ function persistLetterAndCaseData() {
     return false;
   }
   try {
-    if (typeof renderSecretariatTable === "function") renderSecretariatTable();
-    if (typeof renderActiveCaseHistory === "function") renderActiveCaseHistory();
+    if (typeof refreshAllViews === "function") refreshAllViews();
+    else {
+      if (typeof renderSecretariatTable === "function") renderSecretariatTable();
+      if (typeof renderActiveCaseHistory === "function") renderActiveCaseHistory();
+    }
   } catch (viewError) {
     console.warn("Letter saved; a related view could not refresh:", viewError);
   }
@@ -391,9 +394,13 @@ function getLetterDraftFromEditor() {
   var existingLetter = editingLetterId ? findSecretariatLetter(editingLetterId) : null;
   var preservedUtmSnapshot = existingLetter && typeof existingLetter.utmAttachmentHtml === "string"
     ? existingLetter.utmAttachmentHtml : "";
-  var coordinateHtml = freshUtmSnapshot && freshUtmSnapshot.trim() ? freshUtmSnapshot : (requestedUtm ? preservedUtmSnapshot : "");
+  var hasFreshUtmSnapshot = !!(freshUtmSnapshot && freshUtmSnapshot.trim());
+  var coordinateHtml = hasFreshUtmSnapshot ? freshUtmSnapshot : (requestedUtm ? preservedUtmSnapshot : "");
   var hasUtm = !!(coordinateHtml && coordinateHtml.trim());
   var includeUtm = requestedUtm && hasUtm;
+  var snapshotMapId = hasFreshUtmSnapshot && map && map.id
+    ? map.id
+    : (existingLetter && existingLetter.croquisMapId ? existingLetter.croquisMapId : (map && map.id ? map.id : activeCroquisMapId));
   return {
     id: editingLetterId || null,
     caseId: c.id,
@@ -411,7 +418,7 @@ function getLetterDraftFromEditor() {
     water: c.water || "",
     loc: c.loc || "",
     utm: c.utm || "",
-    croquisMapId: map && map.id ? map.id : (activeCroquisMapId || ""),
+    croquisMapId: snapshotMapId || "",
     utmAttachmentHtml: includeUtm ? coordinateHtml : preservedUtmSnapshot,
     body: body,
     paperSize: paperEl && paperEl.value === "A5" ? "A5" : (currentPaperSize || "A4"),
@@ -900,17 +907,21 @@ function saveLetterToSecretariat(goToPrint, forcedPaperSize) {
   var wasNew = !existingId;
   var oldLetter = wasNew ? null : lettersDB[existingIndex];
   var letterObj = Object.assign({}, oldLetter || {}, draft);
+  var changed = wasNew || JSON.stringify(oldLetter) !== JSON.stringify(letterObj);
 
   if (wasNew) lettersDB.unshift(letterObj);
-  else lettersDB[existingIndex] = letterObj;
-  logCaseAction(c, (wasNew ? "صدور و ثبت نامه شماره " : "ویرایش نامه شماره ") +
-    toFa(draft.number) + " در کاغذ " + draft.paperSize + " خطاب به " + draft.recipient);
+  else if (changed) lettersDB[existingIndex] = letterObj;
 
-  if (!persistLetterAndCaseData()) {
-    lettersDB = JSON.parse(oldLettersJson);
-    c.history = JSON.parse(oldHistoryJson);
-    showToastMsg("ذخیره نامه انجام نشد؛ فضای مرورگر یا دسترسی ذخیره‌سازی را بررسی کنید. اطلاعات قبلی حفظ شد.", true);
-    return false;
+  if (changed) {
+    logCaseAction(c, (wasNew ? "صدور و ثبت نامه شماره " : "ویرایش نامه شماره ") +
+      toFa(draft.number) + " در کاغذ " + draft.paperSize + " خطاب به " + draft.recipient);
+
+    if (!persistLetterAndCaseData()) {
+      lettersDB = JSON.parse(oldLettersJson);
+      c.history = JSON.parse(oldHistoryJson);
+      showToastMsg("ذخیره نامه انجام نشد؛ فضای مرورگر یا دسترسی ذخیره‌سازی را بررسی کنید. اطلاعات قبلی حفظ شد.", true);
+      return false;
+    }
   }
 
   editingLetterId = null;
