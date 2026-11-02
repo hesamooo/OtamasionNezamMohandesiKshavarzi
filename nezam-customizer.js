@@ -498,6 +498,14 @@ window.setPaperSize = function(size, skipSave) {
 
   var pages = document.querySelectorAll("#a4-preview-stage .a4-page");
   for (var i = 0; i < pages.length; i++) {
+    var wasA5 = pages[i].classList.contains("paper-a5");
+    if (previous !== currentPaperSize && wasA5 !== (currentPaperSize === "A5")) {
+      var userFont = parseFloat(pages[i].getAttribute("data-user-font-pt"));
+      if (Number.isFinite(userFont)) {
+        userFont = currentPaperSize === "A5" ? userFont * (8.8 / 10.5) : userFont * (10.5 / 8.8);
+        pages[i].setAttribute("data-user-font-pt", Math.max(6.8, Math.min(16, userFont)).toFixed(2));
+      }
+    }
     pages[i].setAttribute("data-paper-size", currentPaperSize);
     pages[i].classList.toggle("paper-a5", currentPaperSize === "A5");
   }
@@ -600,6 +608,11 @@ window.doPrintPaperSheet = function() {
     }
 
     printRequestActive = true;
+    if (window.__nezam636PrintFailsafe) clearTimeout(window.__nezam636PrintFailsafe);
+    window.__nezam636PrintFailsafe = setTimeout(function () {
+      printRequestActive = false;
+      window.__nezam636PrintFailsafe = null;
+    }, 30000);
     applyDynamicPrintPageSizeCSS(currentPaperSize);
     try {
       scheduleFrame(function () {
