@@ -493,6 +493,7 @@
       'موضوع طرح: ' + (active.project || 'ثبت نشده'),
       'ظرفیت: ' + (active.cap || 'ثبت نشده'),
       'مساحت زمین: ' + (active.land || 'ثبت نشده'),
+      'پلاک ثبتی زمین: ' + (active.landParcel || 'ثبت نشده'),
       'موقعیت: ' + (active.loc || 'ثبت نشده'),
       'وضعیت پرونده: ' + (active.caseStatus || 'نامشخص'),
       'استعلام‌ها: ' + (inquiryLines.length ? inquiryLines.join('؛ ') : 'هنوز اطلاعاتی ثبت نشده'),
