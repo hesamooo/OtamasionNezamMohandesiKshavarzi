@@ -783,9 +783,9 @@
       updates.forEach(function (u) {
         var el = getControl(u.control_id);
         if (!el || !/^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName)) throw new Error('فیلد ' + String(u.control_id) + ' در صفحه فعال پیدا نشد.');
-        if (el.disabled || el.readOnly || isSensitiveField(el)) throw new Error('تغییر فیلد حساس/غیرفعال مجاز نیست: ' + labelFor(el));
-        if (el.type && /^(file|password|checkbox|radio|hidden|submit|button)$/i.test(el.type)) throw new Error('نوع این فیلد پشتیبانی نمی‌شود: ' + labelFor(el));
         var value = String(u.value == null ? '' : u.value).trim();
+        if (el.disabled || el.readOnly || (isSensitiveField(el) && normalize(state.currentQuestion).indexOf(normalize(value)) < 0)) throw new Error('فیلد حساس فقط زمانی از طریق عامل تکمیل می‌شود که مقدارش را خودت در همین درخواست صریحاً نوشته باشی: ' + labelFor(el));
+        if (el.type && /^(file|password|checkbox|radio|hidden|submit|button)$/i.test(el.type)) throw new Error('نوع این فیلد پشتیبانی نمی‌شود: ' + labelFor(el));
         if (value.length > 5000) throw new Error('مقدار پیشنهادی بیش از حد طولانی است.');
         if (el.required && !value) throw new Error('فیلد اجباری را نمی‌توان خالی کرد: ' + labelFor(el));
         if (el.tagName === 'SELECT') {
@@ -1061,49 +1061,46 @@
   }
   function applyCaseFields(fields) {
     var order = ['mainGroup', 'entityType', 'actType', 'count'];
-    var deferred = [];
     order.forEach(function (key) {
       if (fields[key] === undefined) return;
-      var id = CASE_FIELDS[key];
-      var el = byId(id);
+      var el = byId(CASE_FIELDS[key]);
       if (!el) return;
       setSelectOrValue(el, fields[key]);
-      if (key === 'mainGroup' && typeof window.onMainGroupChangedInForm === 'function') window.onMainGroupChangedInForm();
-      if (key === 'entityType' && typeof window.onEntityTypeChangedInForm === 'function') window.onEntityTypeChangedInForm();
-      if (key === 'actType' && typeof window.recalcCaseSpecsFromHeadcount === 'function') window.recalcCaseSpecsFromHeadcount();
-      if (key === 'count' && typeof window.recalcCaseSpecsFromHeadcount === 'function') window.recalcCaseSpecsFromHeadcount();
+      if (key === 'mainGroup' && !el.getAttribute('onchange') && typeof window.onMainGroupChangedInForm === 'function') window.onMainGroupChangedInForm();
+      if (key === 'entityType' && !el.getAttribute('onchange') && typeof window.onEntityTypeChangedInForm === 'function') window.onEntityTypeChangedInForm();
     });
+    if ((fields.mainGroup !== undefined || fields.actType !== undefined || fields.count !== undefined) && typeof window.recalcCaseSpecsFromHeadcount === 'function') {
+      window.recalcCaseSpecsFromHeadcount();
+    }
     Object.keys(fields).forEach(function (key) {
       if (order.indexOf(key) >= 0) return;
-      var id = CASE_FIELDS[key];
-      var el = id && byId(id);
-      if (!el) return;
-      if (key === 'nid' || key === 'mobile') return;
-      deferred.push({ el: el, value: fields[key] });
+      var el = byId(CASE_FIELDS[key]);
+      if (el) setSelectOrValue(el, fields[key]);
     });
-    deferred.forEach(function (x) { setSelectOrValue(x.el, x.value); });
     refreshCaseViews();
   }
   function applyGenericFields(updates) {
-    var changedIds = [];
-    var rank = { 'c-main-group': 0, 'c-entity-type': 1, 'c-act-type': 2, 'c-count': 3 };
-    updates = updates.slice().sort(function (a, b) {
-      var ra = Object.prototype.hasOwnProperty.call(rank, a.id) ? rank[a.id] : 10;
-      var rb = Object.prototype.hasOwnProperty.call(rank, b.id) ? rank[b.id] : 10;
-      return ra - rb;
-    });
-    updates.forEach(function (u) {
+    var priority = ['c-main-group', 'c-entity-type', 'c-act-type', 'c-count'];
+    var primary = updates.filter(function (u) { return priority.indexOf(u.id) >= 0; }).sort(function (a, b) { return priority.indexOf(a.id) - priority.indexOf(b.id); });
+    var secondary = updates.filter(function (u) { return priority.indexOf(u.id) < 0; });
+    function applyOne(u) {
       var el = getControl(u.control_id);
       if (!el || !/^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName)) throw new Error('فیلد ' + u.label + ' دیگر در صفحه قابل دسترس نیست.');
-      if (el.disabled || el.readOnly || isSensitiveField(el)) throw new Error('فیلد ' + u.label + ' اکنون قابل تغییر نیست.');
+      if (el.disabled || el.readOnly || (isSensitiveField(el) && normalize(state.currentQuestion).indexOf(normalize(u.value)) < 0)) throw new Error('فیلد ' + u.label + ' اکنون قابل تغییر نیست.');
       setSelectOrValue(el, u.value);
-      changedIds.push(el.id);
+      return el;
+    }
+    var changed = [];
+    primary.forEach(function (u) {
+      var el = applyOne(u);
+      changed.push(el.id);
+      if (el.id === 'c-main-group' && !el.getAttribute('onchange') && typeof window.onMainGroupChangedInForm === 'function') window.onMainGroupChangedInForm();
+      if (el.id === 'c-entity-type' && !el.getAttribute('onchange') && typeof window.onEntityTypeChangedInForm === 'function') window.onEntityTypeChangedInForm();
     });
-    if (changedIds.indexOf('c-main-group') >= 0 && typeof window.onMainGroupChangedInForm === 'function') window.onMainGroupChangedInForm();
-    if (changedIds.indexOf('c-entity-type') >= 0 && typeof window.onEntityTypeChangedInForm === 'function') window.onEntityTypeChangedInForm();
-    if ((changedIds.indexOf('c-count') >= 0 || changedIds.indexOf('c-act-type') >= 0) && typeof window.recalcCaseSpecsFromHeadcount === 'function') {
+    if ((changed.indexOf('c-main-group') >= 0 || changed.indexOf('c-act-type') >= 0 || changed.indexOf('c-count') >= 0) && typeof window.recalcCaseSpecsFromHeadcount === 'function') {
       window.recalcCaseSpecsFromHeadcount();
     }
+    secondary.forEach(applyOne);
     refreshCaseViews();
   }
   async function commitPending() {
