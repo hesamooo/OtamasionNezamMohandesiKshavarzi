@@ -1878,8 +1878,8 @@ function renderSecretariatTable() {
       } else if (action === "a4" || action === "a5") {
         var size = action === "a5" ? "A5" : "A4";
         if (typeof window.previewSavedLetter === "function") {
-          window.previewSavedLetter(id, size, false);
-          showToastMsg("پیش‌نمایش نامه آماده شد؛ برای حفظ اندازه و مقیاس از دکمه «چاپ مستقیم کاغذ» در صفحه چاپ استفاده کنید.");
+          // خود تابع پیش‌نمایش در صورت شکست یا لغو، پیام مناسب را نمایش می‌دهد.
+          window.previewSavedLetter(id, size);
         } else if (typeof window.printArchivedLetter === "function") {
           window.printArchivedLetter(id, size);
         } else showToastMsg("موتور چاپ نامه بارگذاری نشده است.", true);
