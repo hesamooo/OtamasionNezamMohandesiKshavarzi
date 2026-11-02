@@ -243,3 +243,30 @@ test('form and secretariat print engine keeps paper geometry, binder padding, an
   assert.ok(html.includes('.a4-page[data-page-kind="binder-label"] {\n        padding: 15mm !important;'));
   assert.ok(html.includes('nezam-customizer.js?v=20261102-print-engine-r7'));
 });
+
+
+test('letter printing and exports do not silently register archive entries', () => {
+  const customizer = read('nezam-customizer.js');
+  const html = read('index.html');
+
+  const extractFunction = (source, startMarker, endMarker) => {
+    const start = source.indexOf(startMarker);
+    assert.notEqual(start, -1, 'missing function: ' + startMarker);
+    const end = source.indexOf(endMarker, start);
+    assert.notEqual(end, -1, 'missing function end: ' + startMarker);
+    return source.slice(start, end);
+  };
+
+  const print = extractFunction(customizer, 'window.doPrintPaperSheet = function() {', '\nwindow.addEventListener("beforeprint"');
+  const htmlExport = extractFunction(customizer, 'window.downloadPaperSheetFile = function(forcedSize) {', '\nfunction activatePaneForArchivedLetter');
+  const wordExport = extractFunction(customizer, 'function exportStageToWordDoc() {', '\nfunction initBrandingAndTemplatesUI');
+
+  assert.doesNotMatch(print, /savePaperEditsToSecretariat/);
+  assert.doesNotMatch(htmlExport, /savePaperEditsToSecretariat/);
+  assert.doesNotMatch(wordExport, /savePaperEditsToSecretariat/);
+  assert.match(customizer, /window\.printCurrentLetterDraft = function\(forcedPaperSize\)/);
+  assert.match(html, /onclick="printCurrentLetterDraft\('A4'\)"/);
+  assert.match(html, /onclick="printCurrentLetterDraft\('A5'\)"/);
+  assert.match(html, /onclick="saveLetterToSecretariat\(false\)">ثبت در دبیرخانه/);
+  assert.match(html, /فقط نامه‌های ثبت‌شده نمایش داده می‌شوند؛ چاپ و دانلود به‌تنهایی سابقه ایجاد نمی‌کند/);
+});
