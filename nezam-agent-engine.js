@@ -569,7 +569,7 @@
       },
       {
         name: 'prepare_field_updates',
-        description: 'پیشنهاد تغییر چند فیلد در صفحه فعال یا فرم پرونده. تغییرات فقط بعد از تأیید کاربر اعمال می‌شوند و ذخیره نهایی خودکار نیست.',
+        description: 'پیشنهاد تغییر چند فیلد در صفحه فعال یا فرم پرونده؛ ورودی چک‌باکس با true/false پذیرفته می‌شود. تغییرات فقط بعد از تأیید کاربر اعمال می‌شوند و ذخیره نهایی خودکار نیست.',
         parameters: {
           type: 'OBJECT',
           properties: {
@@ -815,9 +815,10 @@
         if (!el || !/^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName)) throw new Error('فیلد ' + String(u.control_id) + ' در صفحه فعال پیدا نشد.');
         var value = String(u.value == null ? '' : u.value).trim();
         if (el.disabled || el.readOnly || (isSensitiveField(el) && normalize(state.currentQuestion).indexOf(normalize(value)) < 0)) throw new Error('فیلد حساس فقط زمانی از طریق عامل تکمیل می‌شود که مقدارش را خودت در همین درخواست صریحاً نوشته باشی: ' + labelFor(el));
-        if (el.type && /^(file|password|checkbox|radio|hidden|submit|button)$/i.test(el.type)) throw new Error('نوع این فیلد پشتیبانی نمی‌شود: ' + labelFor(el));
+        if (el.type && /^(file|password|radio|hidden|submit|button)$/i.test(el.type)) throw new Error('نوع این فیلد پشتیبانی نمی‌شود: ' + labelFor(el));
         if (value.length > 5000) throw new Error('مقدار پیشنهادی بیش از حد طولانی است.');
         if (el.required && !value) throw new Error('فیلد اجباری را نمی‌توان خالی کرد: ' + labelFor(el));
+        if (el.type === 'checkbox' && el.required && /^(false|0|no|خیر|غیرفعال)$/i.test(value)) throw new Error('برای ادامه، گزینه اجباری «' + labelFor(el) + '» باید فعال باشد.');
         if (el.tagName === 'SELECT') {
           var opt = Array.prototype.find.call(el.options || [], function (o) {
             return normalize(o.value) === normalize(value) || normalize(o.text) === normalize(value);
