@@ -524,9 +524,19 @@
         parameters: { type: 'OBJECT', properties: { query: { type: 'STRING' } }, required: ['query'] }
       },
       {
+        name: 'select_active_case',
+        description: 'پرونده موجود را به عنوان پرونده فعال سامانه انتخاب کن؛ هیچ فیلدی تغییر نمی‌کند.',
+        parameters: { type: 'OBJECT', properties: { case_id: { type: 'STRING' } }, required: ['case_id'] }
+      },
+      {
         name: 'get_case_checklist',
         description: 'دریافت چک‌لیست مدارک موردنیاز و وضعیت دریافت آن برای پرونده مشخص. به اجازه پرونده نیاز دارد.',
         parameters: { type: 'OBJECT', properties: { case_id: { type: 'STRING' } }, required: ['case_id'] }
+      },
+      {
+        name: 'read_uploaded_case_document',
+        description: 'محتوای PDF یا تصویر مدرک بارگذاری‌شده در پرونده را پس از تأیید ارسال فایل به Gemini بخواند و تحلیل کند.',
+        parameters: { type: 'OBJECT', properties: { case_id: { type: 'STRING' }, doc_code: { type: 'STRING' }, focus: { type: 'STRING' } }, required: ['case_id', 'doc_code'] }
       },
       {
         name: 'list_office_tasks_and_letters',
@@ -568,6 +578,18 @@
           },
           required: ['updates']
         }
+      },
+      {
+        name: 'prepare_new_case',
+        description: 'پیشنهاد تشکیل پرونده جدید در یکی از سه گروه. ایجاد اولیه و ورود داده فقط پس از تأیید کاربر انجام می‌شود؛ ذخیره نهایی جداست.',
+        parameters: { type: 'OBJECT', properties: {
+          main_group: { type: 'STRING', enum: ['GREENHOUSE_MUSHROOM', 'LIVESTOCK_POULTRY_FISHERIES', 'CLINIC_PHARMACY'] },
+          fields: { type: 'OBJECT', properties: {
+            entityType: { type: 'STRING' }, actType: { type: 'STRING' }, name: { type: 'STRING' }, nid: { type: 'STRING' }, mobile: { type: 'STRING' },
+            regNo: { type: 'STRING' }, repName: { type: 'STRING' }, count: { type: 'NUMBER' }, project: { type: 'STRING' }, cap: { type: 'STRING' },
+            land: { type: 'STRING' }, water: { type: 'STRING' }, loc: { type: 'STRING' }, subarea: { type: 'STRING' }, utm: { type: 'STRING' }
+          } }
+        }, required: ['main_group'] }
       },
       {
         name: 'prepare_case_form_fill',
@@ -673,12 +695,60 @@
         return { id: String(c.id), code: String(c.code || ''), applicant: String(c.name || ''), activity: String(c.project || ''), group: groupName(c.mainGroup), location: String(c.loc || ''), status: String(c.caseStatus || '') };
       }) };
     }
+    if (name === 'select_active_case') {
+      var selected = findCase(args.case_id);
+      if (!selected) throw new Error('پرونده با این شناسه پیدا نشد.');
+      if (typeof window.selectActiveCase !== 'function') throw new Error('تابع انتخاب پرونده در سامانه موجود نیست.');
+      window.selectActiveCase(selected.id);
+      return { success: true, selected_case_id: String(selected.id), applicant: String(selected.name || '') };
+    }
     if (name === 'get_case_checklist') {
       requireConsent();
       var c = findCase(args.case_id);
       if (!c) throw new Error('پرونده موردنظر پیدا نشد.');
       var ctx = await buildCaseContext(c, false);
       return { case_id: c.id, applicant: c.name, activity: ctx.activity, documents: ctx.documents };
+    }
+    if (name === 'read_uploaded_case_document') {
+      requireConsent();
+      var dc = findCase(args.case_id);
+      if (!dc) throw new Error('پرونده مدنظر پیدا نشد.');
+      var spec = (window.ACT_SPECS || {})[dc.actType] || {};
+      var groupDocs = (window.DOC_CHECKLISTS || {})[spec.docGroup || 'LIVESTOCK'] || [];
+      if (!groupDocs.some(function (x) { return String(x.code) === String(args.doc_code || ''); })) throw new Error('کد مدرک متعلق به چک‌لیست این فعالیت نیست.');
+      var uploadMap = await getUploads(dc.id);
+      var uploaded = uploadMap[String(args.doc_code || '')];
+      if (!uploaded) throw new Error('فایل این مدرک در پرونده بارگذاری نشده است.');
+      if (!window.confirm('برای تحلیل محتوای «' + String(uploaded.fileName || args.doc_code) + '»، فایل به Gemini ارسال می‌شود. ادامه می‌دهی؟')) return { cancelled: true };
+      var apiKey = typeof window.getStoredGeminiApiKey === 'function' ? window.getStoredGeminiApiKey() : '';
+      if (!apiKey || typeof window.fetchDirectGeminiWithFallback !== 'function') throw new Error('اتصال Gemini آماده نیست.');
+      var dataUrl = String(uploaded.dataUrl || '');
+      if (!dataUrl && uploaded.rawBlob) {
+        dataUrl = await new Promise(function (resolve, reject) {
+          var reader = new FileReader();
+          reader.onload = function () { resolve(String(reader.result || '')); };
+          reader.onerror = function () { reject(new Error('خواندن فایل مدرک ناموفق بود.')); };
+          reader.readAsDataURL(uploaded.rawBlob);
+        });
+      }
+      var match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+      if (!match) throw new Error('محتوای فایل در مرورگر قابل خواندن نیست.');
+      var mime = match[1];
+      if (!/^application\/pdf$|^image\/(jpeg|png|webp|bmp)$/i.test(mime)) throw new Error('قالب فایل برای خواندن هوشمند پشتیبانی نمی‌شود.');
+      var prompt = [
+        'این فایل، مدرک بارگذاری‌شده در پرونده کشاورزی است.',
+        'فقط اطلاعاتی را استخراج کن که در فایل واقعاً قابل مشاهده است؛ هیچ شماره، تاریخ یا مقدار ناخوانا را حدس نزن.',
+        'عنوان مدرک: ' + String(uploaded.docTitle || args.doc_code),
+        'موضوع کنترل: ' + String(args.focus || 'مشخصات، تاریخ اعتبار و تطبیق با عنوان مدرک'),
+        'پاسخ را در بخش‌های اطلاعات خوانده‌شده، موارد قابل تأیید، ابهام/نقص و نتیجه بنویس.'
+      ].join('\n');
+      var generated = await window.fetchDirectGeminiWithFallback(apiKey, {
+        contents: [{ parts: [{ inlineData: { mimeType: mime, data: match[2] } }, { text: prompt }] }],
+        generationConfig: { temperature: 0.1, maxOutputTokens: 3500 }
+      }, typeof window.getStoredGeminiModel === 'function' ? window.getStoredGeminiModel() : '');
+      var analysis = safeTextFromGemini(generated);
+      if (!analysis) throw new Error('متن قابل خواندن از مدرک دریافت نشد.');
+      return { file_name: String(uploaded.fileName || ''), document_title: String(uploaded.docTitle || ''), analysis: analysis, model: generated.usedModel || '' };
     }
     if (name === 'list_office_tasks_and_letters') {
       requireConsent();
@@ -730,8 +800,34 @@
       return setPending({
         type: 'fields',
         label: 'اعمال ' + prepared.length + ' تغییر در فیلدهای صفحه',
-        summary: trim(args.explanation || '') + (args.explanation ? '\n' : '') + prepared.map(function (x) { return x.label + ': ' + x.value; }).join('\n'),
+        summary: trim(args.explanation || '') + (args.explanation ? '\n' : '') + prepared.map(function (x) { return x.label + ': ' + (/(nid|mobile|phone|tel)/i.test(x.id) ? '•••••• (مقدار در پیش‌نمایش پنهان است)' : x.value); }).join('\n'),
         updates: prepared
+      });
+    }
+    if (name === 'prepare_new_case') {
+      var group = String(args.main_group || '');
+      if (!GROUPS[group]) throw new Error('گروه تخصصی پرونده جدید معتبر نیست.');
+      var fresh = {};
+      var incoming = args.fields || {};
+      Object.keys(CASE_FIELDS).forEach(function (key) {
+        if (incoming[key] === undefined || incoming[key] === null || incoming[key] === '') return;
+        var val = incoming[key];
+        if (key === 'count') {
+          var n = Number(val);
+          if (!Number.isFinite(n) || n < 0 || n > 100000000) throw new Error('مقدار ظرفیت معتبر نیست.');
+          fresh[key] = n;
+        } else {
+          var str = String(val).trim();
+          if (str.length > (key === 'utm' ? 12000 : 600)) throw new Error('یکی از مقادیر بیش از حد مجاز است.');
+          fresh[key] = str;
+        }
+      });
+      fresh.mainGroup = group;
+      if (fresh.actType && (!(window.ACT_SPECS || {})[fresh.actType] || window.ACT_SPECS[fresh.actType].mainGroup !== group)) throw new Error('نوع فعالیت با گروه تخصصی انتخاب‌شده تطابق ندارد.');
+      return setPending({
+        type: 'new_case', mainGroup: group, fields: fresh,
+        label: 'ایجاد اولیه پرونده در گروه ' + groupName(group),
+        summary: Object.keys(fresh).map(function (key) { return (FIELD_LABELS[CASE_FIELDS[key]] || key) + ': ' + ((key === 'nid' || key === 'mobile') ? '•••••• (مقدار پنهان)' : fresh[key]); }).join('\n') + '\nپس از ایجاد، فرم بازبینی می‌شود و ذخیره نهایی باید در خود سامانه انجام شود.'
       });
     }
     if (name === 'prepare_case_form_fill') {
@@ -753,7 +849,6 @@
           if (key === 'mainGroup' && !GROUPS[str]) throw new Error('گروه تخصصی معتبر نیست.');
           if (key === 'entityType' && ['INDIVIDUAL', 'LEGAL', 'ORG'].indexOf(str) < 0) throw new Error('نوع شخصیت معتبر نیست.');
           if (key === 'actType' && !(window.ACT_SPECS || {})[str]) throw new Error('نوع فعالیت در فهرست سامانه وجود ندارد.');
-          if (key === 'nid' || key === 'mobile') throw new Error('برای حفاظت از داده‌های هویتی، کدملی و تلفن را از مسیر ابزار هوشمند وارد نمی‌کنم؛ این دو فیلد را خودت در فرم تکمیل کن.');
           clean[key] = str;
         }
       });
@@ -768,7 +863,7 @@
         type: 'case_fields',
         caseId: record.id,
         label: 'تکمیل فرم پرونده ' + String(record.name || record.code || record.id),
-        summary: Object.keys(clean).map(function (key) { return (FIELD_LABELS[CASE_FIELDS[key]] || key) + ': ' + clean[key]; }).join('\n') +
+        summary: Object.keys(clean).map(function (key) { return (FIELD_LABELS[CASE_FIELDS[key]] || key) + ': ' + ((key === 'nid' || key === 'mobile') ? '•••••• (مقدار پنهان)' : clean[key]); }).join('\n') +
           '\nمحاسبات وابسته پس از تغییر گروه/فعالیت/ظرفیت همگام می‌شوند؛ ذخیره نهایی پرونده انجام نمی‌شود.',
         fields: clean
       });
@@ -991,6 +1086,12 @@
   }
   function applyGenericFields(updates) {
     var changedIds = [];
+    var rank = { 'c-main-group': 0, 'c-entity-type': 1, 'c-act-type': 2, 'c-count': 3 };
+    updates = updates.slice().sort(function (a, b) {
+      var ra = Object.prototype.hasOwnProperty.call(rank, a.id) ? rank[a.id] : 10;
+      var rb = Object.prototype.hasOwnProperty.call(rank, b.id) ? rank[b.id] : 10;
+      return ra - rb;
+    });
     updates.forEach(function (u) {
       var el = getControl(u.control_id);
       if (!el || !/^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName)) throw new Error('فیلد ' + u.label + ' دیگر در صفحه قابل دسترس نیست.');
@@ -1012,15 +1113,21 @@
       if (p.type === 'fields') {
         applyGenericFields(p.updates);
         addMessage('system', 'تغییرات در فیلدهای صفحه اعمال شد؛ ذخیره نهایی انجام نشد.');
-      } else if (p.type === 'case_fields') {
-        var c = findCase(p.caseId);
+      } else if (p.type === 'case_fields' || p.type === 'new_case') {
+        var c = p.type === 'new_case' ? null : findCase(p.caseId);
+        if (p.type === 'new_case') {
+          if (typeof window.startNewCaseWizard !== 'function') throw new Error('فرم ایجاد پرونده جدید در دسترس نیست.');
+          window.startNewCaseWizard(p.mainGroup);
+          c = activeCase();
+          if (!c) throw new Error('فرم اولیه پرونده باز شد، اما رکورد فعالی ایجاد نشد؛ ایجاد پرونده را از فرم سامانه ادامه بده.');
+        }
         if (!c) throw new Error('پرونده دیگر در سامانه موجود نیست.');
         if (typeof window.selectActiveCase === 'function') window.selectActiveCase(c.id);
         if (typeof window.switchMainPane === 'function') window.switchMainPane('pane-cases');
         if (typeof window.switchCaseSubTab === 'function') window.switchCaseSubTab('sub-info');
         if (typeof window.loadActiveCaseIntoForm === 'function') window.loadActiveCaseIntoForm();
         applyCaseFields(p.fields);
-        addMessage('system', 'فیلدهای پیشنهادی در فرم پرونده قرار گرفتند. پرونده هنوز ذخیره نهایی نشده است.');
+        addMessage('system', p.type === 'new_case' ? 'فرم پرونده جدید ایجاد و فیلدهای پیشنهادی در آن قرار گرفتند؛ ذخیره نهایی پرونده انجام نشده است.' : 'فیلدهای پیشنهادی در فرم پرونده قرار گرفتند. پرونده هنوز ذخیره نهایی نشده است.');
       } else if (p.type === 'click') {
         var el = getControl(p.controlId);
         if (!el || el.disabled || dangerousControl(el)) throw new Error('دکمه تغییر کرده یا دیگر ایمن نیست؛ کلیک انجام نشد.');
