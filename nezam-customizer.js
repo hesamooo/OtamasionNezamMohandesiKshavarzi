@@ -412,7 +412,7 @@ function getLetterDraftFromEditor() {
     loc: c.loc || "",
     utm: c.utm || "",
     croquisMapId: map && map.id ? map.id : (activeCroquisMapId || ""),
-    utmAttachmentHtml: coordinateHtml,
+    utmAttachmentHtml: includeUtm ? coordinateHtml : preservedUtmSnapshot,
     body: body,
     paperSize: paperEl && paperEl.value === "A5" ? "A5" : (currentPaperSize || "A4"),
     includeUtm: includeUtm
