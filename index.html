@@ -763,6 +763,14 @@
         overflow: visible !important;
       }
 
+      /* حذف padding پیش‌فرض main مانع جابه‌جایی و کوچک شدن محدوده A4/A5 می‌شود. */
+      main {
+        width: 100% !important;
+        max-width: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
       header, nav, footer,
       .no-print,
       .case-hero-sticky,
@@ -2989,7 +2997,7 @@
 
   <!-- ماژول‌های اصلی اتوماسیون مرکز خدمات ۶۳۶ خفر -->
   <script src="./nezam-core.js?v=20261102-parcel-r3"></script>
-  <script src="./nezam-customizer.js?v=20261102-print-engine-r6"></script>
+  <script src="./nezam-customizer.js?v=20261102-print-engine-r7"></script>
   <script src="./nezam-ai-assistant.js?v=20261101-security-r3"></script>
 
   <!-- ماژول اصلاح‌شده و دوطرفه اتصال سامانه ۶۳۶ خفر به گوگل درایو (ذخیره و بازخوانی ۱۰۰٪ اطلاعات) -->
