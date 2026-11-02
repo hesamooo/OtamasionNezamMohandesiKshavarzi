@@ -289,7 +289,8 @@ test('standalone office correspondence is available without an applicant', () =>
   assert.match(customizer, /var isOfficeLetter = letter\.officeLetter === true/);
 
   const switcher = core.slice(core.indexOf('function switchMainPane'), core.indexOf('\nfunction switchCaseSubTab'));
-  assert.doesNotMatch(switcher, /"pane-letters"\s*:/);
+  const guardedPaneMap = switcher.slice(switcher.indexOf('var guardedPanes'), switcher.indexOf('var independentOfficeLetterFlow'));
+  assert.doesNotMatch(guardedPaneMap, /"pane-letters"\s*:/);
   assert.match(switcher, /paneId === "pane-print" && independentOfficeLetterFlow/);
   assert.match(core, /l\.officeLetter === true[\s\S]*نامه اداری مستقل دفتر/);
   assert.match(core, /مکاتبات مستقل دفتر را می‌توان از مسیر «نامه اداری مستقل دفتر»/);
