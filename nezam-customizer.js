@@ -389,6 +389,9 @@ function getLetterDraftFromEditor() {
   var isNat = rec.indexOf("منابع طبیعی") !== -1;
   var coordinateHtml = includeUtm ? buildAllSelectedFeaturesUtmTableHTML(c, c.utm || "", isNat) : "";
   var hasUtm = !!(coordinateHtml && coordinateHtml.trim());
+  var existingLetter = editingLetterId ? findSecretariatLetter(editingLetterId) : null;
+  var preservedUtmSnapshot = existingLetter && typeof existingLetter.utmAttachmentHtml === "string"
+    ? existingLetter.utmAttachmentHtml : "";
   return {
     id: editingLetterId || null,
     caseId: c.id,
@@ -407,7 +410,7 @@ function getLetterDraftFromEditor() {
     loc: c.loc || "",
     utm: c.utm || "",
     croquisMapId: map && map.id ? map.id : (activeCroquisMapId || ""),
-    utmAttachmentHtml: coordinateHtml,
+    utmAttachmentHtml: includeUtm ? coordinateHtml : preservedUtmSnapshot,
     body: body,
     paperSize: paperEl && paperEl.value === "A5" ? "A5" : (currentPaperSize || "A4"),
     includeUtm: includeUtm
@@ -1012,7 +1015,7 @@ window.savePaperEditsToSecretariat = function(options) {
     attach: attachmentLabel,
     paperSize: currentPaperSize,
     includeUtm: includeUtm,
-    utmAttachmentHtml: includeUtm ? appendixHtml : "",
+    utmAttachmentHtml: includeUtm ? appendixHtml : (base.utmAttachmentHtml || ""),
     croquisMapId: base.croquisMapId || activeCroquisMapId || ""
   });
   var wasNew = draftMode && !existingId;
@@ -1669,8 +1672,6 @@ window.toggleUtmInPreviewSheet = function() {
     if (appendixBeforeToggle) {
       letter.utmAttachmentHtml = appendixBeforeToggle;
       letter.includeUtm = true;
-    } else if (letter.includeUtm !== true) {
-      letter.utmAttachmentHtml = "";
     }
     letter.attach = getLetterAttachmentLabel(attachEl ? attachEl.innerText.trim() : letter.attach,
       !!(appendixBeforeToggle || letter.includeUtm === true));
