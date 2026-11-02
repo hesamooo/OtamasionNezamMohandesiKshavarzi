@@ -2504,7 +2504,7 @@
     </section>
 
     <!-- =====================================================================
-         PANE 5: تکنولوژی تنظیم خودکار تک‌برگی (قفل ابعاد کاغذ ۲۹۶ میلی‌متر - صفحه ۹ راهنمای PDF)
+         PANE 5: تکنولوژی چاپ و پیش‌نمایش استاندارد برگه‌های A4 و A5
          ===================================================================== -->
     <section id="pane-print" class="sec-pane">
       <div class="card-clean mb-3 no-print">
@@ -2522,7 +2522,7 @@
 
             <!-- کنترل اندازه فونت و تکنولوژی تنظیم خودکار تک‌برگی (صفحه ۹ راهنمای PDF) -->
             <div class="d-flex align-items-center gap-1 border rounded px-2 py-1 bg-light">
-              <small class="fw-bold text-dark">🔒 قفل ابعاد ۲۹۶ میلی‌متر:</small>
+              <small class="fw-bold text-dark">🔒 اندازه صفحه استاندارد A4 / A5:</small>
               <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 fw-bold" onclick="adjustPaperFontSize(-1)" title="کوچک‌تر کردن قلم (A-)">A-</button>
               <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 fw-bold" onclick="adjustPaperFontSize(1)" title="بزرگ‌تر کردن قلم (A+)">A+</button>
               <button type="button" class="btn btn-sm btn-success py-0 px-2 fw-bold" onclick="autoFitCurrentPaper()" title="تنظیم خودکار فونت و فاصله‌ها تا تمام محتوا بدون سرریز در یک صفحه تراز شود">✨ تنظیم خودکار تک‌برگی</button>
@@ -2534,7 +2534,7 @@
           </div>
 
           <div class="d-flex flex-wrap gap-2">
-            <button type="button" class="btn btn-sm btn-warning fw-bold" onclick="savePaperEditsToSecretariat()">💾 ذخیره متن و تغییرات در این کاغذ (A4/A5)</button>
+            <button type="button" id="btn-save-print-edits" class="btn btn-sm btn-warning fw-bold" onclick="savePaperEditsToSecretariat()">💾 ذخیره تغییرات نامه در دبیرخانه</button>
             <button type="button" class="btn btn-sm btn-outline-primary fw-bold" onclick="downloadPaperSheetFile()">📥 دانلود فایل مستقل این کاغذ</button>
             <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleQrVerificationOnSheets()">🔳 درج QR اصالت</button>
             <button type="button" class="btn btn-sm btn-primary" onclick="exportStageToWordDoc()">📝 خروجی Word (.doc)</button>
@@ -2544,7 +2544,7 @@
 
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
           <div class="d-flex flex-wrap gap-1">
-            <button type="button" class="btn btn-sm btn-outline-success" onclick="renderSinglePreviewSheet()">پیش‌نمایش نامه</button>
+            <button type="button" class="btn btn-sm btn-outline-success" onclick="previewCurrentLetterDraft()">پیش‌نمایش پیش‌نویس نامه</button>
             <button type="button" class="btn btn-sm btn-outline-primary" onclick="printUtmSketchSheet()">🗺️ شیت کروکی چندلایه UTM (۲ برگه مجزا: نقشه + جداول الف و ب)</button>
             <button type="button" class="btn btn-sm btn-outline-dark" onclick="printOfficialForm('FOLDER_COVER')">📋 روکش تکمیل پرونده</button>
             <button type="button" class="btn btn-sm btn-outline-dark" onclick="printOfficialForm('GREENHOUSE_CHECKLIST')">🌱 فرم پایش فنی گلخانه/قارچ</button>
@@ -2984,7 +2984,7 @@
 
   <!-- ماژول‌های اصلی اتوماسیون مرکز خدمات ۶۳۶ خفر -->
   <script src="./nezam-core.js?v=20261102-parcel-r3"></script>
-  <script src="./nezam-customizer.js?v=20261102-letter-appendix-print-r2"></script>
+  <script src="./nezam-customizer.js?v=20261102-letter-system-audit-r1"></script>
   <script src="./nezam-ai-assistant.js?v=20261101-security-r3"></script>
 
   <!-- ماژول اصلاح‌شده و دوطرفه اتصال سامانه ۶۳۶ خفر به گوگل درایو (ذخیره و بازخوانی ۱۰۰٪ اطلاعات) -->
