@@ -573,12 +573,16 @@ function renderTemplateButtonsInLettersPane() {
 
 function selectInquiryTemplate(key) {
   if (!requireActiveCase("انتخاب قالب نامه استعلام")) return;
+  if ((editingLetterId || letterDraftDirty) && !confirm("با انتخاب قالب جدید، متن فعلی ویرایشگر جایگزین می‌شود. ادامه می‌دهید؟")) return;
   currentTemplateKey = key;
   editingLetterId = null;
+  currentPreviewLetterId = null;
+  currentPreviewDraft = null;
+  currentPreviewMode = "EDITOR";
   var alertBox = document.getElementById("letter-edit-alert");
   if (alertBox) alertBox.style.display = "none";
   renderTemplateButtonsInLettersPane();
-  syncLetterEditorWithActiveCase();
+  syncLetterEditorWithActiveCase(true);
 }
 
 function syncLetterEditorWithActiveCase(force) {
@@ -665,156 +669,232 @@ function getLetterAttachmentLabel(baseValue, hasUtmAttachment) {
 
 function saveLetterToSecretariat(goToPrint, forcedPaperSize) {
   var c = requireActiveCase("ثبت و صدور نامه در دبیرخانه");
-  if (!c) return;
-  var d = window.getInquiryDataObject();
-  var rec = document.getElementById("l-recipient").value.trim() || "مدیریت محترم ...";
-  syncRichEditorToTextarea();
-  var body = sanitizeOfficeRichHtml((document.getElementById("l-body-rich") ? document.getElementById("l-body-rich").innerHTML : (document.getElementById("l-body") ? document.getElementById("l-body").value : "")).trim());
-  var dir = document.getElementById("l-direction").value || "OUT";
-  var chosenSize = forcedPaperSize || (document.getElementById("l-paper-size") || {}).value || currentPaperSize || "A4";
-  var incUtm = document.getElementById("l-include-utm") ? document.getElementById("l-include-utm").checked : true;
-  setPaperSize(chosenSize, true);
-  var letterMap = null;
-  try { if (typeof getActiveCroquisMap === "function") letterMap = getActiveCroquisMap(); } catch (mapError) { console.warn("Could not resolve active UTM map for letter:", mapError); }
-  var natResLetter = rec.indexOf("منابع طبیعی") !== -1;
-  var utmAttachmentSnapshot = incUtm ? buildAllSelectedFeaturesUtmTableHTML(c, c.utm, natResLetter) : "";
-  var hasUtmAttachment = !!(utmAttachmentSnapshot && utmAttachmentSnapshot.trim());
-  var attachmentLabel = getLetterAttachmentLabel(d.attach, hasUtmAttachment);
+  if (!c) return false;
 
-  var letterObj = {
-    id: editingLetterId || ("L-" + new Date().getTime()),
-    caseId: c.id,
-    number: d.num,
-    date: d.date,
-    type: dir,
-    attach: attachmentLabel,
-    recipient: rec,
-    appName: c.name,
-    appNid: c.nid,
-    project: c.project,
-    cap: c.cap,
-    land: c.land,
-    landParcel: c.landParcel || "",
-    water: c.water,
-    loc: c.loc,
-    utm: c.utm,
-    croquisMapId: letterMap && letterMap.id ? letterMap.id : (activeCroquisMapId || ""),
-    utmAttachmentHtml: utmAttachmentSnapshot,
-    body: body,
-    paperSize: chosenSize,
-    includeUtm: incUtm
-  };
-
-  if (editingLetterId) {
-    for (var i = 0; i < lettersDB.length; i++) {
-      if (lettersDB[i].id === editingLetterId) { lettersDB[i] = letterObj; break; }
-    }
-    editingLetterId = null;
-    document.getElementById("letter-edit-alert").style.display = "none";
-    logCaseAction(c, "ویرایش نامه شماره " + toFa(d.num) + " در کاغذ " + chosenSize + " خطاب به " + rec);
-    showToastMsg("تغییرات نامه در قالب کاغذ " + chosenSize + " ذخیره شد.");
-  } else {
-    lettersDB.unshift(letterObj);
-    document.getElementById("l-number").value = toFa("140502130" + (lettersDB.length + 1));
-    logCaseAction(c, "صدور و ذخیره نامه شماره " + toFa(d.num) + " در کاغذ " + chosenSize + " خطاب به " + rec);
-    showToastMsg("نامه در دفتر اندیکاتور و کاغذ " + chosenSize + " ذخیره شد.");
+  var existingId = editingLetterId || null;
+  var existingIndex = existingId ? lettersDB.findIndex(function (x) { return x && String(x.id) === String(existingId); }) : -1;
+  if (existingId && existingIndex < 0) {
+    showToastMsg("نامه در بایگانی پیدا نشد؛ برای جلوگیری از ایجاد سابقه اشتباه، ذخیره متوقف شد.", true);
+    return false;
+  }
+  if (existingId && String(lettersDB[existingIndex].caseId) !== String(c.id)) {
+    showToastMsg("پرونده فعال با پرونده متعلق به نامه یکسان نیست؛ ابتدا پرونده صحیح را انتخاب کنید.", true);
+    return false;
   }
 
+  var draft = getLetterDraftFromEditor();
+  if (!draft) return false;
+  if (!isSecretariatNumberAvailable(draft.number, existingId)) {
+    showToastMsg("شماره نامه تکراری است؛ شماره یکتای دیگری وارد کنید.", true);
+    var numberInput = document.getElementById("l-number");
+    if (numberInput) { numberInput.focus(); numberInput.select(); }
+    return false;
+  }
+
+  draft.paperSize = forcedPaperSize === "A5" ? "A5" : (forcedPaperSize === "A4" ? "A4" : draft.paperSize);
+  draft.id = existingId || ("L-" + Date.now() + "-" + Math.random().toString(36).slice(2, 7));
+  var oldLettersJson = JSON.stringify(lettersDB);
+  var oldHistoryJson = JSON.stringify(c.history || []);
+  var wasNew = !existingId;
+  var oldLetter = wasNew ? null : lettersDB[existingIndex];
+  var letterObj = Object.assign({}, oldLetter || {}, draft);
+
+  if (wasNew) lettersDB.unshift(letterObj);
+  else lettersDB[existingIndex] = letterObj;
+  logCaseAction(c, (wasNew ? "صدور و ثبت نامه شماره " : "ویرایش نامه شماره ") +
+    toFa(draft.number) + " در کاغذ " + draft.paperSize + " خطاب به " + draft.recipient);
+
+  if (!persistLetterAndCaseData()) {
+    lettersDB = JSON.parse(oldLettersJson);
+    c.history = JSON.parse(oldHistoryJson);
+    showToastMsg("ذخیره نامه انجام نشد؛ فضای مرورگر یا دسترسی ذخیره‌سازی را بررسی کنید. اطلاعات قبلی حفظ شد.", true);
+    return false;
+  }
+
+  editingLetterId = null;
+  currentPreviewDraft = null;
+  currentPreviewMode = "LETTER";
   currentPreviewLetterId = letterObj.id;
-  saveAllDB();
-  renderSinglePreviewSheet(letterObj, chosenSize);
+  letterDraftCaseId = c.id;
+  letterDraftDirty = false;
+  var alertBox = document.getElementById("letter-edit-alert");
+  if (alertBox) alertBox.style.display = "none";
+  var nextNumberInput = document.getElementById("l-number");
+  if (wasNew && nextNumberInput) nextNumberInput.value = getNextSecretariatNumber();
+
+  window.setPaperSize(letterObj.paperSize, true);
+  renderSinglePreviewSheet(letterObj, letterObj.paperSize);
+  showToastMsg(wasNew
+    ? "نامه با شماره " + toFa(letterObj.number) + " در دبیرخانه ثبت شد."
+    : "تغییرات نامه شماره " + toFa(letterObj.number) + " در دبیرخانه ذخیره شد.");
+
   if (goToPrint) {
     switchMainPane("pane-print");
-    // دکمه‌های «چاپ A4/A5» واقعاً پنجره چاپ را باز می‌کنند؛ چاپ از مسیر استاندارد انجام می‌شود.
-    setTimeout(function () {
-      if (typeof window.doPrintPaperSheet === "function") window.doPrintPaperSheet();
-    }, 140);
+    setTimeout(function () { window.doPrintPaperSheet(); }, 180);
   }
+  return true;
 }
 window.saveCurrentLetter = saveLetterToSecretariat;
 
-/* ذخیره مستقیم متن‌های ویرایش‌شده داخل برگه کاغذ A4 یا A5 در دبیرخانه و پرونده */
-window.savePaperEditsToSecretariat = function() {
-  var stage = document.getElementById("a4-preview-stage");
-  if (!stage) return;
-  var pageEl = stage.querySelector(".a4-page");
-  if (!pageEl) return;
+function collectUtmAppendixFromStage(stage) {
+  if (!stage) return "";
+  var pages = stage.querySelectorAll(".a4-page");
+  var combined = null;
+  var combinedBody = null;
+  for (var i = 1; i < pages.length; i++) {
+    var table = pages[i].querySelector(".utm-table-print");
+    if (!table) continue;
+    if (!combined) {
+      combined = table.cloneNode(false);
+      var head = table.querySelector("thead");
+      if (head) combined.appendChild(head.cloneNode(true));
+      combinedBody = document.createElement("tbody");
+      combined.appendChild(combinedBody);
+    }
+    var body = table.querySelector("tbody");
+    if (body) {
+      Array.prototype.forEach.call(body.children, function (row) {
+        combinedBody.appendChild(row.cloneNode(true));
+      });
+    }
+  }
+  if (!combined || !combinedBody || !combinedBody.children.length) return "";
+  return sanitizeOfficeRichHtml(combined.outerHTML);
+}
 
-  var c = getActiveCase();
+window.savePaperEditsToSecretariat = function(options) {
+  var opts = options || {};
+  var silent = opts.silent === true;
+  var stage = document.getElementById("a4-preview-stage");
+  if (!stage) {
+    if (!silent) showToastMsg("برگه‌ای برای ذخیره وجود ندارد.", true);
+    return false;
+  }
+  if (currentPreviewMode !== "LETTER" && currentPreviewMode !== "LETTER_DRAFT") {
+    if (!silent) showToastMsg("این عملیات فقط برای نامه‌ها فعال است؛ فرم‌ها و کروکی‌ها را از مسیر خروجی چاپ ذخیره کنید.", true);
+    return false;
+  }
+
+  var pageEls = stage.querySelectorAll(".a4-page");
+  var pageEl = pageEls.length ? pageEls[0] : null;
+  if (!pageEl) {
+    if (!silent) showToastMsg("پیش‌نمایش نامه خالی است.", true);
+    return false;
+  }
   var recEl = pageEl.querySelector(".l-rec");
   var txtEl = pageEl.querySelector(".l-txt");
   var numEl = pageEl.querySelector(".paper-meta-num");
   var dateEl = pageEl.querySelector(".paper-meta-date");
   var attachEl = pageEl.querySelector(".paper-meta-attach");
-
-  var newRec = recEl ? recEl.innerText.trim() : ((document.getElementById("l-recipient") || {}).value || "");
-  var newBodyText = txtEl ? txtEl.innerText.trim() : ((document.getElementById("l-body") || {}).value || "");
-  var newBodyHtml = txtEl ? sanitizeOfficeRichHtml(txtEl.innerHTML) : sanitizeOfficeRichHtml(String(newBodyText || "").replace(/\n/g, "<br>"));
-  var newNum = numEl ? numEl.innerText.trim() : ((document.getElementById("l-number") || {}).value || "۱۴۰۵۰۲۱۳۰۱");
-  var newDate = dateEl ? dateEl.innerText.trim() : todayShamsi();
+  var newRec = recEl ? recEl.innerText.trim() : "";
+  var newBodyText = txtEl ? (txtEl.innerText || txtEl.textContent || "").trim() : "";
+  var newBodyHtml = txtEl ? sanitizeOfficeRichHtml(txtEl.innerHTML) : "";
+  var newNum = numEl ? numEl.innerText.trim() : "";
+  var newDate = dateEl ? dateEl.innerText.trim() : "";
   var newAttach = attachEl ? attachEl.innerText.trim() : "ندارد";
 
-  // همگام‌سازی با فرم دبیرخانه در صورتیکه نامه عادی است
-  if (currentPreviewMode === "LETTER") {
-    if (document.getElementById("l-recipient") && newRec) document.getElementById("l-recipient").value = newRec;
-    if (document.getElementById("l-body") && newBodyText) document.getElementById("l-body").value = newBodyText;
-    if (document.getElementById("l-number") && newNum) document.getElementById("l-number").value = newNum;
-    if (document.getElementById("l-date") && newDate) document.getElementById("l-date").value = newDate;
-    if (document.getElementById("l-attach") && newAttach) document.getElementById("l-attach").value = newAttach;
+  if (!newBodyText || !newRec || !newNum || !newDate) {
+    if (!silent) showToastMsg("متن، گیرنده، شماره و تاریخ نامه باید کامل باشند.", true);
+    return false;
   }
 
-  var targetLetter = null;
-  if (currentPreviewLetterId) {
-    for (var i = 0; i < lettersDB.length; i++) {
-      if (lettersDB[i].id === currentPreviewLetterId) {
-        targetLetter = lettersDB[i];
-        break;
-      }
-    }
+  var draftMode = currentPreviewMode === "LETTER_DRAFT";
+  var draft = draftMode ? currentPreviewDraft : null;
+  var existingId = draftMode ? (draft && draft.id) : currentPreviewLetterId;
+  var existingIndex = existingId ? lettersDB.findIndex(function (x) { return x && String(x.id) === String(existingId); }) : -1;
+  if (existingId && existingIndex < 0) {
+    if (!silent) showToastMsg("سابقه نامه برای ذخیره پیدا نشد؛ دوباره پیش‌نمایش بگیرید.", true);
+    return false;
+  }
+  if (!draftMode && !existingId) {
+    if (!silent) showToastMsg("این برگه به نامه ثبت‌شده متصل نیست؛ ابتدا پیش‌نویس را از دبیرخانه ثبت کنید.", true);
+    return false;
   }
 
-  if (targetLetter) {
-    if (currentPreviewMode === "LETTER") {
-      targetLetter.recipient = newRec || targetLetter.recipient;
-      targetLetter.body = newBodyHtml || targetLetter.body;
-    }
-    targetLetter.number = newNum || targetLetter.number;
-    targetLetter.date = newDate || targetLetter.date;
-    targetLetter.attach = newAttach || targetLetter.attach;
-    targetLetter.paperSize = currentPaperSize;
-    targetLetter.savedPaperHtml = pageEl.outerHTML;
-  } else if (c) {
-    var created = {
-      id: "L-" + new Date().getTime(),
-      caseId: c.id,
-      number: newNum,
-      date: newDate,
-      type: "OUT",
-      attach: newAttach,
-      recipient: newRec || ("برگه رسمی (" + currentPaperSize + ") - " + c.name),
-      appName: c.name,
-      appNid: c.nid,
-      project: c.project,
-      cap: c.cap,
-      land: c.land,
-      landParcel: c.landParcel || "",
-      water: c.water,
-      loc: c.loc,
-      utm: c.utm,
-      body: currentPreviewMode === "LETTER" ? newBodyHtml : ("سند چاپی ذخیره‌شده در کاغذ " + currentPaperSize),
-      paperSize: currentPaperSize,
-      includeUtm: false,
-      savedPaperHtml: pageEl.outerHTML
-    };
-    lettersDB.unshift(created);
-    currentPreviewLetterId = created.id;
+  var base = draftMode ? draft : lettersDB[existingIndex];
+  if (!base) {
+    if (!silent) showToastMsg("اطلاعات پیش‌نویس نامه در دسترس نیست.", true);
+    return false;
+  }
+  var caseObj = (Array.isArray(window.casesDB) ? window.casesDB : []).find(function (item) {
+    return item && String(item.id) === String(base.caseId);
+  }) || getActiveCase();
+  if (!caseObj || String(caseObj.id) !== String(base.caseId)) {
+    if (!silent) showToastMsg("پرونده مرتبط با نامه در دسترس نیست؛ ذخیره متوقف شد.", true);
+    return false;
+  }
+  if (!isSecretariatNumberAvailable(newNum, existingId)) {
+    if (!silent) showToastMsg("شماره نامه در بایگانی تکراری شده است؛ ابتدا شماره یکتا انتخاب کنید.", true);
+    return false;
   }
 
-  if (c) {
-    logCaseAction(c, "ذخیره متن و چیدمان نامه شماره " + toFa(newNum) + " در کاغذ " + currentPaperSize);
+  var appendixHtml = collectUtmAppendixFromStage(stage);
+  var includeUtm = !!(appendixHtml && appendixHtml.trim());
+  var attachmentLabel = getLetterAttachmentLabel(newAttach, includeUtm);
+  var updated = Object.assign({}, base, {
+    number: newNum,
+    date: newDate,
+    recipient: newRec,
+    body: newBodyHtml,
+    attach: attachmentLabel,
+    paperSize: currentPaperSize,
+    includeUtm: includeUtm,
+    utmAttachmentHtml: includeUtm ? appendixHtml : "",
+    croquisMapId: base.croquisMapId || activeCroquisMapId || ""
+  });
+  var wasNew = draftMode && !existingId;
+  if (wasNew) updated.id = "L-" + Date.now() + "-" + Math.random().toString(36).slice(2, 7);
+
+  var oldLettersJson = JSON.stringify(lettersDB);
+  var oldHistoryJson = JSON.stringify(caseObj.history || []);
+  var oldLetterJson = existingIndex >= 0 ? JSON.stringify(lettersDB[existingIndex]) : null;
+  if (wasNew) lettersDB.unshift(updated);
+  else lettersDB[existingIndex] = updated;
+
+  var changed = wasNew || oldLetterJson !== JSON.stringify(updated);
+  if (wasNew || (changed && opts.log !== false)) {
+    logCaseAction(caseObj, (wasNew ? "صدور و ثبت نامه شماره " : "ذخیره اصلاحات نامه شماره ") +
+      toFa(newNum) + " روی کاغذ " + currentPaperSize);
   }
-  saveAllDB();
-  showToastMsg("✅ متن و تغییرات مستقیماً در قالب کاغذ " + currentPaperSize + " در دبیرخانه و پرونده ذخیره شد.");
+
+  if (!persistLetterAndCaseData()) {
+    lettersDB = JSON.parse(oldLettersJson);
+    caseObj.history = JSON.parse(oldHistoryJson);
+    if (!silent) showToastMsg("ذخیره تغییرات نامه ناموفق بود؛ نسخه قبلی حفظ شد.", true);
+    return false;
+  }
+
+  currentPreviewMode = "LETTER";
+  currentPreviewLetterId = updated.id;
+  currentPreviewDraft = null;
+  editingLetterId = null;
+  letterDraftCaseId = caseObj.id;
+  letterDraftDirty = false;
+
+  var fields = {
+    "l-number": newNum,
+    "l-date": newDate,
+    "l-attach": attachmentLabel,
+    "l-recipient": newRec,
+    "l-body": newBodyText
+  };
+  Object.keys(fields).forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.value = fields[id];
+  });
+  var rich = document.getElementById("l-body-rich");
+  if (rich) rich.innerHTML = newBodyHtml;
+  var includeEl = document.getElementById("l-include-utm");
+  if (includeEl) includeEl.checked = includeUtm;
+  var paperEl = document.getElementById("l-paper-size");
+  if (paperEl) paperEl.value = currentPaperSize;
+
+  updatePrintUtmBtnState(includeUtm);
+  updatePaperActionButtons();
+  if (!silent) showToastMsg(wasNew
+    ? "پیش‌نویس در دبیرخانه ثبت و ذخیره شد."
+    : (changed ? "تغییرات نامه و پیوست آن در دبیرخانه ذخیره شد." : "نامه بدون تغییر جدید در دبیرخانه ثبت است."));
+  return true;
 };
 
 /* دانلود فایل مستقل برگه A4 یا A5 جهت بایگانی یا چاپ در هر سیستم */
