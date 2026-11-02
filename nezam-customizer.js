@@ -166,7 +166,7 @@ function applyDynamicPrintPageSizeCSS(size) {
     document.head.appendChild(styleEl);
   }
   // قانون @page باید در سطح اول استایل باشد تا مرورگر حاشیه پیش‌فرض را صفر کرده و سایز دقیق A4/A5 را اعمال کند
-  styleEl.textContent = "@page { size: " + s + " portrait; size: " + mmDims + "; margin: 0mm; }";
+  styleEl.textContent = "@page { size: " + mmDims + "; margin: 0; }";
 }
 
 window.setPaperSize = function(size, skipSave) {
@@ -387,9 +387,18 @@ function syncTextareaToRichEditor() {
 window.syncTextareaToRichEditor = syncTextareaToRichEditor;
 
 function onToggleLetterIncludeUtm(checked) {
-  showToastMsg(checked ? "📍 جدول مختصات UTM در نامه درج خواهد شد." : "📍 نامه بدون جدول مختصات UTM صادر خواهد شد.");
+  showToastMsg(checked ? "📍 جدول مختصات به‌صورت برگه پیوست مستقل به نامه افزوده خواهد شد." : "📍 پیوست مختصات برای این نامه غیرفعال شد.");
 }
 window.onToggleLetterIncludeUtm = onToggleLetterIncludeUtm;
+
+function getLetterAttachmentLabel(baseValue, hasUtmAttachment) {
+  var base = String(baseValue || "").trim();
+  var label = "جدول مختصات UTM";
+  if (!hasUtmAttachment) return base || "ندارد";
+  if (!base || /^ندارد$/i.test(base)) return label;
+  if (base.indexOf(label) !== -1) return base;
+  return base + "، " + label;
+}
 
 function saveLetterToSecretariat(goToPrint, forcedPaperSize) {
   var c = requireActiveCase("ثبت و صدور نامه در دبیرخانه");
@@ -402,6 +411,12 @@ function saveLetterToSecretariat(goToPrint, forcedPaperSize) {
   var chosenSize = forcedPaperSize || (document.getElementById("l-paper-size") || {}).value || currentPaperSize || "A4";
   var incUtm = document.getElementById("l-include-utm") ? document.getElementById("l-include-utm").checked : true;
   setPaperSize(chosenSize, true);
+  var letterMap = null;
+  try { if (typeof getActiveCroquisMap === "function") letterMap = getActiveCroquisMap(); } catch (mapError) { console.warn("Could not resolve active UTM map for letter:", mapError); }
+  var natResLetter = rec.indexOf("منابع طبیعی") !== -1;
+  var utmAttachmentSnapshot = incUtm ? buildAllSelectedFeaturesUtmTableHTML(c, c.utm, natResLetter) : "";
+  var hasUtmAttachment = !!(utmAttachmentSnapshot && utmAttachmentSnapshot.trim());
+  var attachmentLabel = getLetterAttachmentLabel(d.attach, hasUtmAttachment);
 
   var letterObj = {
     id: editingLetterId || ("L-" + new Date().getTime()),
@@ -409,7 +424,7 @@ function saveLetterToSecretariat(goToPrint, forcedPaperSize) {
     number: d.num,
     date: d.date,
     type: dir,
-    attach: d.attach,
+    attach: attachmentLabel,
     recipient: rec,
     appName: c.name,
     appNid: c.nid,
@@ -420,6 +435,8 @@ function saveLetterToSecretariat(goToPrint, forcedPaperSize) {
     water: c.water,
     loc: c.loc,
     utm: c.utm,
+    croquisMapId: letterMap && letterMap.id ? letterMap.id : (activeCroquisMapId || ""),
+    utmAttachmentHtml: utmAttachmentSnapshot,
     body: body,
     paperSize: chosenSize,
     includeUtm: incUtm
@@ -443,7 +460,13 @@ function saveLetterToSecretariat(goToPrint, forcedPaperSize) {
   currentPreviewLetterId = letterObj.id;
   saveAllDB();
   renderSinglePreviewSheet(letterObj, chosenSize);
-  if (goToPrint) switchMainPane("pane-print");
+  if (goToPrint) {
+    switchMainPane("pane-print");
+    // دکمه‌های «چاپ A4/A5» واقعاً پنجره چاپ را باز می‌کنند؛ چاپ از مسیر استاندارد انجام می‌شود.
+    setTimeout(function () {
+      if (typeof window.doPrintPaperSheet === "function") window.doPrintPaperSheet();
+    }, 140);
+  }
 }
 window.saveCurrentLetter = saveLetterToSecretariat;
 
@@ -462,7 +485,8 @@ window.savePaperEditsToSecretariat = function() {
   var attachEl = pageEl.querySelector(".paper-meta-attach");
 
   var newRec = recEl ? recEl.innerText.trim() : ((document.getElementById("l-recipient") || {}).value || "");
-  var newBody = txtEl ? txtEl.innerText.trim() : ((document.getElementById("l-body") || {}).value || "");
+  var newBodyText = txtEl ? txtEl.innerText.trim() : ((document.getElementById("l-body") || {}).value || "");
+  var newBodyHtml = txtEl ? sanitizeOfficeRichHtml(txtEl.innerHTML) : sanitizeOfficeRichHtml(String(newBodyText || "").replace(/\n/g, "<br>"));
   var newNum = numEl ? numEl.innerText.trim() : ((document.getElementById("l-number") || {}).value || "۱۴۰۵۰۲۱۳۰۱");
   var newDate = dateEl ? dateEl.innerText.trim() : todayShamsi();
   var newAttach = attachEl ? attachEl.innerText.trim() : "ندارد";
@@ -470,7 +494,7 @@ window.savePaperEditsToSecretariat = function() {
   // همگام‌سازی با فرم دبیرخانه در صورتیکه نامه عادی است
   if (currentPreviewMode === "LETTER") {
     if (document.getElementById("l-recipient") && newRec) document.getElementById("l-recipient").value = newRec;
-    if (document.getElementById("l-body") && newBody) document.getElementById("l-body").value = newBody;
+    if (document.getElementById("l-body") && newBodyText) document.getElementById("l-body").value = newBodyText;
     if (document.getElementById("l-number") && newNum) document.getElementById("l-number").value = newNum;
     if (document.getElementById("l-date") && newDate) document.getElementById("l-date").value = newDate;
     if (document.getElementById("l-attach") && newAttach) document.getElementById("l-attach").value = newAttach;
@@ -489,7 +513,7 @@ window.savePaperEditsToSecretariat = function() {
   if (targetLetter) {
     if (currentPreviewMode === "LETTER") {
       targetLetter.recipient = newRec || targetLetter.recipient;
-      targetLetter.body = newBody || targetLetter.body;
+      targetLetter.body = newBodyHtml || targetLetter.body;
     }
     targetLetter.number = newNum || targetLetter.number;
     targetLetter.date = newDate || targetLetter.date;
@@ -514,7 +538,7 @@ window.savePaperEditsToSecretariat = function() {
       water: c.water,
       loc: c.loc,
       utm: c.utm,
-      body: currentPreviewMode === "LETTER" ? newBody : ("سند چاپی ذخیره‌شده در کاغذ " + currentPaperSize),
+      body: currentPreviewMode === "LETTER" ? newBodyHtml : ("سند چاپی ذخیره‌شده در کاغذ " + currentPaperSize),
       paperSize: currentPaperSize,
       savedPaperHtml: pageEl.outerHTML
     };
@@ -541,14 +565,14 @@ window.downloadPaperSheetFile = function(forcedSize) {
   var c = getActiveCase();
   var pSize = currentPaperSize || "A4";
   var wMm = pSize === "A5" ? "148mm" : "210mm";
-  var hMm = pSize === "A5" ? "208mm" : "295mm";
+  var hMm = pSize === "A5" ? "210mm" : "297mm";
   var docHtml = '<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="UTF-8">' +
     '<title>برگه رسمی ' + pSize + ' - مرکز خدمات ۶۳۶ خفر</title>' +
     '<style>' +
     '*{box-sizing:border-box;font-family:Vazirmatn,Tahoma,sans-serif;}' +
     'body{margin:0;padding:10mm;background:#334155;display:flex;flex-direction:column;align-items:center;gap:16px;direction:rtl;}' +
-    '.a4-page{width:210mm;height:296mm;max-height:296mm;background:#fff;color:#000;display:flex;flex-direction:column;justify-content:space-between;box-shadow:0 8px 25px rgba(0,0,0,0.4);overflow:hidden;page-break-after:always;break-after:page;}' +
-    '.a4-page.paper-a5{width:148mm !important;height:209mm !important;max-height:209mm !important;}' +
+    '.a4-page{width:210mm;height:297mm;max-height:297mm;background:#fff;color:#000;display:flex;flex-direction:column;justify-content:space-between;box-shadow:0 8px 25px rgba(0,0,0,0.4);overflow:hidden;page-break-after:always;break-after:page;}' +
+    '.a4-page.paper-a5{width:148mm !important;height:210mm !important;max-height:210mm !important;}' +
     '.lh-top{color:#fff;padding:5mm 8mm;display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #f3e06b;}' +
     '.lh-r{width:42%;text-align:right;}.lh-sub{font-size:8.5pt;font-weight:700;}.lh-main{font-size:10.5pt;font-weight:900;color:#f3e06b;}' +
     '.lh-c{width:20%;text-align:center;font-size:12pt;font-weight:900;}' +
@@ -559,8 +583,8 @@ window.downloadPaperSheetFile = function(forcedSize) {
     '.l-rec{font-size:11pt;font-weight:900;margin-bottom:2mm;}' +
     '.l-txt{font-size:10.2pt;line-height:1.95;text-align:justify;white-space:pre-line;}' +
     '.paper-a5 .lh-body{padding:4mm 6mm;}.paper-a5 .l-rec{font-size:9.5pt;}.paper-a5 .l-txt{font-size:8.8pt;line-height:1.65;}' +
-    '.utm-table-print{width:96%;margin:2.5mm auto;border-collapse:collapse;font-size:8.2pt;}' +
-    '.utm-table-print th,.utm-table-print td{border:1.2px solid #000;padding:1mm 1.8mm;text-align:center;}' +
+    '.utm-table-print{width:96%;margin:2.5mm auto;border-collapse:collapse;table-layout:fixed;font-size:8.2pt;direction:rtl;}' +
+    '.utm-table-print th,.utm-table-print td{border:1.2px solid #000;padding:1mm 1.8mm;text-align:center;overflow-wrap:anywhere;}' +
     '.paper-a5 .utm-table-print{width:100%;font-size:6.8pt;margin:1.5mm auto;}' +
     '.paper-a5 .utm-table-print th,.paper-a5 .utm-table-print td{padding:0.6mm 0.9mm;}' +
     '.utm-table-print th{background:#e2e8f0;font-weight:900;}' +
@@ -569,9 +593,9 @@ window.downloadPaperSheetFile = function(forcedSize) {
     '.lh-foot{color:#fff;padding:3.5mm 8mm;border-top:2.5px solid #f3e06b;font-size:8pt;flex-shrink:0;}' +
     '.f-warn{text-align:center;font-weight:800;color:#f3e06b;margin-bottom:1mm;}' +
     '.f-info{display:flex;justify-content:space-between;align-items:center;}' +
-    '@page{size:' + pSize + ' portrait;margin:0mm;}' +
+    '@page{size:' + wMm + ' ' + hMm + ';margin:0;}' +
     '.no-print{display:none !important;}' +
-    '@media print{*{print-color-adjust:exact !important;-webkit-print-color-adjust:exact !important;}body{padding:0;margin:0;background:#fff;display:block;}.a4-page,.a4-page.paper-a5{box-shadow:none !important;margin:0 auto !important;width:100% !important;max-width:' + wMm + ' !important;height:' + hMm + ' !important;max-height:' + hMm + ' !important;page-break-inside:avoid !important;break-inside:avoid !important;page-break-after:always !important;break-after:page !important;}.a4-page:last-child,.a4-page.paper-a5:last-child{page-break-after:auto !important;break-after:auto !important;}}' +
+    '@media print{*{print-color-adjust:exact !important;-webkit-print-color-adjust:exact !important;}html,body{width:' + wMm + ' !important;height:auto !important;padding:0 !important;margin:0 !important;background:#fff;display:block;}.a4-page,.a4-page.paper-a5{box-shadow:none !important;margin:0 !important;width:' + wMm + ' !important;min-width:' + wMm + ' !important;max-width:' + wMm + ' !important;height:' + hMm + ' !important;min-height:' + hMm + ' !important;max-height:' + hMm + ' !important;page-break-inside:avoid !important;break-inside:avoid !important;page-break-after:always !important;break-after:page !important;}.a4-page:last-child,.a4-page.paper-a5:last-child{page-break-after:auto !important;break-after:auto !important;}}' +
     '</style></head><body>' + stage.innerHTML + '</body></html>';
 
   var a = document.createElement("a");
@@ -666,6 +690,8 @@ function previewSavedLetter(letterId, forcedPaperSize, printNow) {
   });
   if (linkedCase) {
     activeCaseId = linkedCase.id;
+    activeCroquisMapId = l.croquisMapId || "";
+    activeCroquisLayerId = "";
     try { localStorage.setItem("nezam636_active_case_id", String(linkedCase.id)); } catch (storageError) {}
     try {
       if (typeof populateGlobalCaseSelector === "function") populateGlobalCaseSelector();
@@ -789,11 +815,15 @@ function buildAllSelectedFeaturesUtmTableHTML(c, utmRaw, isNatRes) {
 }
 
 /* ساخت برگه A4 و A5 سربرگ رسمی مرکز ۶۳۶ با کنترل سرریز متن و تفکیک شیت‌ها */
-function buildSingleA4HTML(rec, bodyTxt, numStr, dateStr, attachStr, utmRaw, isNatRes, isRawHtml, paperSize, includeUtm, sheetTag) {
+function buildSingleA4HTML(rec, bodyTxt, numStr, dateStr, attachStr, utmRaw, isNatRes, isRawHtml, paperSize, includeUtm, sheetTag, utmHtmlOverride) {
   var pSize = (paperSize || currentPaperSize) === "A5" ? "A5" : "A4";
   var c = getActiveCase();
   var showUtm = includeUtm !== false;
-  var utmTableHtml = (!isRawHtml && showUtm && (utmRaw || c)) ? buildAllSelectedFeaturesUtmTableHTML(c, utmRaw, isNatRes) : "";
+  var utmTableHtml = "";
+  if (showUtm) {
+    if (typeof utmHtmlOverride === "string") utmTableHtml = utmHtmlOverride;
+    else if (utmRaw || c) utmTableHtml = buildAllSelectedFeaturesUtmTableHTML(c, utmRaw, isNatRes);
+  }
   var safeHeaderColor = safeHexColor(brandCfg.headerColor, "#1b4332");
   var logoData = String(brandCfg.customLogoData || "");
   var stampData = String(brandCfg.customStampData || "");
@@ -868,33 +898,34 @@ function autoFitPaperContent(container) {
   for (var i = 0; i < pages.length; i++) {
     var page = pages[i];
     var body = page.querySelector(".lh-body");
+    var wrap = page.querySelector(".lh-content-wrap");
     var txt = page.querySelector(".l-txt");
     if (!body || !txt) continue;
 
     var isA5 = page.classList.contains("paper-a5");
     var currentSize = isA5 ? 8.8 : 10.5;
     var lineH = isA5 ? 1.65 : 1.95;
-
-    txt.style.fontSize = currentSize + "pt";
-    txt.style.lineHeight = lineH;
-
     var tables = page.querySelectorAll(".utm-table-print");
     var tblFont = isA5 ? 7.2 : 8.2;
 
+    txt.style.fontSize = currentSize + "pt";
+    txt.style.lineHeight = lineH;
+    function hasOverflow() {
+      return body.scrollHeight > body.clientHeight + 1 || (wrap && wrap.scrollHeight > wrap.clientHeight + 1);
+    }
     var count = 0;
-    while (body.scrollHeight > body.clientHeight && count < 10) {
-      currentSize = Math.max(7.2, currentSize - 0.45);
-      lineH = Math.max(1.35, lineH - 0.07);
+    while (hasOverflow() && count < 18) {
+      currentSize = Math.max(isA5 ? 6.8 : 7.2, currentSize - 0.35);
+      lineH = Math.max(1.25, lineH - 0.05);
       txt.style.fontSize = currentSize + "pt";
       txt.style.lineHeight = lineH;
       if (tables.length) {
-        tblFont = Math.max(6.5, tblFont - 0.35);
-        for (var t = 0; t < tables.length; t++) {
-          tables[t].style.fontSize = tblFont + "pt";
-        }
+        tblFont = Math.max(isA5 ? 5.5 : 6.0, tblFont - 0.3);
+        for (var t = 0; t < tables.length; t++) tables[t].style.fontSize = tblFont + "pt";
       }
       count++;
     }
+    page.setAttribute("data-content-overflow", hasOverflow() ? "true" : "false");
   }
 }
 window.autoFitPaperContent = autoFitPaperContent;
@@ -915,6 +946,56 @@ window.adjustPaperFontSize = function(delta) {
   showToastMsg(delta > 0 ? "اندازه قلم برگه بزرگ‌تر شد (A+)" : "اندازه قلم برگه کوچک‌تر شد (A-)");
 };
 
+function splitUtmAttachmentTableHtml(tableHtml, paperSize) {
+  if (!tableHtml) return [];
+  try {
+    var parsed = new DOMParser().parseFromString(String(tableHtml), "text/html");
+    var source = parsed.querySelector("table.utm-table-print");
+    if (!source) return [String(tableHtml)];
+    var tbody = source.querySelector("tbody");
+    if (!tbody) return [source.outerHTML];
+    var rows = Array.prototype.slice.call(tbody.children);
+    var maxPoints = paperSize === "A5" ? 10 : 18;
+    var chunks = [], current = [], pointCount = 0, activeGroupHeader = null;
+    function flushChunk() {
+      if (!current.length) return;
+      chunks.push(current);
+      current = [];
+      pointCount = 0;
+    }
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      var isGroupHeader = row.cells && row.cells.length === 1 && Number(row.cells[0].colSpan || 1) > 1;
+      if (isGroupHeader) {
+        activeGroupHeader = row.cloneNode(true);
+        if (pointCount >= maxPoints) flushChunk();
+        current.push(row.cloneNode(true));
+        continue;
+      }
+      if (pointCount >= maxPoints) {
+        flushChunk();
+        if (activeGroupHeader) current.push(activeGroupHeader.cloneNode(true));
+      }
+      current.push(row.cloneNode(true));
+      pointCount++;
+    }
+    flushChunk();
+    if (chunks.length <= 1) return [source.outerHTML];
+    return chunks.map(function (chunkRows) {
+      var table = source.cloneNode(false);
+      var head = source.querySelector("thead");
+      if (head) table.appendChild(head.cloneNode(true));
+      var newBody = document.createElement("tbody");
+      chunkRows.forEach(function (r) { newBody.appendChild(r); });
+      table.appendChild(newBody);
+      return table.outerHTML;
+    });
+  } catch (e) {
+    console.warn("Could not split UTM coordinate appendix:", e);
+    return [String(tableHtml)];
+  }
+}
+
 function renderSinglePreviewSheet(letterObj, forcedPaperSize) {
   var stage = document.getElementById("a4-preview-stage");
   if (!stage) return;
@@ -933,9 +1014,25 @@ function renderSinglePreviewSheet(letterObj, forcedPaperSize) {
   setPaperSize(pSize, true);
   var isNat = (l.recipient || "").indexOf("منابع طبیعی") !== -1;
   var incUtm = l.includeUtm !== false;
-  stage.innerHTML = buildSingleA4HTML(l.recipient, sanitizeOfficeRichHtml(l.body), l.number, l.date, l.attach || "ندارد", l.utm, isNat, true, pSize, incUtm);
-  updatePrintUtmBtnState(incUtm);
-  setTimeout(autoFitPaperContent, 50);
+  var linkedCase = (Array.isArray(window.casesDB) ? window.casesDB : []).find(function (item) { return item && String(item.id) === String(l.caseId); }) || c;
+  var coordinateHtml = (typeof l.utmAttachmentHtml === "string" && l.utmAttachmentHtml.trim())
+    ? l.utmAttachmentHtml
+    : (incUtm && linkedCase ? buildAllSelectedFeaturesUtmTableHTML(linkedCase, l.utm || linkedCase.utm || "", isNat) : "");
+  var hasUtm = incUtm && !!(coordinateHtml && coordinateHtml.trim());
+  var attachmentLabel = getLetterAttachmentLabel(l.attach, hasUtm);
+
+  // برگه اول فقط متن نامه است؛ جدول مختصات در برگه پیوست مستقل چاپ می‌شود.
+  stage.innerHTML = buildSingleA4HTML(l.recipient, sanitizeOfficeRichHtml(l.body), l.number, l.date, attachmentLabel, l.utm, isNat, true, pSize, false, "");
+  if (hasUtm) {
+    var sheets = splitUtmAttachmentTableHtml(coordinateHtml, pSize);
+    var intro = "جدول مختصات UTM مربوط به زمین و عوارض پرونده «" + safeHtmlText(l.appName || (linkedCase && linkedCase.name) || "") + "»، پیوست نامه شماره " + safeHtmlText(toFa(l.number || "")) + " است.";
+    for (var si = 0; si < sheets.length; si++) {
+      var appendixTitle = "پیوست مختصات - صفحه " + toFa(si + 1) + " از " + toFa(sheets.length);
+      stage.innerHTML += buildSingleA4HTML("پیوست: جدول مختصات UTM", intro, l.number, l.date, "جدول مختصات UTM", l.utm, isNat, true, pSize, true, appendixTitle, sheets[si]);
+    }
+  }
+  updatePrintUtmBtnState(incUtm && hasUtm);
+  setTimeout(autoFitPaperContent, 60);
 }
 
 window.toggleUtmInPreviewSheet = function() {
@@ -945,7 +1042,7 @@ window.toggleUtmInPreviewSheet = function() {
       lettersDB[i].includeUtm = lettersDB[i].includeUtm === false ? true : false;
       renderSinglePreviewSheet(lettersDB[i]);
       saveAllDB();
-      showToastMsg(lettersDB[i].includeUtm ? "✅ جدول مختصات UTM به نامه اضافه شد." : "❌ جدول مختصات UTM از نامه حذف شد.");
+      showToastMsg(lettersDB[i].includeUtm ? "✅ برگه پیوست مختصات به نامه اضافه شد." : "❌ برگه پیوست مختصات از نامه حذف شد.");
       break;
     }
   }
@@ -955,7 +1052,7 @@ function updatePrintUtmBtnState(isOn) {
   var btn = document.getElementById("btn-toggle-print-utm");
   if (!btn) return;
   btn.className = isOn ? "btn btn-sm btn-success fw-bold" : "btn btn-sm btn-outline-secondary fw-bold";
-  btn.textContent = isOn ? "📍 جدول UTM در نامه: دارد" : "📍 جدول UTM در نامه: ندارد";
+  btn.textContent = isOn ? "📎 پیوست مختصات: دارد" : "📎 پیوست مختصات: ندارد";
 }
 
 /* ابزارهای ویرایشگر متنی همانند مایکروسافت ورد (Rich Text Editor) */
