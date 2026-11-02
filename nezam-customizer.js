@@ -481,8 +481,27 @@ function updatePaperActionButtons() {
 }
 
 window.setPaperSize = function(size, skipSave) {
+  var requestedSize = size === "A5" ? "A5" : "A4";
+  if (!skipSave && requestedSize !== currentPaperSize) {
+    if (paperPreviewDirty) {
+      showToastMsg("ابتدا تغییرات روی خود برگه را ذخیره کنید؛ سپس اندازه کاغذ را عوض کنید.", true);
+      var printSelectNow = document.getElementById("print-paper-size-select");
+      var letterSelectNow = document.getElementById("l-paper-size");
+      if (printSelectNow) printSelectNow.value = currentPaperSize;
+      if (letterSelectNow) letterSelectNow.value = currentPaperSize;
+      return false;
+    }
+    if (letterDraftDirty && (currentPreviewMode === "LETTER" || currentPreviewMode === "LETTER_DRAFT")) {
+      showToastMsg("فرم نامه بعد از آخرین پیش‌نمایش تغییر کرده است؛ ابتدا دوباره پیش‌نمایش بگیرید.", true);
+      var printSelectDraft = document.getElementById("print-paper-size-select");
+      var letterSelectDraft = document.getElementById("l-paper-size");
+      if (printSelectDraft) printSelectDraft.value = currentPaperSize;
+      if (letterSelectDraft) letterSelectDraft.value = currentPaperSize;
+      return false;
+    }
+  }
   var previous = currentPaperSize;
-  currentPaperSize = size === "A5" ? "A5" : "A4";
+  currentPaperSize = requestedSize;
   try { localStorage.setItem("nezam636_paper_size", currentPaperSize); } catch (e) {}
   applyDynamicPrintPageSizeCSS(currentPaperSize);
 
@@ -602,8 +621,8 @@ window.doPrintPaperSheet = function() {
       showToastMsg("اندازه‌گیری صفحه چاپ کامل نشد؛ از نمایش بودن پیش‌نمایش اطمینان حاصل کنید.", true);
       return;
     }
-    if ((currentPreviewMode === "LETTER" || currentPreviewMode === "LETTER_DRAFT") && fitResult.overflowCount) {
-      showToastMsg("چاپ متوقف شد؛ یک یا چند برگه هنوز از محدوده خارج می‌شوند. متن را کوتاه‌تر کنید یا A4 را انتخاب کنید.", true);
+    if (currentPreviewMode !== "CROQUIS" && fitResult.overflowCount) {
+      showToastMsg("چاپ متوقف شد؛ یک یا چند برگه از محدوده کاغذ بیرون می‌زنند. اندازه کاغذ یا چیدمان محتوا را اصلاح کنید.", true);
       return;
     }
 
@@ -1139,8 +1158,7 @@ window.downloadPaperSheetFile = function(forcedSize) {
     return false;
   }
   var fitResult = autoFitPaperContent(stage);
-  if ((currentPreviewMode === "LETTER" || currentPreviewMode === "LETTER_DRAFT") &&
-      (fitResult.pendingCount || fitResult.overflowCount)) {
+  if (currentPreviewMode !== "CROQUIS" && (fitResult.pendingCount || fitResult.overflowCount)) {
     showToastMsg("خروجی HTML ساخته نشد؛ صفحه هنوز کامل قابل اندازه‌گیری نیست یا محتوا از محدوده بیرون می‌زند.", true);
     return false;
   }
@@ -4424,8 +4442,7 @@ function exportStageToWordDoc() {
     return false;
   }
   var fitResult = autoFitPaperContent(stage);
-  if ((currentPreviewMode === "LETTER" || currentPreviewMode === "LETTER_DRAFT") &&
-      (fitResult.pendingCount || fitResult.overflowCount)) {
+  if (currentPreviewMode !== "CROQUIS" && (fitResult.pendingCount || fitResult.overflowCount)) {
     showToastMsg("خروجی Word ساخته نشد؛ صفحه هنوز کامل قابل اندازه‌گیری نیست یا محتوا از محدوده بیرون می‌زند.", true);
     return false;
   }
