@@ -368,9 +368,10 @@ function isSecretariatNumberAvailable(number, ignoreId) {
 }
 
 function getLetterDraftFromEditor() {
-  var c = getActiveCase();
-  if (!c) return null;
-  if (letterDraftCaseId && String(letterDraftCaseId) !== String(c.id) && !editingLetterId) {
+  var officeMode = window.__nezamOfficeLetterDraftMode === true;
+  var c = officeMode ? null : getActiveCase();
+  if (!c && !officeMode) return null;
+  if (!officeMode && letterDraftCaseId && String(letterDraftCaseId) !== String(c.id) && !editingLetterId) {
     showToastMsg("پیش‌نویس متعلق به پرونده دیگری است؛ ابتدا یکی از قالب‌های نامه را برای پرونده فعال انتخاب کنید.", true);
     return null;
   }
@@ -404,14 +405,16 @@ function getLetterDraftFromEditor() {
     return null;
   }
   var map = null;
-  try { if (typeof getActiveCroquisMap === "function") map = getActiveCroquisMap(); } catch (mapError) {
-    console.warn("Could not resolve current UTM map:", mapError);
+  if (!officeMode) {
+    try { if (typeof getActiveCroquisMap === "function") map = getActiveCroquisMap(); } catch (mapError) {
+      console.warn("Could not resolve current UTM map:", mapError);
+    }
   }
-  var requestedUtm = !!(includeEl && includeEl.checked);
+  var requestedUtm = !officeMode && !!(includeEl && includeEl.checked);
   var isNat = rec.indexOf("منابع طبیعی") !== -1;
   var freshUtmSnapshot = requestedUtm ? buildAllSelectedFeaturesUtmTableHTML(c, c.utm || "", isNat) : "";
   var existingLetter = editingLetterId ? findSecretariatLetter(editingLetterId) : null;
-  var preservedUtmSnapshot = existingLetter && typeof existingLetter.utmAttachmentHtml === "string"
+  var preservedUtmSnapshot = !officeMode && existingLetter && typeof existingLetter.utmAttachmentHtml === "string"
     ? existingLetter.utmAttachmentHtml : "";
   var hasFreshUtmSnapshot = !!(freshUtmSnapshot && freshUtmSnapshot.trim());
   var coordinateHtml = hasFreshUtmSnapshot ? freshUtmSnapshot : (requestedUtm ? preservedUtmSnapshot : "");
@@ -422,28 +425,30 @@ function getLetterDraftFromEditor() {
     : (existingLetter && existingLetter.croquisMapId ? existingLetter.croquisMapId : (map && map.id ? map.id : activeCroquisMapId));
   return {
     id: editingLetterId || null,
-    caseId: c.id,
+    caseId: officeMode ? "" : c.id,
+    officeLetter: officeMode,
     number: number,
     date: date,
-    type: directionEl && directionEl.value === "IN" ? "IN" : "OUT",
+    type: officeMode ? "OUT" : (directionEl && directionEl.value === "IN" ? "IN" : "OUT"),
     attach: getLetterAttachmentLabel(String(attachEl && attachEl.value || "ندارد"), hasUtm),
     recipient: rec,
-    appName: c.name || "",
-    appNid: c.nid || "",
-    project: c.project || "",
-    cap: c.cap || "",
-    land: c.land || "",
-    landParcel: c.landParcel || "",
-    water: c.water || "",
-    loc: c.loc || "",
-    utm: c.utm || "",
-    croquisMapId: snapshotMapId || "",
-    utmAttachmentHtml: includeUtm ? coordinateHtml : preservedUtmSnapshot,
+    appName: officeMode ? "" : (c.name || ""),
+    appNid: officeMode ? "" : (c.nid || ""),
+    project: officeMode ? "" : (c.project || ""),
+    cap: officeMode ? "" : (c.cap || ""),
+    land: officeMode ? "" : (c.land || ""),
+    landParcel: officeMode ? "" : (c.landParcel || ""),
+    water: officeMode ? "" : (c.water || ""),
+    loc: officeMode ? "" : (c.loc || ""),
+    utm: officeMode ? "" : (c.utm || ""),
+    croquisMapId: officeMode ? "" : (snapshotMapId || ""),
+    utmAttachmentHtml: officeMode ? "" : (includeUtm ? coordinateHtml : preservedUtmSnapshot),
     body: body,
     paperSize: paperEl && paperEl.value === "A5" ? "A5" : (currentPaperSize || "A4"),
     includeUtm: includeUtm
   };
 }
+
 
 function renderLetterPreviewObject(letter, forcedPaperSize, mode) {
   var stage = document.getElementById("a4-preview-stage");
@@ -459,9 +464,10 @@ function renderLetterPreviewObject(letter, forcedPaperSize, mode) {
   window.setPaperSize(pSize, true);
   var isNat = (letter.recipient || "").indexOf("منابع طبیعی") !== -1;
   var includeUtm = letter.includeUtm === true;
-  var linkedCase = (Array.isArray(window.casesDB) ? window.casesDB : []).find(function (item) {
-    return item && String(item.id) === String(letter.caseId);
-  }) || getActiveCase();
+  var linkedCase = letter.officeLetter === true ? null :
+    ((Array.isArray(window.casesDB) ? window.casesDB : []).find(function (item) {
+      return item && String(item.id) === String(letter.caseId);
+    }) || getActiveCase());
   var coordinateHtml = (typeof letter.utmAttachmentHtml === "string" && letter.utmAttachmentHtml.trim())
     ? letter.utmAttachmentHtml
     : (includeUtm && linkedCase ? buildAllSelectedFeaturesUtmTableHTML(linkedCase, letter.utm || linkedCase.utm || "", isNat) : "");
@@ -773,11 +779,12 @@ function renderTemplateButtonsInLettersPane() {
 
 function selectInquiryTemplate(key) {
   if (!getActiveCase()) {
-    requireActiveCase("انتخاب قالب نامه استعلام", function () { selectInquiryTemplate(key); });
+    requireActiveCase("انتخاب قالب نامه مرتبط با پرونده متقاضی", function () { selectInquiryTemplate(key); });
     return false;
   }
   if (!confirmDiscardLetterChanges("با انتخاب قالب جدید، متن یا پیش‌نمایش فعلی کنار گذاشته می‌شود.")) return false;
   clearUnsavedLetterStateAfterConfirmation();
+  window.__nezamOfficeLetterDraftMode = false;
   currentTemplateKey = key;
   editingLetterId = null;
   currentPreviewLetterId = null;
@@ -787,8 +794,93 @@ function selectInquiryTemplate(key) {
   if (alertBox) alertBox.style.display = "none";
   renderTemplateButtonsInLettersPane();
   syncLetterEditorWithActiveCase(true);
+  updateLetterScopeUI();
   return true;
 }
+
+/* انتخاب نوع مکاتبه: متقاضی‌محور یا مستقل از پرونده */
+function updateLetterScopeUI() {
+  var officeMode = window.__nezamOfficeLetterDraftMode === true;
+  var caseBtn = document.getElementById("btn-letter-case-mode");
+  var officeBtn = document.getElementById("btn-letter-office-mode");
+  var note = document.getElementById("letter-scope-note");
+  var templateTitle = document.getElementById("letter-template-title");
+  var templateHolder = document.getElementById("template-buttons-container");
+  var utmBox = document.getElementById("l-include-utm");
+  var direction = document.getElementById("l-direction");
+  if (caseBtn) caseBtn.className = "btn btn-sm " + (officeMode ? "btn-outline-success" : "btn-success");
+  if (officeBtn) officeBtn.className = "btn btn-sm " + (officeMode ? "btn-primary" : "btn-outline-primary");
+  if (note) note.textContent = officeMode
+    ? "نامه مستقل دفتر؛ بدون اتصال به پرونده متقاضی و با شماره‌گذاری مشترک دبیرخانه."
+    : "نامه پرونده‌محور؛ اطلاعات متقاضی در متن و سوابق همان پرونده قابل استفاده است.";
+  if (templateTitle) templateTitle.style.display = officeMode ? "none" : "";
+  if (templateHolder) templateHolder.style.display = officeMode ? "none" : "";
+  if (utmBox && utmBox.closest) {
+    var utmContainer = utmBox.closest(".form-check");
+    if (utmContainer) utmContainer.style.display = officeMode ? "none" : "";
+  }
+  if (direction) {
+    if (officeMode) direction.value = "OUT";
+    direction.disabled = officeMode;
+  }
+}
+window.updateLetterScopeUI = updateLetterScopeUI;
+
+window.startIndependentOfficeLetter = function() {
+  if (!confirmDiscardLetterChanges("با شروع نامه مستقل، پیش‌نویس یا ویرایش فعلی کنار گذاشته می‌شود.")) return false;
+  clearUnsavedLetterStateAfterConfirmation();
+  window.__nezamOfficeLetterDraftMode = true;
+  letterDraftCaseId = "__OFFICE__";
+  var fields = {
+    "l-direction": "OUT",
+    "l-number": getNextSecretariatNumber(),
+    "l-date": todayShamsi(),
+    "l-attach": "ندارد",
+    "l-recipient": ""
+  };
+  Object.keys(fields).forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.value = fields[id];
+  });
+  var includeEl = document.getElementById("l-include-utm");
+  if (includeEl) includeEl.checked = false;
+  var body = document.getElementById("l-body");
+  if (body) body.value = "";
+  var rich = document.getElementById("l-body-rich");
+  if (rich) rich.innerHTML = "";
+  var paper = document.getElementById("l-paper-size");
+  if (paper) paper.value = currentPaperSize || "A4";
+  currentPreviewMode = "EDITOR";
+  currentPreviewDraft = null;
+  currentPreviewLetterId = null;
+  editingLetterId = null;
+  letterDraftDirty = false;
+  paperPreviewDirty = false;
+  var alertEl = document.getElementById("letter-edit-alert");
+  if (alertEl) alertEl.style.display = "none";
+  updateLetterScopeUI();
+  updatePaperActionButtons();
+  showToastMsg("فرم نامه مستقل دفتر آماده است؛ نام ارگان مقصد و متن نامه را وارد کنید.");
+  return true;
+};
+
+window.startCaseLinkedLetter = function() {
+  if (!confirmDiscardLetterChanges("با شروع نامه مرتبط با پرونده، پیش‌نویس یا ویرایش فعلی کنار گذاشته می‌شود.")) return false;
+  function beginForActiveCase() {
+    clearUnsavedLetterStateAfterConfirmation();
+    window.__nezamOfficeLetterDraftMode = false;
+    if (!syncLetterEditorWithActiveCase(true)) return false;
+    updateLetterScopeUI();
+    showToastMsg("فرم نامه مرتبط با پرونده فعال آماده است.");
+    return true;
+  }
+  if (!getActiveCase()) {
+    requireActiveCase("شروع نامه مرتبط با پرونده متقاضی", beginForActiveCase);
+    return false;
+  }
+  return beginForActiveCase();
+};
+
 
 function bindLetterEditorDirtyTracking() {
   var ids = ["l-direction","l-number","l-date","l-attach","l-recipient","l-include-utm","l-paper-size","l-body"];
@@ -830,6 +922,7 @@ function syncLetterEditorWithActiveCase(force) {
   var attachEl = document.getElementById("l-attach");
   var includeEl = document.getElementById("l-include-utm");
 
+  window.__nezamOfficeLetterDraftMode = false;
   if (numEl) numEl.value = getNextSecretariatNumber();
   if (dateEl) dateEl.value = todayShamsi();
   if (recEl) recEl.value = spec.rec || "";
@@ -890,9 +983,10 @@ function getLetterAttachmentLabel(baseValue, hasUtmAttachment) {
 }
 
 function saveLetterToSecretariat(goToPrint, forcedPaperSize) {
-  var c = getActiveCase();
-  if (!c) {
-    requireActiveCase("ثبت و صدور نامه در دبیرخانه", function () { saveLetterToSecretariat(goToPrint, forcedPaperSize); });
+  var officeMode = window.__nezamOfficeLetterDraftMode === true;
+  var c = officeMode ? null : getActiveCase();
+  if (!c && !officeMode) {
+    requireActiveCase("ثبت و صدور نامه مرتبط با پرونده", function () { saveLetterToSecretariat(goToPrint, forcedPaperSize); });
     return false;
   }
 
@@ -902,9 +996,16 @@ function saveLetterToSecretariat(goToPrint, forcedPaperSize) {
     showToastMsg("نامه در بایگانی پیدا نشد؛ برای جلوگیری از ایجاد سابقه اشتباه، ذخیره متوقف شد.", true);
     return false;
   }
-  if (existingId && String(lettersDB[existingIndex].caseId) !== String(c.id)) {
-    showToastMsg("پرونده فعال با پرونده متعلق به نامه یکسان نیست؛ ابتدا پرونده صحیح را انتخاب کنید.", true);
-    return false;
+  if (existingId) {
+    var oldRecordIsOffice = lettersDB[existingIndex].officeLetter === true;
+    if (oldRecordIsOffice !== officeMode) {
+      showToastMsg("نوع نامه با سابقه انتخاب‌شده یکسان نیست؛ نامه را از مسیر صحیح ویرایش کنید.", true);
+      return false;
+    }
+    if (!officeMode && String(lettersDB[existingIndex].caseId) !== String(c.id)) {
+      showToastMsg("پرونده فعال با پرونده متعلق به نامه یکسان نیست؛ ابتدا پرونده صحیح را انتخاب کنید.", true);
+      return false;
+    }
   }
 
   var draft = getLetterDraftFromEditor();
@@ -916,10 +1017,12 @@ function saveLetterToSecretariat(goToPrint, forcedPaperSize) {
     return false;
   }
 
+  draft.officeLetter = officeMode;
+  draft.caseId = officeMode ? "" : c.id;
   draft.paperSize = forcedPaperSize === "A5" ? "A5" : (forcedPaperSize === "A4" ? "A4" : draft.paperSize);
   draft.id = existingId || ("L-" + Date.now() + "-" + Math.random().toString(36).slice(2, 7));
   var oldLettersJson = JSON.stringify(lettersDB);
-  var oldHistoryJson = JSON.stringify(c.history || []);
+  var oldHistoryJson = c ? JSON.stringify(c.history || []) : null;
   var wasNew = !existingId;
   var oldLetter = wasNew ? null : lettersDB[existingIndex];
   var letterObj = Object.assign({}, oldLetter || {}, draft);
@@ -929,12 +1032,13 @@ function saveLetterToSecretariat(goToPrint, forcedPaperSize) {
   else if (changed) lettersDB[existingIndex] = letterObj;
 
   if (changed) {
-    logCaseAction(c, (wasNew ? "صدور و ثبت نامه شماره " : "ویرایش نامه شماره ") +
-      toFa(draft.number) + " در کاغذ " + draft.paperSize + " خطاب به " + draft.recipient);
-
+    if (c) {
+      logCaseAction(c, (wasNew ? "صدور و ثبت نامه شماره " : "ویرایش نامه شماره ") +
+        toFa(draft.number) + " در کاغذ " + draft.paperSize + " خطاب به " + draft.recipient);
+    }
     if (!persistLetterAndCaseData()) {
       lettersDB = JSON.parse(oldLettersJson);
-      c.history = JSON.parse(oldHistoryJson);
+      if (c) c.history = JSON.parse(oldHistoryJson);
       showToastMsg("ذخیره نامه انجام نشد؛ فضای مرورگر یا دسترسی ذخیره‌سازی را بررسی کنید. اطلاعات قبلی حفظ شد.", true);
       return false;
     }
@@ -945,7 +1049,8 @@ function saveLetterToSecretariat(goToPrint, forcedPaperSize) {
   currentPreviewMode = "LETTER";
   currentPreviewLetterId = letterObj.id;
   paperPreviewDirty = false;
-  letterDraftCaseId = c.id;
+  letterDraftCaseId = officeMode ? "__OFFICE__" : c.id;
+  window.__nezamOfficeLetterDraftMode = officeMode;
   letterDraftDirty = false;
   var alertBox = document.getElementById("letter-edit-alert");
   if (alertBox) alertBox.style.display = "none";
@@ -954,9 +1059,10 @@ function saveLetterToSecretariat(goToPrint, forcedPaperSize) {
 
   window.setPaperSize(letterObj.paperSize, true);
   renderSinglePreviewSheet(letterObj, letterObj.paperSize);
-  showToastMsg(wasNew
-    ? "نامه با شماره " + toFa(letterObj.number) + " در دبیرخانه ثبت شد."
-    : "تغییرات نامه شماره " + toFa(letterObj.number) + " در دبیرخانه ذخیره شد.");
+  updateLetterScopeUI();
+  showToastMsg(officeMode
+    ? (wasNew ? "نامه اداری مستقل با شماره " : "تغییرات نامه اداری مستقل شماره ") + toFa(letterObj.number) + " در دفتر اندیکاتور ثبت شد."
+    : (wasNew ? "نامه با شماره " + toFa(letterObj.number) + " در دبیرخانه ثبت شد." : "تغییرات نامه شماره " + toFa(letterObj.number) + " در دبیرخانه ذخیره شد."));
 
   if (goToPrint) {
     switchMainPane("pane-print");
@@ -964,6 +1070,7 @@ function saveLetterToSecretariat(goToPrint, forcedPaperSize) {
   }
   return true;
 }
+
 window.saveCurrentLetter = saveLetterToSecretariat;
 
 function collectUtmAppendixFromStage(stage) {
@@ -1050,10 +1157,11 @@ window.savePaperEditsToSecretariat = function(options) {
     if (!silent) showToastMsg("اطلاعات پیش‌نویس نامه در دسترس نیست.", true);
     return false;
   }
-  var caseObj = (Array.isArray(window.casesDB) ? window.casesDB : []).find(function (item) {
+  var officeLetter = base.officeLetter === true;
+  var caseObj = officeLetter ? null : ((Array.isArray(window.casesDB) ? window.casesDB : []).find(function (item) {
     return item && String(item.id) === String(base.caseId);
-  }) || getActiveCase();
-  if (!caseObj || String(caseObj.id) !== String(base.caseId)) {
+  }) || getActiveCase());
+  if (!officeLetter && (!caseObj || String(caseObj.id) !== String(base.caseId))) {
     if (!silent) showToastMsg("پرونده مرتبط با نامه در دسترس نیست؛ ذخیره متوقف شد.", true);
     return false;
   }
@@ -1081,13 +1189,13 @@ window.savePaperEditsToSecretariat = function(options) {
   if (wasNew) updated.id = "L-" + Date.now() + "-" + Math.random().toString(36).slice(2, 7);
 
   var oldLettersJson = JSON.stringify(lettersDB);
-  var oldHistoryJson = JSON.stringify(caseObj.history || []);
+  var oldHistoryJson = caseObj ? JSON.stringify(caseObj.history || []) : null;
   var oldLetterJson = existingIndex >= 0 ? JSON.stringify(lettersDB[existingIndex]) : null;
   if (wasNew) lettersDB.unshift(updated);
   else lettersDB[existingIndex] = updated;
 
   var changed = wasNew || oldLetterJson !== JSON.stringify(updated);
-  if (changed && opts.log !== false) {
+  if (changed && opts.log !== false && caseObj) {
     logCaseAction(caseObj, (wasNew ? "صدور و ثبت نامه شماره " : "ذخیره اصلاحات نامه شماره ") +
       toFa(newNum) + " روی کاغذ " + currentPaperSize);
   }
@@ -1095,7 +1203,7 @@ window.savePaperEditsToSecretariat = function(options) {
   // در نبود تغییر واقعی، از نوشتن تکراری در LocalStorage و بازآرایی غیرضروری آرشیو پرهیز می‌شود.
   if (changed && !persistLetterAndCaseData()) {
     lettersDB = JSON.parse(oldLettersJson);
-    caseObj.history = JSON.parse(oldHistoryJson);
+    if (caseObj) caseObj.history = JSON.parse(oldHistoryJson);
     if (!silent) showToastMsg("ذخیره تغییرات نامه ناموفق بود؛ نسخه قبلی حفظ شد.", true);
     return false;
   }
@@ -1105,7 +1213,8 @@ window.savePaperEditsToSecretariat = function(options) {
   currentPreviewDraft = null;
   paperPreviewDirty = false;
   editingLetterId = null;
-  letterDraftCaseId = caseObj.id;
+  letterDraftCaseId = officeLetter ? "__OFFICE__" : caseObj.id;
+  window.__nezamOfficeLetterDraftMode = officeLetter;
   letterDraftDirty = false;
 
   var fields = {
@@ -1128,9 +1237,11 @@ window.savePaperEditsToSecretariat = function(options) {
 
   updatePrintUtmBtnState(includeUtm);
   updatePaperActionButtons();
-  if (!silent) showToastMsg(wasNew
-    ? "پیش‌نویس در دبیرخانه ثبت و ذخیره شد."
-    : (changed ? "تغییرات نامه و پیوست آن در دبیرخانه ذخیره شد." : "نامه بدون تغییر جدید در دبیرخانه ثبت است."));
+  updateLetterScopeUI();
+  if (!silent) showToastMsg(officeLetter
+    ? (wasNew ? "نامه مستقل دفتر در دفتر اندیکاتور ثبت شد." : (changed ? "تغییرات نامه مستقل دفتر ذخیره شد." : "نامه مستقل بدون تغییر جدید باقی ماند."))
+    : (wasNew ? "پیش‌نویس در دبیرخانه ثبت و ذخیره شد."
+      : (changed ? "تغییرات نامه و پیوست آن در دبیرخانه ذخیره شد." : "نامه بدون تغییر جدید در دبیرخانه ثبت است.")));
   return true;
 };
 
@@ -1231,9 +1342,16 @@ function cancelLetterEditing() {
   if (alertEl) alertEl.style.display = "none";
   letterDraftDirty = false;
   paperPreviewDirty = false;
-  syncLetterEditorWithActiveCase(true);
-  showToastMsg("ویرایش نامه لغو شد؛ قالب پیش‌نویس پرونده دوباره بارگذاری شد.");
+  window.__nezamOfficeLetterDraftMode = false;
+  if (getActiveCase()) syncLetterEditorWithActiveCase(true);
+  else {
+    letterDraftCaseId = "";
+    currentPreviewMode = "EDITOR";
+  }
+  updateLetterScopeUI();
+  showToastMsg("ویرایش نامه لغو شد؛ هیچ تغییری در سوابق ذخیره نشد.");
 }
+
 window.cancelLetterEditing = cancelLetterEditing;
 
 function editLetterFromSecretariat(letterId) {
@@ -1242,36 +1360,40 @@ function editLetterFromSecretariat(letterId) {
     showToastMsg("نامه انتخاب‌شده در دفتر اندیکاتور پیدا نشد.", true);
     return false;
   }
-  var linkedCase = (Array.isArray(window.casesDB) ? window.casesDB : []).find(function (item) {
+  var isOfficeLetter = letter.officeLetter === true;
+  var linkedCase = isOfficeLetter ? null : (Array.isArray(window.casesDB) ? window.casesDB : []).find(function (item) {
     return item && String(item.id) === String(letter.caseId);
   });
-  if (!linkedCase) {
+  if (!isOfficeLetter && !linkedCase) {
     showToastMsg("پرونده مرتبط با این نامه پیدا نشد؛ ویرایش برای جلوگیری از اتصال اشتباه متوقف شد.", true);
     return false;
   }
   if (!confirmDiscardLetterChanges("با باز کردن نامهٔ بایگانی، ویرایش فعلی کنار گذاشته می‌شود.")) return false;
 
-  activeCaseId = linkedCase.id;
-  activeCroquisMapId = letter.croquisMapId || "";
-  activeCroquisLayerId = "";
-  try { localStorage.setItem("nezam636_active_case_id", String(linkedCase.id)); } catch (e) {}
-  try {
-    if (typeof populateGlobalCaseSelector === "function") populateGlobalCaseSelector();
-    if (typeof loadActiveCaseIntoForm === "function") loadActiveCaseIntoForm();
-    if (typeof window.initCroquisWorkspaceForActiveCase === "function") window.initCroquisWorkspaceForActiveCase();
-  } catch (caseError) {
-    console.warn("Could not load the case for letter editing:", caseError);
+  if (linkedCase) {
+    activeCaseId = linkedCase.id;
+    activeCroquisMapId = letter.croquisMapId || "";
+    activeCroquisLayerId = "";
+    try { localStorage.setItem("nezam636_active_case_id", String(linkedCase.id)); } catch (e) {}
+    try {
+      if (typeof populateGlobalCaseSelector === "function") populateGlobalCaseSelector();
+      if (typeof loadActiveCaseIntoForm === "function") loadActiveCaseIntoForm();
+      if (typeof window.initCroquisWorkspaceForActiveCase === "function") window.initCroquisWorkspaceForActiveCase();
+    } catch (caseError) {
+      console.warn("Could not load the case for letter editing:", caseError);
+    }
   }
 
+  window.__nezamOfficeLetterDraftMode = isOfficeLetter;
   editingLetterId = letter.id;
   currentPreviewLetterId = null;
   currentPreviewDraft = null;
   currentPreviewMode = "EDITOR";
-  letterDraftCaseId = linkedCase.id;
+  letterDraftCaseId = isOfficeLetter ? "__OFFICE__" : linkedCase.id;
   letterDraftDirty = false;
   paperPreviewDirty = false;
   var fields = {
-    "l-direction": letter.type || "OUT",
+    "l-direction": isOfficeLetter ? "OUT" : (letter.type || "OUT"),
     "l-number": letter.number || "",
     "l-date": letter.date || "",
     "l-attach": letter.attach || "ندارد",
@@ -1283,7 +1405,7 @@ function editLetterFromSecretariat(letterId) {
     if (el) el.value = fields[id];
   });
   var includeEl = document.getElementById("l-include-utm");
-  if (includeEl) includeEl.checked = letter.includeUtm === true;
+  if (includeEl) includeEl.checked = !isOfficeLetter && letter.includeUtm === true;
   if (typeof window.syncTextareaToRichEditor === "function") window.syncTextareaToRichEditor();
   if (letter.paperSize) window.setPaperSize(letter.paperSize, true);
 
@@ -1291,24 +1413,29 @@ function editLetterFromSecretariat(letterId) {
   if (alertEl) {
     alertEl.style.display = "flex";
     alertEl.className = "alert alert-warning py-2 px-3 small fw-bold mb-3 d-flex justify-content-between align-items-center";
-    alertEl.innerHTML = '<span>✏️ در حال ویرایش نامه شماره «' + safeHtmlText(toFa(letter.number)) + '» (' +
-      safeHtmlText(letter.appName || linkedCase.name) + ' - کاغذ ' + (letter.paperSize === "A5" ? "A5" : "A4") + ')</span>' +
+    alertEl.innerHTML = '<span>✏️ در حال ویرایش ' + (isOfficeLetter ? "نامه مستقل دفتر" : "نامه متقاضی " + safeHtmlText(letter.appName || linkedCase.name)) +
+      ' شماره «' + safeHtmlText(toFa(letter.number)) + '» (کاغذ ' + (letter.paperSize === "A5" ? "A5" : "A4") + ')</span>' +
       '<button type="button" class="btn btn-sm btn-outline-dark py-0" onclick="cancelLetterEditing()">لغو ویرایش</button>';
   }
+  updateLetterScopeUI();
   updatePaperActionButtons();
   if (typeof window.switchMainPane === "function") window.switchMainPane("pane-letters");
   showToastMsg("نامه شماره " + toFa(letter.number || "") + " برای ویرایش بارگذاری شد.");
   return true;
 }
+
 window.editLetterFromSecretariat = editLetterFromSecretariat;
 
 function previewCurrentLetterDraft(forcedPaperSize) {
-  if (!getActiveCase()) {
-    requireActiveCase("پیش‌نمایش پیش‌نویس نامه", function () { previewCurrentLetterDraft(forcedPaperSize); });
+  var officeMode = window.__nezamOfficeLetterDraftMode === true;
+  if (!getActiveCase() && !officeMode) {
+    requireActiveCase("پیش‌نمایش نامه مرتبط با پرونده متقاضی", function () { previewCurrentLetterDraft(forcedPaperSize); });
     return false;
   }
   var draft = getLetterDraftFromEditor();
   if (!draft) return false;
+  draft.officeLetter = officeMode;
+  if (officeMode) draft.caseId = "";
   draft.id = editingLetterId || null;
   currentPreviewDraft = draft;
   currentPreviewLetterId = null;
@@ -1316,10 +1443,14 @@ function previewCurrentLetterDraft(forcedPaperSize) {
   if (!renderLetterPreviewObject(draft, pSize, "LETTER_DRAFT")) return false;
   letterDraftDirty = false;
   paperPreviewDirty = false;
+  updateLetterScopeUI();
   if (typeof window.switchMainPane === "function") window.switchMainPane("pane-print");
-  showToastMsg("پیش‌نمایش آماده است؛ چاپ و دانلود به‌تنهایی نامه را در دبیرخانه ثبت نمی‌کند.");
+  showToastMsg(officeMode
+    ? "پیش‌نمایش نامه اداری مستقل آماده است؛ این نامه هنوز در دفتر اندیکاتور ثبت نشده است."
+    : "پیش‌نمایش آماده است؛ چاپ و دانلود به‌تنهایی نامه را در دبیرخانه ثبت نمی‌کند.");
   return true;
 }
+
 window.previewCurrentLetterDraft = previewCurrentLetterDraft;
 
 /* چاپ مستقیم پیش‌نویس؛ عمداً بدون ثبت در دفتر اندیکاتور */
@@ -1350,11 +1481,12 @@ function previewSavedLetter(letterId, forcedPaperSize) {
     showToastMsg("نامه انتخاب‌شده در دفتر اندیکاتور پیدا نشد.", true);
     return false;
   }
-  var linkedCase = (Array.isArray(window.casesDB) ? window.casesDB : []).find(function (item) {
+  var isOfficeLetter = letter.officeLetter === true;
+  var linkedCase = isOfficeLetter ? null : (Array.isArray(window.casesDB) ? window.casesDB : []).find(function (item) {
     return item && String(item.id) === String(letter.caseId);
   });
-  if (!linkedCase) {
-    showToastMsg("پرونده مرتبط با نامه پیدا نشد؛ پیش‌نمایش برای جلوگیری از نمایش مختصات پرونده اشتباه متوقف شد.", true);
+  if (!isOfficeLetter && !linkedCase) {
+    showToastMsg("پرونده مرتبط با این نامه پیدا نشد؛ پیش‌نمایش برای جلوگیری از نمایش مختصات پرونده اشتباه متوقف شد.", true);
     return false;
   }
   if (!confirmDiscardLetterChanges("با باز کردن نامهٔ بایگانی، ویرایش فعلی کنار گذاشته می‌شود.")) return false;
@@ -1371,16 +1503,20 @@ function previewSavedLetter(letterId, forcedPaperSize) {
       console.warn("Could not refresh the case before letter preview:", caseError);
     }
   }
+  window.__nezamOfficeLetterDraftMode = isOfficeLetter;
   editingLetterId = null;
   currentPreviewDraft = null;
   letterDraftDirty = false;
-  letterDraftCaseId = linkedCase.id;
+  letterDraftCaseId = isOfficeLetter ? "__OFFICE__" : linkedCase.id;
   var targetSize = forcedPaperSize === "A5" ? "A5" : (forcedPaperSize === "A4" ? "A4" : (letter.paperSize || currentPaperSize || "A4"));
   if (!renderLetterPreviewObject(letter, targetSize, "LETTER")) return false;
+  updateLetterScopeUI();
   if (typeof window.switchMainPane === "function") window.switchMainPane("pane-print");
-  showToastMsg("پیش‌نمایش نامه شماره " + toFa(letter.number || "") + " روی کاغذ " + targetSize + " آماده شد.");
+  showToastMsg((isOfficeLetter ? "پیش‌نمایش نامه مستقل دفتر" : "پیش‌نمایش نامه پرونده") +
+    " شماره " + toFa(letter.number || "") + " روی کاغذ " + targetSize + " آماده شد.");
   return true;
 }
+
 window.previewSavedLetter = previewSavedLetter;
 window.printArchivedLetter = function(letterId, paperSize) {
   return previewSavedLetter(letterId, paperSize);
@@ -1747,6 +1883,10 @@ window.toggleUtmInPreviewSheet = function() {
 
   // روی نسخه موقت کار می‌کنیم؛ رکورد بایگانی فقط با دکمه ثبت نهایی تغییر می‌کند.
   var letter = JSON.parse(JSON.stringify(sourceLetter));
+  if (letter.officeLetter === true) {
+    showToastMsg("پیوست UTM فقط برای نامه‌های مرتبط با پرونده متقاضی فعال است.", true);
+    return false;
+  }
   var original = JSON.parse(JSON.stringify(letter));
   var stage = document.getElementById("a4-preview-stage");
   var firstPage = stage && stage.querySelector(".a4-page");
@@ -4546,6 +4686,7 @@ function initBrandingAndTemplatesUI() {
   setPaperSize(currentPaperSize, true);
   renderTemplateButtonsInLettersPane();
   bindLetterEditorDirtyTracking();
+  updateLetterScopeUI();
   if (currentPreviewMode === "EDITOR") syncLetterEditorWithActiveCase();
   updatePaperActionButtons();
   if (typeof window.initCroquisWorkspaceForActiveCase === "function") {
