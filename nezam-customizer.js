@@ -266,6 +266,12 @@ function clearUnsavedLetterStateAfterConfirmation() {
   if (alertEl) alertEl.style.display = "none";
 }
 
+window.addEventListener("beforeunload", function (event) {
+  if (!hasUnsavedLetterChanges()) return;
+  event.preventDefault();
+  event.returnValue = "";
+});
+
 function bindLetterPreviewDirtyTracking(stage) {
   if (!stage || stage.dataset.letterPreviewDirtyBound === "1") return;
   stage.dataset.letterPreviewDirtyBound = "1";
@@ -1106,6 +1112,7 @@ function activatePaneForArchivedLetter(paneId) {
 }
 
 function cancelLetterEditing() {
+  if (!confirmDiscardLetterChanges("با لغو ویرایش، تغییرات ذخیره‌نشده این نامه کنار گذاشته می‌شود.")) return false;
   editingLetterId = null;
   currentPreviewLetterId = null;
   currentPreviewDraft = null;
@@ -1657,8 +1664,6 @@ function issueDeficiencyLetterForActiveCase() {
     requireActiveCase("صدور ابلاغیه نواقص مدارک", function () { issueDeficiencyLetterForActiveCase(); });
     return;
   }
-  if (!confirmDiscardLetterChanges("با ساخت اخطاریه جدید، پیش‌نویس یا ویرایش فعلی کنار گذاشته می‌شود.")) return false;
-  clearUnsavedLetterStateAfterConfirmation();
   var sp = ACT_SPECS[c.actType] || ACT_SPECS.sheep_high;
   var reqDocs = DOC_CHECKLISTS[sp.docGroup || "LIVESTOCK"] || DOC_CHECKLISTS.LIVESTOCK;
 
@@ -1668,6 +1673,8 @@ function issueDeficiencyLetterForActiveCase() {
       if (!upMap[reqDocs[i].code]) missing.push(toFa(missing.length + 1) + "- " + reqDocs[i].title);
     }
     if (!missing.length) { alert("پرونده کامل است و نقصی ندارد."); return; }
+    if (!confirmDiscardLetterChanges("با صدور اخطاریه، پیش‌نویس یا ویرایش فعلی کنار گذاشته می‌شود.")) return;
+    clearUnsavedLetterStateAfterConfirmation();
 
     var recipient = "متقاضی محترم، " + c.name + " (کد ملی/شناسه: " + toFa(c.nid) + ")";
     var body = "احتراماً پیرو تشکیل پرونده جنابعالی/سرکار عالی در مرکز خدمات کشاورزی و منابع طبیعی غیردولتی شماره ۶۳۶ شهرستان خفر جهت «" + c.project + "» واقع در اراضی " + c.loc + "، پس از بررسی مدارک مشخص گردید پرونده شما دارای نواقص زیر می‌باشد:\n\n" +
