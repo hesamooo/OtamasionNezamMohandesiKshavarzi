@@ -493,7 +493,13 @@ window.doPrintPaperSheet = function() {
   }
   applyDynamicPrintPageSizeCSS(currentPaperSize);
   switchMainPane("pane-print");
-  if (currentPreviewMode !== "CROQUIS") autoFitPaperContent();
+  if (currentPreviewMode !== "CROQUIS") {
+    var fitResult = autoFitPaperContent();
+    if ((currentPreviewMode === "LETTER" || currentPreviewMode === "LETTER_DRAFT") && fitResult.overflowCount) {
+      showToastMsg("چاپ متوقف شد؛ بخشی از نامه هنوز از محدوده کاغذ بیرون می‌زند. متن را کوتاه یا کاغذ A4 را انتخاب کنید.", true);
+      return false;
+    }
+  }
   printRequestActive = true;
   setTimeout(function() {
     try { window.print(); }
@@ -588,8 +594,11 @@ function renderTemplateButtonsInLettersPane() {
 }
 
 function selectInquiryTemplate(key) {
-  if (!requireActiveCase("انتخاب قالب نامه استعلام")) return;
-  if ((editingLetterId || letterDraftDirty) && !confirm("با انتخاب قالب جدید، متن فعلی ویرایشگر جایگزین می‌شود. ادامه می‌دهید؟")) return;
+  if (!getActiveCase()) {
+    requireActiveCase("انتخاب قالب نامه استعلام", function () { selectInquiryTemplate(key); });
+    return false;
+  }
+  if ((editingLetterId || letterDraftDirty) && !confirm("با انتخاب قالب جدید، متن فعلی ویرایشگر جایگزین می‌شود. ادامه می‌دهید؟")) return false;
   currentTemplateKey = key;
   editingLetterId = null;
   currentPreviewLetterId = null;
@@ -599,6 +608,7 @@ function selectInquiryTemplate(key) {
   if (alertBox) alertBox.style.display = "none";
   renderTemplateButtonsInLettersPane();
   syncLetterEditorWithActiveCase(true);
+  return true;
 }
 
 function syncLetterEditorWithActiveCase(force) {
@@ -684,8 +694,11 @@ function getLetterAttachmentLabel(baseValue, hasUtmAttachment) {
 }
 
 function saveLetterToSecretariat(goToPrint, forcedPaperSize) {
-  var c = requireActiveCase("ثبت و صدور نامه در دبیرخانه");
-  if (!c) return false;
+  var c = getActiveCase();
+  if (!c) {
+    requireActiveCase("ثبت و صدور نامه در دبیرخانه", function () { saveLetterToSecretariat(goToPrint, forcedPaperSize); });
+    return false;
+  }
 
   var existingId = editingLetterId || null;
   var existingIndex = existingId ? lettersDB.findIndex(function (x) { return x && String(x.id) === String(existingId); }) : -1;
@@ -1309,46 +1322,57 @@ function buildSingleA4HTML(rec, bodyTxt, numStr, dateStr, attachStr, utmRaw, isN
 
 function autoFitPaperContent(container) {
   var stage = container || document.getElementById("a4-preview-stage");
-  if (!stage) return;
+  if (!stage) return { overflowCount: 0, pages: 0 };
   var pages = stage.querySelectorAll(".a4-page");
+  var overflowCount = 0;
   for (var i = 0; i < pages.length; i++) {
     var page = pages[i];
     var body = page.querySelector(".lh-body");
     var wrap = page.querySelector(".lh-content-wrap");
     var txt = page.querySelector(".l-txt");
-    if (!body || !txt) continue;
-
+    if (!body || !txt) {
+      page.removeAttribute("data-content-overflow");
+      continue;
+    }
     var isA5 = page.classList.contains("paper-a5");
     var currentSize = isA5 ? 8.8 : 10.5;
+    var minTextSize = isA5 ? 6.8 : 7.2;
     var lineH = isA5 ? 1.65 : 1.95;
     var tables = page.querySelectorAll(".utm-table-print");
     var tblFont = isA5 ? 7.2 : 8.2;
-
+    var minTableSize = isA5 ? 5.2 : 5.8;
     txt.style.fontSize = currentSize + "pt";
-    txt.style.lineHeight = lineH;
+    txt.style.lineHeight = String(lineH);
     function hasOverflow() {
-      return body.scrollHeight > body.clientHeight + 1 || (wrap && wrap.scrollHeight > wrap.clientHeight + 1);
+      return body.scrollHeight > body.clientHeight + 2 || (wrap && wrap.scrollHeight > wrap.clientHeight + 2);
     }
     var count = 0;
-    while (hasOverflow() && count < 18) {
-      currentSize = Math.max(isA5 ? 6.8 : 7.2, currentSize - 0.35);
-      lineH = Math.max(1.25, lineH - 0.05);
+    while (hasOverflow() && count < 28) {
+      var oldTextSize = currentSize;
+      currentSize = Math.max(minTextSize, currentSize - 0.25);
+      lineH = Math.max(1.2, lineH - 0.035);
       txt.style.fontSize = currentSize + "pt";
-      txt.style.lineHeight = lineH;
+      txt.style.lineHeight = String(lineH);
       if (tables.length) {
-        tblFont = Math.max(isA5 ? 5.5 : 6.0, tblFont - 0.3);
+        tblFont = Math.max(minTableSize, tblFont - 0.2);
         for (var t = 0; t < tables.length; t++) tables[t].style.fontSize = tblFont + "pt";
       }
       count++;
+      if (currentSize === oldTextSize && tblFont <= minTableSize) break;
     }
-    page.setAttribute("data-content-overflow", hasOverflow() ? "true" : "false");
+    var overflow = hasOverflow();
+    page.setAttribute("data-content-overflow", overflow ? "true" : "false");
+    if (overflow) overflowCount++;
   }
+  return { overflowCount: overflowCount, pages: pages.length };
 }
 window.autoFitPaperContent = autoFitPaperContent;
 
 window.autoFitCurrentPaper = function() {
-  autoFitPaperContent();
-  showToastMsg("✨ اندازه قلم و فاصله‌ها به صورت خودکار برای جا شدن در برگه تنظیم شد.");
+  var result = autoFitPaperContent();
+  showToastMsg(result.overflowCount
+    ? "برخی صفحات هنوز جا نمی‌شوند؛ اندازه کاغذ را بزرگ‌تر یا متن را کوتاه‌تر کنید."
+    : "✨ اندازه قلم و فاصله‌ها برای جا شدن محتوا تنظیم شد.", !!result.overflowCount);
 };
 
 window.adjustPaperFontSize = function(delta) {
@@ -1412,83 +1436,6 @@ function splitUtmAttachmentTableHtml(tableHtml, paperSize) {
   }
 }
 
-function renderSinglePreviewSheet(letterObj, forcedPaperSize) {
-  var stage = document.getElementById("a4-preview-stage");
-  if (!stage) return;
-  currentPreviewMode = "LETTER";
-  var c = getActiveCase();
-  var l = letterObj;
-  if (!l && c) {
-    for (var i = 0; i < lettersDB.length; i++) {
-      if (lettersDB[i].caseId === c.id) { l = lettersDB[i]; break; }
-    }
-  }
-  if (!l) l = lettersDB[0];
-  if (!l) return;
-  currentPreviewLetterId = l.id;
-  var pSize = forcedPaperSize || l.paperSize || currentPaperSize || "A4";
-  setPaperSize(pSize, true);
-  var isNat = (l.recipient || "").indexOf("منابع طبیعی") !== -1;
-  var incUtm = l.includeUtm === true;
-  var linkedCase = (Array.isArray(window.casesDB) ? window.casesDB : []).find(function (item) { return item && String(item.id) === String(l.caseId); }) || c;
-  var coordinateHtml = (typeof l.utmAttachmentHtml === "string" && l.utmAttachmentHtml.trim())
-    ? l.utmAttachmentHtml
-    : (incUtm && linkedCase ? buildAllSelectedFeaturesUtmTableHTML(linkedCase, l.utm || linkedCase.utm || "", isNat) : "");
-  var hasUtm = incUtm && !!(coordinateHtml && coordinateHtml.trim());
-  var attachmentLabel = getLetterAttachmentLabel(l.attach, hasUtm);
-
-  // برگه اول فقط متن نامه است؛ جدول مختصات در برگه پیوست مستقل چاپ می‌شود.
-  stage.innerHTML = buildSingleA4HTML(l.recipient, sanitizeOfficeRichHtml(l.body), l.number, l.date, attachmentLabel, l.utm, isNat, true, pSize, false, "");
-  if (hasUtm) {
-    var sheets = splitUtmAttachmentTableHtml(coordinateHtml, pSize);
-    var intro = "جدول مختصات UTM مربوط به زمین و عوارض پرونده «" + safeHtmlText(l.appName || (linkedCase && linkedCase.name) || "") + "»، پیوست نامه شماره " + safeHtmlText(toFa(l.number || "")) + " است.";
-    for (var si = 0; si < sheets.length; si++) {
-      var appendixTitle = "پیوست مختصات - صفحه " + toFa(si + 1) + " از " + toFa(sheets.length);
-      stage.innerHTML += buildSingleA4HTML("پیوست: جدول مختصات UTM", intro, l.number, l.date, "جدول مختصات UTM", l.utm, isNat, true, pSize, true, appendixTitle, sheets[si]);
-    }
-  }
-  updatePrintUtmBtnState(incUtm && hasUtm);
-  setTimeout(autoFitPaperContent, 60);
-}
-
-window.toggleUtmInPreviewSheet = function() {
-  var isDraft = currentPreviewMode === "LETTER_DRAFT" && currentPreviewDraft;
-  var letter = isDraft ? currentPreviewDraft : (currentPreviewMode === "LETTER" ? findSecretariatLetter(currentPreviewLetterId) : null);
-  if (!letter) {
-    showToastMsg("ابتدا یک نامه را پیش‌نمایش بگیرید.", true);
-    return false;
-  }
-  var oldLetter = JSON.parse(JSON.stringify(letter));
-  letter.includeUtm = letter.includeUtm !== true;
-  if (letter.includeUtm && !(letter.utmAttachmentHtml || "").trim()) {
-    var caseObj = (Array.isArray(window.casesDB) ? window.casesDB : []).find(function (item) {
-      return item && String(item.id) === String(letter.caseId);
-    }) || getActiveCase();
-    if (letter.croquisMapId) activeCroquisMapId = letter.croquisMapId;
-    letter.utmAttachmentHtml = caseObj
-      ? buildAllSelectedFeaturesUtmTableHTML(caseObj, letter.utm || caseObj.utm || "", (letter.recipient || "").indexOf("منابع طبیعی") !== -1)
-      : "";
-  }
-  var hasCoordinates = letter.includeUtm && !!(letter.utmAttachmentHtml && letter.utmAttachmentHtml.trim());
-  if (letter.includeUtm && !hasCoordinates) {
-    letter.includeUtm = false;
-    showToastMsg("برای این پرونده مختصات قابل پیوست پیدا نشد.", true);
-    return false;
-  }
-  letter.attach = getLetterAttachmentLabel(letter.attach, hasCoordinates);
-  if (!isDraft) {
-    if (!persistLetterAndCaseData()) {
-      Object.keys(letter).forEach(function (key) { delete letter[key]; });
-      Object.assign(letter, oldLetter);
-      showToastMsg("ذخیره تغییر وضعیت پیوست مختصات ناموفق بود.", true);
-      return false;
-    }
-  }
-  renderLetterPreviewObject(letter, currentPaperSize, isDraft ? "LETTER_DRAFT" : "LETTER");
-  showToastMsg(hasCoordinates ? "برگه پیوست مختصات به نامه اضافه شد." : "پیوست مختصات از نامه حذف شد.");
-  return true;
-};
-
 function updatePrintUtmBtnState(isOn) {
   var btn = document.getElementById("btn-toggle-print-utm");
   if (!btn) return;
@@ -1551,8 +1498,11 @@ window.insertLetterTable = function() {
 };
 
 function issueDeficiencyLetterForActiveCase() {
-  var c = requireActiveCase("صدور ابلاغیه نواقص مدارک");
-  if (!c) return;
+  var c = getActiveCase();
+  if (!c) {
+    requireActiveCase("صدور ابلاغیه نواقص مدارک", function () { issueDeficiencyLetterForActiveCase(); });
+    return;
+  }
   var sp = ACT_SPECS[c.actType] || ACT_SPECS.sheep_high;
   var reqDocs = DOC_CHECKLISTS[sp.docGroup || "LIVESTOCK"] || DOC_CHECKLISTS.LIVESTOCK;
 
@@ -1593,8 +1543,11 @@ function issueDeficiencyLetterForActiveCase() {
 }
 
 function printOfficialForm(formType) {
-  var c = requireActiveCase("چاپ فرم رسمی برای پرونده");
-  if (!c) return;
+  var c = getActiveCase();
+  if (!c) {
+    requireActiveCase("چاپ فرم رسمی برای پرونده", function () { printOfficialForm(formType); });
+    return;
+  }
   currentPreviewMode = "FORM";
   currentPreviewLetterId = null;
   currentPreviewDraft = null;
@@ -3673,8 +3626,11 @@ window.setCroquisPrintFocusLayer = function(layerId) {
 
 /* چاپ رسمی کروکی چندلایه زمین به تفکیک ۲ برگه مجزا (برگه اول: نقشه ماهواره‌ای با ابزار تعاملی برش کادر و برگه دوم: جداول مساحت و مختصات کامل X, Y, ارتفاع, Zone) */
 function printUtmSketchSheet() {
-  var c = requireActiveCase("چاپ برگه کروکی مهندسی زمین");
-  if (!c) return;
+  var c = getActiveCase();
+  if (!c) {
+    requireActiveCase("چاپ برگه کروکی مهندسی زمین", function () { printUtmSketchSheet(); });
+    return;
+  }
   var m = getActiveCroquisMap();
   if (!m) return;
   currentPreviewMode = "CROQUIS";
