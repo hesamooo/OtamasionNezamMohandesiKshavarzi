@@ -580,32 +580,6 @@ window.downloadPaperSheetFile = function(forcedSize) {
   showToastMsg("📥 فایل مستقل کاغذ " + pSize + " با متن ذخیره‌شده دانلود شد.");
 };
 
-function editLetterFromSecretariat(letterId) {
-  for (var i = 0; i < lettersDB.length; i++) {
-    if (lettersDB[i].id === letterId) {
-      var l = lettersDB[i];
-      editingLetterId = l.id;
-      if (l.caseId) selectActiveCase(l.caseId);
-      document.getElementById("l-direction").value = l.type || "OUT";
-      document.getElementById("l-number").value = l.number || "";
-      document.getElementById("l-date").value = l.date || "";
-      document.getElementById("l-attach").value = l.attach || "ندارد";
-      document.getElementById("l-recipient").value = l.recipient || "";
-      document.getElementById("l-body").value = l.body || "";
-      if (l.paperSize) setPaperSize(l.paperSize, true);
-
-      var alertEl = document.getElementById("letter-edit-alert");
-      alertEl.style.display = "flex";
-      alertEl.className = "alert alert-warning py-2 px-3 small fw-bold mb-3 d-flex justify-content-between align-items-center";
-      alertEl.innerHTML = '<span>✏️ در حال ویرایش نامه شماره «' + safeHtmlText(toFa(l.number)) + '» (' + safeHtmlText(l.appName) + ' - کاغذ ' + (l.paperSize === "A5" ? "A5" : "A4") + ')</span>' +
-        '<button class="btn btn-sm btn-outline-dark py-0" onclick="editingLetterId=null;document.getElementById(\'letter-edit-alert\').style.display=\'none\';syncLetterEditorWithActiveCase();">لغو ویرایش</button>';
-
-      switchMainPane("pane-letters");
-      break;
-    }
-  }
-}
-
 function activatePaneForArchivedLetter(paneId) {
   var pane = document.getElementById(paneId);
   if (!pane) return false;
@@ -620,34 +594,59 @@ function activatePaneForArchivedLetter(paneId) {
 }
 
 function editLetterFromSecretariat(letterId) {
+  var l = null;
   for (var i = 0; i < lettersDB.length; i++) {
-    if (String(lettersDB[i].id) === String(letterId)) {
-      var l = lettersDB[i];
-      editingLetterId = l.id;
-      var linkedCase = (Array.isArray(window.casesDB) ? window.casesDB : []).find(function (c) {
-        return c && String(c.id) === String(l.caseId);
-      });
-      if (linkedCase) selectActiveCase(linkedCase.id);
-      document.getElementById("l-direction").value = l.type || "OUT";
-      document.getElementById("l-number").value = l.number || "";
-      document.getElementById("l-date").value = l.date || "";
-      document.getElementById("l-attach").value = l.attach || "ندارد";
-      document.getElementById("l-recipient").value = l.recipient || "";
-      document.getElementById("l-body").value = l.body || "";
-      if (l.paperSize) setPaperSize(l.paperSize, true);
+    if (String(lettersDB[i].id) === String(letterId)) { l = lettersDB[i]; break; }
+  }
+  if (!l) {
+    showToastMsg("نامه انتخاب‌شده در دفتر اندیکاتور پیدا نشد.", true);
+    return false;
+  }
 
-      var alertEl = document.getElementById("letter-edit-alert");
-      if (alertEl) {
-        alertEl.style.display = "flex";
-        alertEl.className = "alert alert-warning py-2 px-3 small fw-bold mb-3 d-flex justify-content-between align-items-center";
-        alertEl.innerHTML = '<span>✏️ در حال ویرایش نامه شماره «' + safeHtmlText(toFa(l.number)) + '» (' + safeHtmlText(l.appName) + ' - کاغذ ' + (l.paperSize === "A5" ? "A5" : "A4") + ')</span>' +
-          '<button class="btn btn-sm btn-outline-dark py-0" onclick="editingLetterId=null;document.getElementById(\'letter-edit-alert\').style.display=\'none\';syncLetterEditorWithActiveCase();">لغو ویرایش</button>';
-      }
-      if (typeof getActiveCase === "function" && getActiveCase()) switchMainPane("pane-letters");
-      else activatePaneForArchivedLetter("pane-letters");
-      break;
+  // پرونده مرتبط را بدون اجرای زنجیره جانبی selectActiveCase فعال می‌کنیم.
+  var linkedCase = (Array.isArray(window.casesDB) ? window.casesDB : []).find(function (c) {
+    return c && String(c.id) === String(l.caseId);
+  });
+  if (linkedCase) {
+    activeCaseId = linkedCase.id;
+    try { localStorage.setItem("nezam636_active_case_id", String(linkedCase.id)); } catch (storageError) {}
+    try {
+      if (typeof populateGlobalCaseSelector === "function") populateGlobalCaseSelector();
+      if (typeof loadActiveCaseIntoForm === "function") loadActiveCaseIntoForm();
+    } catch (caseUiError) {
+      console.warn("Could not refresh linked case form before editing archived letter:", caseUiError);
     }
   }
+
+  // شناسه ویرایش بعد از بارگذاری پرونده تنظیم می‌شود؛ بارگذاری نباید آن را پاک کند.
+  editingLetterId = l.id;
+  var fields = {
+    "l-direction": l.type || "OUT",
+    "l-number": l.number || "",
+    "l-date": l.date || "",
+    "l-attach": l.attach || "ندارد",
+    "l-recipient": l.recipient || "",
+    "l-body": l.body || ""
+  };
+  Object.keys(fields).forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.value = fields[id];
+  });
+  if (typeof window.syncTextareaToRichEditor === "function") window.syncTextareaToRichEditor();
+  if (l.paperSize && typeof window.setPaperSize === "function") window.setPaperSize(l.paperSize, true);
+
+  var alertEl = document.getElementById("letter-edit-alert");
+  if (alertEl) {
+    alertEl.style.display = "flex";
+    alertEl.className = "alert alert-warning py-2 px-3 small fw-bold mb-3 d-flex justify-content-between align-items-center";
+    alertEl.innerHTML = '<span>✏️ در حال ویرایش نامه شماره «' + safeHtmlText(toFa(l.number)) + '» (' + safeHtmlText(l.appName) + ' - کاغذ ' + (l.paperSize === "A5" ? "A5" : "A4") + ')</span>' +
+      '<button class="btn btn-sm btn-outline-dark py-0" onclick="editingLetterId=null;document.getElementById(&quot;letter-edit-alert&quot;).style.display=&quot;none&quot;;syncLetterEditorWithActiveCase();">لغو ویرایش</button>';
+  }
+
+  if (linkedCase && typeof window.switchMainPane === "function") window.switchMainPane("pane-letters");
+  else activatePaneForArchivedLetter("pane-letters");
+  showToastMsg("نامه شماره " + toFa(l.number || "") + " برای ویرایش بارگذاری شد.");
+  return true;
 }
 window.editLetterFromSecretariat = editLetterFromSecretariat;
 
@@ -660,18 +659,25 @@ function previewSavedLetter(letterId, forcedPaperSize, printNow) {
     showToastMsg("نامه انتخاب‌شده در دفتر اندیکاتور پیدا نشد.", true);
     return false;
   }
+
   var linkedCase = (Array.isArray(window.casesDB) ? window.casesDB : []).find(function (c) {
     return c && String(c.id) === String(l.caseId);
   });
-  // فقط در صورت وجود واقعی پرونده، آن را فعال می‌کنیم؛ شناسه قدیمی نباید انتخاب فعال را خراب کند.
-  if (linkedCase) selectActiveCase(linkedCase.id);
+  if (linkedCase) {
+    activeCaseId = linkedCase.id;
+    try { localStorage.setItem("nezam636_active_case_id", String(linkedCase.id)); } catch (storageError) {}
+    try { if (typeof populateGlobalCaseSelector === "function") populateGlobalCaseSelector(); }
+    catch (caseUiError) { console.warn("Could not refresh active applicant selector for archived print:", caseUiError); }
+  }
 
   var targetSize = forcedPaperSize === "A5" ? "A5" : (forcedPaperSize === "A4" ? "A4" : (l.paperSize || currentPaperSize || "A4"));
+  currentPreviewMode = "LETTER";
   currentPreviewLetterId = l.id;
-  setPaperSize(targetSize, false);
+  // تغییر سایز بدون اجرای عملیات جانبی؛ چاپ کروکی/ذخیره ناخواسته نباید فعال شود.
+  window.setPaperSize(targetSize, true);
   renderSinglePreviewSheet(l, targetSize);
 
-  if (typeof getActiveCase === "function" && getActiveCase()) switchMainPane("pane-print");
+  if (linkedCase && typeof window.switchMainPane === "function") window.switchMainPane("pane-print");
   else activatePaneForArchivedLetter("pane-print");
 
   showToastMsg("پیش‌نمایش نامه شماره " + toFa(l.number || "") + " روی کاغذ " + targetSize + " آماده شد.");
@@ -682,9 +688,9 @@ function previewSavedLetter(letterId, forcedPaperSize, printNow) {
         else window.print();
       } catch (error) {
         console.error("Archived letter print failed:", error);
-        showToastMsg("آماده‌سازی چاپ ناموفق بود: " + (error && error.message ? error.message : "خطای نامشخص"), true);
+        showToastMsg("خطای چاپ نامه: " + (error && error.message ? error.message : String(error)), true);
       }
-    }, 250);
+    }, 300);
   }
   return true;
 }
