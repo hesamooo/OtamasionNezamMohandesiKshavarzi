@@ -529,8 +529,8 @@
 
     .a4-page {
       width: 210mm;
-      height: 296mm;
-      max-height: 296mm;
+      height: 297mm;
+      max-height: 297mm;
       background: #ffffff;
       color: #000000;
       box-sizing: border-box;
@@ -549,8 +549,8 @@
     /* استایل استاندارد کاغذ A5 (۱۴۸ در ۲۱۰ میلی‌متر) */
     .a4-page.paper-a5 {
       width: 148mm !important;
-      height: 209mm !important;
-      max-height: 209mm !important;
+      height: 210mm !important;
+      max-height: 210mm !important;
       page-break-after: always;
       break-after: page;
     }
@@ -595,6 +595,7 @@
     }
     .lh-content-wrap {
       flex: 1;
+      min-height: 0;
       overflow: hidden;
     }
     .l-rec { font-size: 11.5pt; font-weight: 900; margin-bottom: 2mm; }
@@ -604,12 +605,15 @@
       width: 94%;
       margin: 3mm auto;
       border-collapse: collapse;
+      table-layout: fixed;
+      direction: rtl;
       font-size: 8.8pt;
     }
     .utm-table-print th, .utm-table-print td {
       border: 1.2px solid #000;
       padding: 1.2mm 2.2mm;
       text-align: center;
+      overflow-wrap: anywhere;
     }
     .utm-table-print th { background: #e2e8f0; font-weight: 900; }
 
@@ -738,7 +742,6 @@
 
     /* قوانین سراسری ابعاد کاغذ برای چاپ و خروجی PDF (A4 و A5) */
     @page {
-      size: A4 portrait;
       size: 210mm 297mm;
       margin: 0;
     }
@@ -784,6 +787,8 @@
 
       #pane-print {
         display: block !important;
+        animation: none !important;
+        transform: none !important;
         position: static !important;
         margin: 0 !important;
         padding: 0 !important;
@@ -820,9 +825,13 @@
         padding: 0 !important;
         box-sizing: border-box !important;
         width: 210mm !important;
-        height: 295mm !important;
-        min-height: 295mm !important;
-        max-height: 295mm !important;
+        min-width: 210mm !important;
+        height: 297mm !important;
+        min-height: 297mm !important;
+        max-height: 297mm !important;
+        transform: none !important;
+        animation: none !important;
+        transition: none !important;
         page-break-inside: avoid !important;
         break-inside: avoid !important;
         page-break-after: always !important;
@@ -840,9 +849,13 @@
 
       .a4-page.paper-a5 {
         width: 148mm !important;
-        height: 208mm !important;
-        min-height: 208mm !important;
-        max-height: 208mm !important;
+        min-width: 148mm !important;
+        height: 210mm !important;
+        min-height: 210mm !important;
+        max-height: 210mm !important;
+        transform: none !important;
+        animation: none !important;
+        transition: none !important;
         page-break-inside: avoid !important;
         break-inside: avoid !important;
         page-break-after: always !important;
@@ -2441,9 +2454,9 @@
             <div class="form-check form-switch mb-3 p-2 rounded bg-light border">
               <input class="form-check-input ms-2" type="checkbox" id="l-include-utm" checked onchange="onToggleLetterIncludeUtm(this.checked)" style="cursor:pointer;" />
               <label class="form-check-label fw-bold text-success" for="l-include-utm" style="cursor:pointer;">
-                📍 ۳. سوییچ جدول UTM: درج جدول مختصات زمین اصلی و عوارض در انتهای نامه (فعال)
+                📎 ۳. پیوست مستقل جدول مختصات UTM (زمین اصلی و عوارض)
               </label>
-              <small class="text-muted d-block mt-1">💡 امکان فعال/غیرفعال کردن درج جدول مختصات در انتهای نامه با یک کلیک (مناسب گزارش‌های عمومی).</small>
+              <small class="text-muted d-block mt-1">💡 در صورت فعال بودن، جدول نقاط UTM پس از نامه در یک یا چند برگه پیوست مستقل چاپ می‌شود.</small>
             </div>
 
             <div class="d-flex flex-wrap gap-2">
@@ -2497,7 +2510,7 @@
       <div class="card-clean mb-3 no-print">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2 pb-2 border-bottom">
           <div class="d-flex flex-wrap align-items-center gap-2">
-            <span id="active-paper-size-badge" class="badge bg-dark fs-6">📄 قالب فعال: کاغذ A4 (قفل ارتفاع: ۲۹۶ میلی‌متر)</span>
+            <span id="active-paper-size-badge" class="badge bg-dark fs-6">📄 قالب فعال: کاغذ A4 (۲۱۰×۲۹۷ میلی‌متر)</span>
             <div class="d-flex gap-1">
               <button type="button" id="btn-paper-a4" class="btn btn-sm btn-success fw-bold" onclick="setPaperSize('A4')">📄 کاغذ A4</button>
               <button type="button" id="btn-paper-a5" class="btn btn-sm btn-outline-success fw-bold" onclick="setPaperSize('A5')">📄 کاغذ A5</button>
@@ -2971,7 +2984,7 @@
 
   <!-- ماژول‌های اصلی اتوماسیون مرکز خدمات ۶۳۶ خفر -->
   <script src="./nezam-core.js?v=20261102-parcel-r3"></script>
-  <script src="./nezam-customizer.js?v=20261102-archive-print-r3"></script>
+  <script src="./nezam-customizer.js?v=20261102-letter-appendix-print-r1"></script>
   <script src="./nezam-ai-assistant.js?v=20261101-security-r3"></script>
 
   <!-- ماژول اصلاح‌شده و دوطرفه اتصال سامانه ۶۳۶ خفر به گوگل درایو (ذخیره و بازخوانی ۱۰۰٪ اطلاعات) -->
