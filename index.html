@@ -1955,6 +1955,7 @@
               </div>
               <div class="col-lg-2 col-md-3">
                 <button type="button" id="case-doc-bulk-upload" class="btn btn-sm btn-primary fw-bold w-100">📤 بارگذاری در Drive</button>
+                <button type="button" id="case-doc-retry-failed" class="btn btn-sm btn-outline-warning fw-bold w-100 mt-1" hidden>↻ تلاش مجدد فایل‌های ناموفق</button>
               </div>
             </div>
             <div class="row g-2 align-items-center mt-2">
@@ -1969,6 +1970,7 @@
                 <div id="case-doc-upload-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" style="width:0%" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">0%</div>
               </div>
             </div>
+            <div id="case-doc-upload-errors" class="small text-danger bg-white border border-danger rounded p-2 mt-2" style="display:none;white-space:pre-wrap;"></div>
             <div id="case-docs-legacy-files" class="small mt-2"></div>
           </div>
           <div id="case-missing-docs-banner"></div>
