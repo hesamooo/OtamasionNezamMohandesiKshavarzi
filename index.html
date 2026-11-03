@@ -1934,6 +1934,37 @@
             </div>
           </div>
 
+          <div id="case-docs-drive-toolbar" class="border rounded-3 p-3 mb-3 bg-light">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+              <div>
+                <b class="text-success">☁️ بایگانی مستقیم مدارک در Google Drive</b>
+                <div class="small text-muted">فایل‌ها مستقیماً در پوشه ابری متقاضی ذخیره می‌شوند؛ انتخاب چند فایل هم‌زمان امکان‌پذیر است.</div>
+              </div>
+              <button type="button" id="case-doc-migrate-legacy" class="btn btn-sm btn-outline-warning">🔄 انتقال مدارک قدیمی این مرورگر به Drive</button>
+            </div>
+            <div class="row g-2 align-items-end">
+              <div class="col-lg-3 col-md-4">
+                <label class="form-label small fw-bold" for="case-doc-bulk-code">عنوان مدرک</label>
+                <select id="case-doc-bulk-code" class="form-select form-select-sm"></select>
+              </div>
+              <div class="col-lg-5 col-md-5">
+                <label class="form-label small fw-bold" for="case-doc-bulk-files">انتخاب چند فایل</label>
+                <input id="case-doc-bulk-files" class="form-control form-control-sm" type="file" multiple
+                  accept=".pdf,.jpg,.jpeg,.png,.webp,.gif,.tif,.tiff,.bmp,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.rtf,.odt,.ods,.odp">
+                <small class="text-muted" id="case-doc-bulk-file-label">هنوز فایلی انتخاب نشده است؛ حداکثر حجم هر فایل ۱۰ مگابایت</small>
+              </div>
+              <div class="col-lg-2 col-md-3">
+                <button type="button" id="case-doc-bulk-upload" class="btn btn-sm btn-primary fw-bold w-100">📤 بارگذاری در Drive</button>
+              </div>
+            </div>
+            <div id="case-doc-upload-progress-wrap" class="mt-3" hidden>
+              <div class="d-flex justify-content-between small mb-1"><span id="case-doc-upload-progress-label">آماده‌سازی...</span><span>پیشرفت</span></div>
+              <div class="progress" role="progressbar" aria-label="پیشرفت بارگذاری">
+                <div id="case-doc-upload-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" style="width:0%" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">0%</div>
+              </div>
+            </div>
+            <div id="case-docs-legacy-files" class="small mt-2"></div>
+          </div>
           <div id="case-missing-docs-banner"></div>
 
           <div class="table-responsive">
@@ -3007,7 +3038,8 @@
   <div id="smart-mouse-tooltip"></div>
 
   <!-- ماژول‌های اصلی اتوماسیون مرکز خدمات ۶۳۶ خفر -->
-  <script src="./nezam-core.js?v=20261103-delete-tombstone-r2"></script>
+  <script src="./nezam-core.js?v=20261103-drive-docs-r1"></script>
+  <script src="./nezam-drive-documents.js?v=20261103-drive-docs-r1"></script>
   <script src="./nezam-customizer.js?v=20261103-print-engine-r12"></script>
   <script src="./nezam-ai-assistant.js?v=20261101-security-r3"></script>
 
