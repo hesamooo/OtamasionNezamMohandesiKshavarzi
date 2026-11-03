@@ -316,3 +316,17 @@ test('authoritative Google Drive snapshots prevent deleted applicants and letter
   assert.ok(restore.includes('if (!hasAuthoritativeFullSnapshot && recoveredCases.length > 0)'), 'legacy applicant backups must only be used without a full snapshot');
   assert.ok(restore.includes('if (!hasAuthoritativeFullSnapshot && recoveredLetters.length > 0)'), 'legacy letter backups must only be used without a full snapshot');
 });
+
+
+test('Drive sync queues a second snapshot when a write arrives during an active sync', () => {
+  const html = read('index.html');
+  const start = html.indexOf('async function syncAllDataToDrive');
+  const end = html.indexOf('// ۴. ساخت پوشه اختصاصی متقاضی فعال', start);
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+  const sync = html.slice(start, end);
+
+  assert.ok(sync.includes('syncRequestedWhileBusy = true'), 'a busy sync must queue the newer change');
+  assert.ok(sync.includes('if (syncRequestedWhileBusy && isInitialLoadDone && !isRestoring)'), 'queued changes must run after the active request finishes');
+  assert.ok(sync.includes('setTimeout(() => syncAllDataToDrive(false), 350)'), 'the queued snapshot must be sent after the previous request');
+});
