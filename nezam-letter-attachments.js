@@ -64,7 +64,7 @@
         if (!Number.isInteger(index) || index < 0 || index >= draft.length) return;
         draft.splice(index, 1);
         render();
-        window.__nezam636LetterDraftDirty = true;
+        window.letterDraftDirty = true;
       });
     }
   }
@@ -78,7 +78,7 @@
       added++;
     });
     render();
-    window.__nezam636LetterDraftDirty = true;
+    window.letterDraftDirty = true;
     return added;
   }
 
