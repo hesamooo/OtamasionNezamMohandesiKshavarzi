@@ -1228,6 +1228,16 @@ function bindLetterEditorDirtyTracking() {
     editor.dataset.letterKeyboardBound="1";
     editor.addEventListener("keyup",rememberLetterEditorSelection);
     editor.addEventListener("mouseup",rememberLetterEditorSelection);
+    editor.addEventListener("paste",function(event) {
+      var clipboard = event.clipboardData;
+      if (!clipboard || typeof clipboard.getData !== "function") return;
+      var pastedHtml = clipboard.getData("text/html") || "";
+      var pastedText = clipboard.getData("text/plain") || "";
+      if (!pastedHtml && !pastedText) return;
+      event.preventDefault();
+      if (pastedHtml) insertHtmlAtLetterSelection(pastedHtml);
+      else insertTextAtLetterSelection(pastedText);
+    });
     editor.addEventListener("keydown",function(event){
       if(!(event.ctrlKey||event.metaKey)||event.altKey)return;
       var key=String(event.key||"").toLowerCase();
@@ -1301,10 +1311,8 @@ function syncRichEditorToTextarea() {
   var editor = document.getElementById("l-body-rich");
   var ta = document.getElementById("l-body");
   if (editor && ta) {
-    var rawHtml = editor.innerHTML;
-    var safeHtml = sanitizeOfficeRichHtml(rawHtml);
-    if (safeHtml !== rawHtml) editor.innerHTML = safeHtml;
-    ta.value = editor.innerText || editor.textContent;
+    // هنگام تایپ، DOM و محل نشانگر را بازسازی نکن؛ پاک‌سازی امن هنگام paste و ذخیره انجام می‌شود.
+    ta.value = editor.innerText || editor.textContent || "";
     if (!window.__nezam636ProgrammaticLetterSync) letterDraftDirty = true;
   }
 }
