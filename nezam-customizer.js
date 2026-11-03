@@ -711,8 +711,8 @@ window.doPrintPaperSheet = function() {
     showToastMsg("اندازه‌گیری صفحات کامل نشده است؛ پیش‌نمایش را باز نگه دارید و دوباره چاپ را بزنید.", true);
     return false;
   }
-  if (previewMode !== "CROQUIS" && fitResult.overflowCount) {
-    showToastMsg("چاپ متوقف شد؛ محتوای یک یا چند صفحه از محدوده کاغذ بیرون می‌زند.", true);
+  if (fitResult.overflowCount) {
+    showToastMsg("چاپ متوقف شد؛ محتوای یک یا چند صفحه از محدوده کاغذ بیرون می‌زند. اندازه قلم، تعداد ردیف‌ها یا چیدمان را اصلاح کنید تا اطلاعات ناقص چاپ نشود.", true);
     return false;
   }
 
@@ -809,8 +809,9 @@ window.doPrintPaperSheet = function() {
     // مسیر جایگزین در صورت مسدودبودن پنجره جدید: چاپ ایمن در همان صفحه.
     showToastMsg("مرورگر پنجره مستقل چاپ را مسدود کرد؛ چاپ در همین صفحه انجام می‌شود.");
     applyDynamicPrintPageSizeCSS(paperSize);
-    requestAnimationFrame(function() {
-      requestAnimationFrame(function() {
+    var nextFrame = window.requestAnimationFrame || function(callback) { return setTimeout(callback, 40); };
+    nextFrame(function() {
+      nextFrame(function() {
         try { window.print(); }
         catch (printError) {
           console.error("Fallback print failed:", printError);
