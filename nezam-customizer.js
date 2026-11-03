@@ -373,6 +373,31 @@ function isSecretariatNumberAvailable(number, ignoreId) {
   });
 }
 
+function ensureApplicantIdentityInLetterBody_(bodyHtml, applicant) {
+  var source = applicant || {};
+  var name = String(source.name || source.appName || "").trim();
+  var parcel = String(source.landParcel || source.parcel || "").trim();
+  var missing = [];
+  if (!name) missing.push("نام متقاضی");
+  if (!parcel) missing.push("پلاک ثبتی زمین");
+  if (missing.length) return { ok: false, missing: missing, html: String(bodyHtml || "") };
+  var parsed = new DOMParser().parseFromString(String(bodyHtml || ""), "text/html");
+  var normalize = function(value) {
+    return String(value || "").replace(/[يى]/g, "ی").replace(/ك/g, "ک").replace(/[\s\u200c\u200f\u0640]/g, "").toLowerCase();
+  };
+  var plain = normalize(parsed.body.textContent || "");
+  var additions = [];
+  if (plain.indexOf(normalize(name)) === -1) additions.push("نام متقاضی: " + name);
+  if (plain.indexOf(normalize(parcel)) === -1) additions.push("پلاک ثبتی زمین: " + parcel);
+  if (additions.length) {
+    var p = parsed.createElement("p");
+    p.setAttribute("data-nezam-required-identity", "true");
+    p.textContent = additions.join(" | ");
+    parsed.body.appendChild(p);
+  }
+  return { ok: true, html: parsed.body.innerHTML, added: additions.length > 0 };
+}
+
 function getLetterDraftFromEditor() {
   var officeMode = window.__nezamOfficeLetterDraftMode === true;
   var c = officeMode ? null : getActiveCase();
@@ -403,6 +428,22 @@ function getLetterDraftFromEditor() {
     if (editor) editor.focus();
     return null;
   }
+  if (!officeMode) {
+    var identity = ensureApplicantIdentityInLetterBody_(body, c);
+    if (!identity.ok) {
+      showToastMsg("برای صدور نامه، این اطلاعات پرونده الزامی است: " + identity.missing.join(" و ") + "؛ ابتدا پرونده متقاضی را تکمیل کنید.", true);
+      var parcelInput = document.getElementById("c-land-parcel");
+      if (parcelInput && identity.missing.indexOf("پلاک ثبتی زمین") !== -1) parcelInput.focus();
+      else { var nameInput = document.getElementById("c-name"); if (nameInput) nameInput.focus(); }
+      return null;
+    }
+    body = identity.html;
+    if (identity.added) {
+      if (editor) editor.innerHTML = body;
+      if (bodyField) bodyField.value = editor ? (editor.innerText || editor.textContent || "") : body;
+      letterDraftDirty = true;
+    }
+  }
   var rec = String(recipientEl.value || "").trim();
   if (!rec) {
     showToastMsg("عنوان گیرنده نامه را وارد کنید.", true);
@@ -428,14 +469,16 @@ function getLetterDraftFromEditor() {
   var snapshotMapId = hasFreshUtmSnapshot && map && map.id
     ? map.id
     : (existingLetter && existingLetter.croquisMapId ? existingLetter.croquisMapId : (map && map.id ? map.id : activeCroquisMapId));
+  var letterAttachments = window.NezamLetterAttachments ? window.NezamLetterAttachments.getDraft() : [];
   return {
     id: editingLetterId || null,
     caseId: officeMode ? "" : c.id,
+    attachments: letterAttachments,
     officeLetter: officeMode,
     number: number,
     date: date,
     type: officeMode ? "OUT" : (directionEl && directionEl.value === "IN" ? "IN" : "OUT"),
-    attach: getLetterAttachmentLabel(String(attachEl && attachEl.value || "ندارد"), hasUtm),
+    attach: getLetterAttachmentLabel(String(attachEl && attachEl.value || "ندارد"), hasUtm, letterAttachments.length),
     recipient: rec,
     appName: officeMode ? "" : (c.name || ""),
     appNid: officeMode ? "" : (c.nid || ""),
@@ -1297,6 +1340,7 @@ function syncLetterEditorWithActiveCase(force) {
   if (includeEl) includeEl.checked = true;
 
   letterDraftCaseId = c.id;
+  if (window.NezamLetterAttachments) window.NezamLetterAttachments.clear();
   letterDraftDirty = false;
   currentPreviewDraft = null;
   currentPreviewLetterId = null;
@@ -1332,16 +1376,20 @@ function onToggleLetterIncludeUtm(checked) {
 }
 window.onToggleLetterIncludeUtm = onToggleLetterIncludeUtm;
 
-function getLetterAttachmentLabel(baseValue, hasUtmAttachment) {
+function getLetterAttachmentLabel(baseValue, hasUtmAttachment, fileCount) {
   var base = String(baseValue || "").trim();
-  var label = "جدول مختصات UTM";
-  if (!hasUtmAttachment) {
-    base = base.replace(/،?\s*جدول مختصات UTM/g, "").replace(/^[،,\s]+|[،,\s]+$/g, "").trim();
-    return base || "ندارد";
-  }
-  if (!base || /^ندارد$/i.test(base)) return label;
-  if (base.indexOf(label) !== -1) return base;
-  return base + "، " + label;
+  base = base.replace(/،?\s*جدول مختصات UTM/g, "").replace(/،?\s*\d+\s*(?:فایل|سند)\s*پیوست/g, "");
+  base = base.replace(/^[،,\s]+|[،,\s]+$/g, "").trim();
+  var parts = [];
+  if (base && !/^ندارد$/i.test(base)) parts.push(base);
+  if (hasUtmAttachment) parts.push("جدول مختصات UTM");
+  if (Number(fileCount) > 0) parts.push(toFa(Number(fileCount)) + " فایل پیوست");
+  return parts.join("، ") || "ندارد";
+}
+
+function getLetterAttachmentBaseLabel(value) {
+  return String(value || "").replace(/،?\s*جدول مختصات UTM/g, "")
+    .replace(/،?\s*\d+\s*(?:فایل|سند)\s*پیوست/g, "").replace(/^[،,\s]+|[،,\s]+$/g, "").trim() || "ندارد";
 }
 
 function saveLetterToSecretariat(goToPrint, forcedPaperSize) {
@@ -1775,11 +1823,12 @@ function editLetterFromSecretariat(letterId) {
   letterDraftCaseId = isOfficeLetter ? "__OFFICE__" : linkedCase.id;
   letterDraftDirty = false;
   paperPreviewDirty = false;
+  if (window.NezamLetterAttachments) window.NezamLetterAttachments.setDraft(letter.attachments || []);
   var fields = {
     "l-direction": isOfficeLetter ? "OUT" : (letter.type || "OUT"),
     "l-number": letter.number || "",
     "l-date": letter.date || "",
-    "l-attach": letter.attach || "ندارد",
+    "l-attach": getLetterAttachmentBaseLabel(letter.attach || "ندارد"),
     "l-recipient": letter.recipient || "",
     "l-body": letter.body || ""
   };
