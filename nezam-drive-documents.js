@@ -4,6 +4,7 @@
   var DRIVE_API_URL = 'https://script.google.com/macros/s/AKfycbyd7lrIZfKVUm09OzBQewj8_XRWJfMpd8vCm6DV-tAUXEkA33LgqL10UKe8Yz17TwM2/exec';
   var ACCESS_KEY_STORAGE = '__nezam636_docs_access_key';
   var MAX_FILE_BYTES = 10 * 1024 * 1024;
+  var lastFailedFiles = [];
   var ALLOWED = new Set(['pdf','jpg','jpeg','png','webp','gif','tif','tiff','bmp','doc','docx','xls','xlsx','ppt','pptx','txt','csv','rtf','odt','ods','odp']);
 
   function getAccessKey(forcePrompt) {
@@ -110,6 +111,7 @@
     files.forEach(validateFile);
     var successes = [];
     var failures = [];
+    lastFailedFiles = [];
     var replaceId = context.replaceFileId || '';
     setProgress(0, files.length, '', 'آماده‌سازی بارگذاری...');
     for (var i = 0; i < files.length; i++) {
@@ -121,12 +123,24 @@
         if (result.document) successes.push(result.document);
         else throw new Error('سرور فایل ذخیره‌شده را برنگرداند.');
       } catch (error) {
-        failures.push({fileName:file.name,message:error && error.message ? error.message : String(error)});
+        var failure = {fileName:file.name,message:error && error.message ? error.message : String(error)};
+        failures.push(failure);
+        lastFailedFiles.push({file:file,context:Object.assign({},context,{replaceFileId:context.replaceFileId || ''})});
       }
       if (replaceId) replaceId = '';
       setProgress(i+1,files.length,file.name,(i+1)+' از '+files.length+' فایل پردازش شد');
     }
     setProgress(files.length,files.length,'',failures.length ? ('اتمام با '+failures.length+' خطا') : ('همه '+successes.length+' فایل با موفقیت در Drive ثبت شدند'));
+    var errorBox = document.getElementById('case-doc-upload-errors');
+    if (errorBox) {
+      errorBox.textContent = failures.map(function(item) { return item.fileName + ': ' + item.message; }).join('\n');
+      errorBox.style.display = failures.length ? 'block' : 'none';
+    }
+    var retryButton = document.getElementById('case-doc-retry-failed');
+    if (retryButton) {
+      retryButton.hidden = !lastFailedFiles.length;
+      retryButton.textContent = lastFailedFiles.length ? '↻ تلاش مجدد (' + lastFailedFiles.length + ')' : '↻ تلاش مجدد';
+    }
     if (typeof window.renderActiveCaseDocsChecklist === 'function') window.renderActiveCaseDocsChecklist();
     if (successes.length && typeof window.logCaseAction === 'function') {
       var active = window.getActiveCase ? window.getActiveCase() : null;
@@ -182,6 +196,13 @@
     });
   }
 
+  async function retryFailed() {
+    if (!lastFailedFiles.length) throw new Error('فایل ناموفقی برای تلاش مجدد باقی نمانده است.');
+    var pending = lastFailedFiles.slice();
+    lastFailedFiles = [];
+    return uploadFiles(pending.map(function(item) { return item.file; }), pending[0].context);
+  }
+
   function getCaseContext() {
     var c=typeof window.getActiveCase==='function'?window.getActiveCase():null;
     if(!c)throw new Error('ابتدا یک متقاضی را انتخاب کنید.');
@@ -189,7 +210,7 @@
   }
 
   window.NezamDriveDocuments={
-    list:list,readDatabase:readDatabase,uploadFiles:uploadFiles,remove:remove,migrateLegacyDocs:migrateLegacyDocs,
+    list:list,readDatabase:readDatabase,uploadFiles:uploadFiles,retryFailed:retryFailed,remove:remove,migrateLegacyDocs:migrateLegacyDocs,
     getCaseContext:getCaseContext,getAccessKey:function(){return getAccessKey(false);},
     clearAccessKey:function(){try{localStorage.removeItem(ACCESS_KEY_STORAGE);}catch(e){}},
     maxFileBytes:MAX_FILE_BYTES
