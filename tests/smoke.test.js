@@ -445,3 +445,27 @@ test('print pipeline isolates the printable document and waits for map image til
   assert.ok(a5Css.includes(".a4-page,.a4-page.paper-a5{width:148mm!important"));
   assert.ok(a4Css.includes(".no-print,[data-no-print='true']{display:none!important;}"));
 });
+
+
+test('Google Drive applicant document vault supports protected multi-file storage', () => {
+  const html = read('index.html');
+  const core = read('nezam-core.js');
+  const vault = read('nezam-drive-documents.js');
+
+  assert.match(html, /nezam-drive-documents\.js\?v=/);
+  assert.match(html, /id="case-doc-bulk-files"[^>]*multiple/);
+  assert.match(html, /id="case-doc-bulk-upload"/);
+  assert.match(html, /id="case-doc-migrate-legacy"/);
+  assert.match(core, /window\.NezamDriveDocuments\.uploadFiles/);
+  assert.match(core, /data-doc-action="replace"/);
+  assert.match(core, /data-doc-action="remove-file"/);
+
+  assert.match(vault, /MAX_FILE_BYTES = 10 \* 1024 \* 1024/);
+  assert.match(vault, /for \(var i = 0; i < files\.length; i\+\+\)/);
+  assert.match(vault, /action: context\.replaceFileId \? 'replaceCaseDocument' : 'uploadCaseDocument'/);
+  assert.match(vault, /action:'listCaseDocuments'/);
+  assert.match(vault, /action:'deleteCaseDocument'/);
+  assert.match(vault, /__nezam636_docs_access_key/);
+  assert.doesNotMatch(vault, /NEZAM636_DOCS_ACCESS_KEY\s*=\s*['"][^'"]+['"]/);
+});
+
