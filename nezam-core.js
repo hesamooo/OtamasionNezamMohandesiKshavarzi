@@ -2159,7 +2159,9 @@ function renderActiveCaseDocsChecklist() {
         var allFiles = (cloudFiles || []).slice().sort(function(a, b) {
           return Number(b.updatedAt || b.uploadedAt || 0) - Number(a.updatedAt || a.uploadedAt || 0);
         });
-        if (!allFiles.length) {
+        if (cloudError) {
+          libraryBody.innerHTML = '<tr><td colspan="6" class="text-center text-danger py-4">دریافت فهرست فایل‌ها ناموفق بود: ' + escapeHtmlCore(cloudError) + '<br><small>اتصال و دسترسی Google Drive را بررسی و دکمه تازه‌سازی را اجرا کنید.</small></td></tr>';
+        } else if (!allFiles.length) {
           libraryBody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">هنوز فایلی در پوشه Google Drive این متقاضی پیدا نشد.</td></tr>';
         } else {
           libraryBody.innerHTML = allFiles.map(function(file, index) {
