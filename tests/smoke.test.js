@@ -241,7 +241,7 @@ test('form and secretariat print engine keeps paper geometry, binder padding, an
   assert.ok(customizer.includes('letterPageIndex === 0 ? "letter" : "letter-appendix"'));
   assert.ok(html.includes('main {\n        width: 100% !important;\n        max-width: none !important;\n        margin: 0 !important;\n        padding: 0 !important;'));
   assert.ok(html.includes('.a4-page[data-page-kind="binder-label"] {\n        padding: 15mm !important;'));
-  assert.ok(html.includes('nezam-customizer.js?v=20261103-print-engine-r14'));
+  assert.ok(html.includes('nezam-customizer.js?v=20261103-secretariat-r15'));
 });
 
 
@@ -536,4 +536,34 @@ test('local IndexedDB failures cannot indefinitely block Google Drive document l
   assert.match(vault, /function withTimeout\(promise, timeoutMs, message\)/);
   assert.match(vault, /15000, 'پاسخ Google Apps Script برای بررسی اتصال در ۱۵ ثانیه دریافت نشد/);
   assert.match(vault, /18000,\s*'پاسخ Google Apps Script در ۱۸ ثانیه دریافت نشد/);
+});
+
+
+test('secretariat variable injection resolves in preview using the letter snapshot and linked case', () => {
+  const customizer = read('nezam-customizer.js');
+  assert.match(customizer, /function resolveOfficeLetterVariables\(bodyHtml, letter, linkedCase\)/);
+  assert.match(customizer, /pick\(\["appName", "name"\], \["name"\]\)/);
+  assert.match(customizer, /"نام": "name"/);
+  assert.match(customizer, /"پلاکثبتی": "landParcel"/);
+  assert.match(customizer, /window\.__nezam636UnresolvedLetterVars = bodyResolution\.unresolved\.slice\(\)/);
+  assert.match(customizer, /bodyResolution\.html/);
+  assert.match(customizer, /isDraft \? getActiveCase\(\) : null/);
+  assert.match(customizer, /چاپ تا تکمیل متغیرها مجاز نیست/);
+});
+
+test('secretariat output is blocked while letter variables remain unresolved', () => {
+  const customizer = read('nezam-customizer.js');
+  assert.match(customizer, /function ensureLetterVariablesResolvedForOutput\(\)/);
+  assert.match(customizer, /if \(!ensureLetterVariablesResolvedForOutput\(\)\) return false;/);
+  assert.match(customizer, /چاپ\/خروجی متوقف شد/);
+});
+
+test('rich letter editor preserves selection and caret during token insertion', () => {
+  const customizer = read('nezam-customizer.js');
+  assert.match(customizer, /var letterEditorSavedRange=null/);
+  assert.match(customizer, /function restoreLetterEditorSelection\(editor\)/);
+  assert.match(customizer, /function insertTextAtLetterSelection\(text\)/);
+  assert.match(customizer, /function insertHtmlAtLetterSelection\(html\)/);
+  assert.match(customizer, /editor\.innerHTML = safeHtml/);
+  assert.match(customizer, /editor\.dataset\.letterKeyboardBound/);
 });
