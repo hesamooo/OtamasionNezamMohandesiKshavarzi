@@ -473,6 +473,8 @@ function normalizeLetterVariableKey(value) {
 var LETTER_VARIABLE_ALIASES = {
   "نام": "name",
   "ناممتقاضی": "name",
+  "نامونامخانوادگی": "name",
+  "ناموخانوادگی": "name",
   "نامبهرهبردار": "name",
   "نامو": "name",
   "ناموخانوادگی": "name",
@@ -1467,6 +1469,7 @@ window.savePaperEditsToSecretariat = function(options) {
     if (!silent) showToastMsg("فرم نامه بعد از آخرین پیش‌نمایش تغییر کرده است؛ ابتدا دوباره پیش‌نمایش بگیرید تا نسخه قدیمی ذخیره نشود.", true);
     return false;
   }
+  if (!ensureLetterVariablesResolvedForOutput()) return false;
 
   var pageEls = stage.querySelectorAll(".a4-page");
   var pageEl = pageEls.length ? pageEls[0] : null;
