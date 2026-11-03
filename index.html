@@ -676,6 +676,18 @@
       border-color: #2d6a4f;
       box-shadow: 0 0 0 3px rgba(45, 106, 79, 0.15);
     }
+    .rich-editor-paper:empty::before {
+      content: attr(placeholder);
+      color: #94a3b8;
+      pointer-events: none;
+    }
+    .rich-editor-paper {
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: normal;
+      direction: rtl;
+      unicode-bidi: plaintext;
+    }
     .rich-editor-paper [data-nezam-variable] {
       display: inline-block;
       padding: 0 4px;
@@ -2552,7 +2564,8 @@
               </div>
 
               <!-- محیط نوشتاری غنی با پشتیبانی کامل از استایل‌ها -->
-              <div id="l-body-rich" class="rich-editor-paper" contenteditable="true" oninput="syncRichEditorToTextarea()" placeholder="متن کامل نامه اداری را در این قسمت بنویسید یا ویرایش کنید..."></div>
+              <div id="l-body-rich" class="rich-editor-paper" contenteditable="true" role="textbox" aria-multiline="true" aria-label="متن نامه اداری" spellcheck="true" oninput="syncRichEditorToTextarea()" placeholder="متن کامل نامه اداری را در این قسمت بنویسید یا ویرایش کنید..."></div>
+              <small class="text-muted d-block mt-1">متغیرها داخل متن با آکولاد درج می‌شوند؛ هنگام پیش‌نمایش با اطلاعات همان نامه جایگزین می‌شوند. متغیر بدون مقدار، چاپ و خروجی را متوقف می‌کند.</small>
               <textarea id="l-body" class="form-control form-control-sm" rows="6" style="display:none;" oninput="syncTextareaToRichEditor()"></textarea>
             </div>
 
@@ -3083,9 +3096,9 @@
   <div id="smart-mouse-tooltip"></div>
 
   <!-- ماژول‌های اصلی اتوماسیون مرکز خدمات ۶۳۶ خفر -->
-  <script src="./nezam-core.js?v=20261103-drive-docs-r8"></script>
+  <script src="./nezam-core.js?v=20261103-secretariat-r9"></script>
   <script src="./nezam-drive-documents.js?v=20261103-drive-docs-r6"></script>
-  <script src="./nezam-customizer.js?v=20261103-secretariat-r15"></script>
+  <script src="./nezam-customizer.js?v=20261103-secretariat-r16"></script>
   <script src="./nezam-ai-assistant.js?v=20261101-security-r3"></script>
 
   <!-- ماژول اصلاح‌شده و دوطرفه اتصال سامانه ۶۳۶ خفر به گوگل درایو (ذخیره و بازخوانی ۱۰۰٪ اطلاعات) -->
