@@ -1905,6 +1905,22 @@ function renderActiveCaseDocsChecklist() {
     var fileInput = document.getElementById("case-doc-bulk-files");
     var uploadBtn = document.getElementById("case-doc-bulk-upload");
     var migrateBtn = document.getElementById("case-doc-migrate-legacy");
+    var retryBtn = document.getElementById("case-doc-retry-failed");
+    if (retryBtn) retryBtn.addEventListener("click", async function() {
+      if (!window.NezamDriveDocuments || !window.NezamDriveDocuments.retryFailed) return;
+      retryBtn.disabled = true;
+      try {
+        var result = await window.NezamDriveDocuments.retryFailed();
+        var failed = result.failures ? result.failures.length : 0;
+        showToastMsg((result.successes ? result.successes.length : 0) + " فایل در تلاش مجدد ذخیره شد." +
+          (failed ? " " + failed + " فایل همچنان ناموفق است." : ""), !!failed);
+        renderActiveCaseDocsChecklist();
+      } catch (error) {
+        showToastMsg(error.message || "تلاش مجدد ناموفق بود.", true);
+      } finally {
+        retryBtn.disabled = false;
+      }
+    });
     var searchInput = document.getElementById("case-doc-search");
     if (searchInput) searchInput.addEventListener("input", function() {
       var query = String(searchInput.value || "").trim().toLocaleLowerCase();
@@ -2067,7 +2083,7 @@ function renderActiveCaseDocsChecklist() {
           var downloadUrl = /^https:\/\/drive\.google\.com\//.test(String(file.downloadUrl || "")) ? String(file.downloadUrl) : "";
           return '<div class="d-flex flex-wrap align-items-center gap-1 border rounded p-1 mb-1 bg-white">' +
             (viewUrl ? '<a class="small fw-bold text-decoration-none" href="' + escapeHtmlCore(viewUrl) + '" target="_blank" rel="noopener noreferrer">👁️ ' + safeName + '</a>' : '<span class="small fw-bold">' + safeName + '</span>') +
-            '<small class="text-muted">' + escapeHtmlCore(sizeLabel) + '</small>' +
+            '<small class="text-muted">' + escapeHtmlCore(sizeLabel) + (Number(file.version || 1) > 1 ? ' · نسخه ' + escapeHtmlCore(toFa(file.version)) : '') + '</small>' +
             (downloadUrl ? '<a class="btn btn-sm btn-outline-secondary py-0 px-1" href="' + escapeHtmlCore(downloadUrl) + '" target="_blank" rel="noopener noreferrer">دریافت</a>' : '') +
             (!file.legacy ? '<label class="btn btn-sm btn-outline-primary py-0 px-1 m-0" title="ابتدا نسخه جدید ذخیره می‌شود و سپس نسخه قبلی به سطل زباله می‌رود">جایگزینی<input type="file" data-doc-action="replace" data-doc-code="' + safeCode + '" data-doc-title="' + safeTitle + '" data-file-id="' + safeId + '" accept=".pdf,.jpg,.jpeg,.png,.webp,.gif,.tif,.tiff,.bmp,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.rtf,.odt,.ods,.odp" hidden></label>' : '') +
             '<button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" data-doc-action="remove-file" data-doc-code="' + safeCode + '" data-file-id="' + safeId + '">حذف</button>' +
