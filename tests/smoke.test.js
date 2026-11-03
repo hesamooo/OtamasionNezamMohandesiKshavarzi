@@ -457,6 +457,10 @@ test('navigation and printing have one clear control path', () => {
   assert.doesNotMatch(html, /var SUB_TABS_MAP\s*=|function renderSubBar\s*\(/);
   assert.doesNotMatch(html, /id\s*=\s*'nezam-top-subbar'/);
   assert.match(html, /id="sub-docs"/);
+  assert.ok(html.includes('id="btn-sub-matrix"'));
+  assert.ok(html.includes('id="btn-sub-docs"'));
+  assert.ok(html.includes('display: block !important;'));
+  assert.ok(!html.includes('display: none !important;\n  }\n\n  /* ۴. تضمین نمایش ۱۰۰٪ تایل‌های نقشه Leaflet */'));
   assert.equal((html.match(/id="print-paper-size-select"/g) || []).length, 1);
   assert.doesNotMatch(html, /id="l-paper-size"|id="btn-paper-a4"|id="btn-paper-a5"|id="btn-preview-letter-draft"/);
   assert.doesNotMatch(customizer, /l-paper-size|btn-paper-a4|btn-paper-a5|btn-preview-letter-draft/);
