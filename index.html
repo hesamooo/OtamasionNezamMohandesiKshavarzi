@@ -676,6 +676,22 @@
       border-color: #2d6a4f;
       box-shadow: 0 0 0 3px rgba(45, 106, 79, 0.15);
     }
+    .rich-editor-paper [data-nezam-variable] {
+      display: inline-block;
+      padding: 0 4px;
+      margin: 0 1px;
+      border: 1px dashed #2d6a4f;
+      border-radius: 4px;
+      background: #e6efe9;
+      color: #174b36;
+      font-weight: 700;
+      white-space: nowrap;
+      cursor: default;
+    }
+    .rich-editor-paper [data-nezam-variable]:focus {
+      outline: 2px solid rgba(45, 106, 79, 0.28);
+      outline-offset: 1px;
+    }
 
     /* کارت‌های بخش راهنمای اتوماسیون */
     .guide-card {
@@ -2503,19 +2519,19 @@
                     🏷️ ۱. تزریق متغیر...
                   </button>
                   <ul class="dropdown-menu dropdown-menu-end shadow" style="display:none;" onmouseleave="this.style.display='none';">
-                    <li><a class="dropdown-item small" href="javascript:void(0)" onclick="insertTagIntoLetterBody('{نام}');this.closest('ul').style.display='none';">👤 {نام متقاضی}</a></li>
-                    <li><a class="dropdown-item small" href="javascript:void(0)" onclick="insertTagIntoLetterBody('{کدملی}');this.closest('ul').style.display='none';">🆔 {کد ملی/شناسه}</a></li>
-                    <li><a class="dropdown-item small" href="javascript:void(0)" onclick="insertTagIntoLetterBody('{طرح}');this.closest('ul').style.display='none';">📋 {موضوع طرح}</a></li>
-                    <li><a class="dropdown-item small" href="javascript:void(0)" onclick="insertTagIntoLetterBody('{مساحت}');this.closest('ul').style.display='none';">📐 {مساحت زمین}</a></li>
-                    <li><a class="dropdown-item small" href="javascript:void(0)" onclick="insertTagIntoLetterBody('{ظرفیت}');this.closest('ul').style.display='none';">🔢 {ظرفیت طرح}</a></li>
-                    <li><a class="dropdown-item small" href="javascript:void(0)" onclick="insertTagIntoLetterBody('{موقعیت}');this.closest('ul').style.display='none';">📍 {موقعیت اراضی}</a></li>
-                    <li><a class="dropdown-item small" href="javascript:void(0)" onclick="insertTagIntoLetterBody('{پلاک ثبتی}');this.closest('ul').style.display='none';">📑 {پلاک ثبتی}</a></li>
-                    <li><a class="dropdown-item small" href="javascript:void(0)" onclick="insertTagIntoLetterBody('{آب}');this.closest('ul').style.display='none';">💧 {منبع آب}</a></li>
-                    <li><a class="dropdown-item small" href="javascript:void(0)" onclick="insertTagIntoLetterBody('{کلاسه پرونده}');this.closest('ul').style.display='none';">🗂️ {کلاسه پرونده}</a></li>
-                    <li><a class="dropdown-item small" href="javascript:void(0)" onclick="insertTagIntoLetterBody('{شماره نامه}');this.closest('ul').style.display='none';">🔢 {شماره نامه}</a></li>
-                    <li><a class="dropdown-item small" href="javascript:void(0)" onclick="insertTagIntoLetterBody('{تاریخ}');this.closest('ul').style.display='none';">📅 {تاریخ نامه}</a></li>
-                    <li><a class="dropdown-item small" href="javascript:void(0)" onclick="insertTagIntoLetterBody('{پیوست}');this.closest('ul').style.display='none';">📎 {پیوست}</a></li>
-                    <li><a class="dropdown-item small" href="javascript:void(0)" onclick="insertTagIntoLetterBody('{گیرنده}');this.closest('ul').style.display='none';">🏛️ {عنوان گیرنده}</a></li>
+                    <li><a class="dropdown-item small" href="javascript:void(0)" onmousedown="rememberLetterEditorSelection()" onclick="insertTagIntoLetterBody('{نام}');this.closest('ul').style.display='none';">👤 {نام متقاضی}</a></li>
+                    <li><a class="dropdown-item small" href="javascript:void(0)" onmousedown="rememberLetterEditorSelection()" onclick="insertTagIntoLetterBody('{کدملی}');this.closest('ul').style.display='none';">🆔 {کد ملی/شناسه}</a></li>
+                    <li><a class="dropdown-item small" href="javascript:void(0)" onmousedown="rememberLetterEditorSelection()" onclick="insertTagIntoLetterBody('{طرح}');this.closest('ul').style.display='none';">📋 {موضوع طرح}</a></li>
+                    <li><a class="dropdown-item small" href="javascript:void(0)" onmousedown="rememberLetterEditorSelection()" onclick="insertTagIntoLetterBody('{مساحت}');this.closest('ul').style.display='none';">📐 {مساحت زمین}</a></li>
+                    <li><a class="dropdown-item small" href="javascript:void(0)" onmousedown="rememberLetterEditorSelection()" onclick="insertTagIntoLetterBody('{ظرفیت}');this.closest('ul').style.display='none';">🔢 {ظرفیت طرح}</a></li>
+                    <li><a class="dropdown-item small" href="javascript:void(0)" onmousedown="rememberLetterEditorSelection()" onclick="insertTagIntoLetterBody('{موقعیت}');this.closest('ul').style.display='none';">📍 {موقعیت اراضی}</a></li>
+                    <li><a class="dropdown-item small" href="javascript:void(0)" onmousedown="rememberLetterEditorSelection()" onclick="insertTagIntoLetterBody('{پلاک ثبتی}');this.closest('ul').style.display='none';">📑 {پلاک ثبتی}</a></li>
+                    <li><a class="dropdown-item small" href="javascript:void(0)" onmousedown="rememberLetterEditorSelection()" onclick="insertTagIntoLetterBody('{آب}');this.closest('ul').style.display='none';">💧 {منبع آب}</a></li>
+                    <li><a class="dropdown-item small" href="javascript:void(0)" onmousedown="rememberLetterEditorSelection()" onclick="insertTagIntoLetterBody('{کلاسه پرونده}');this.closest('ul').style.display='none';">🗂️ {کلاسه پرونده}</a></li>
+                    <li><a class="dropdown-item small" href="javascript:void(0)" onmousedown="rememberLetterEditorSelection()" onclick="insertTagIntoLetterBody('{شماره نامه}');this.closest('ul').style.display='none';">🔢 {شماره نامه}</a></li>
+                    <li><a class="dropdown-item small" href="javascript:void(0)" onmousedown="rememberLetterEditorSelection()" onclick="insertTagIntoLetterBody('{تاریخ}');this.closest('ul').style.display='none';">📅 {تاریخ نامه}</a></li>
+                    <li><a class="dropdown-item small" href="javascript:void(0)" onmousedown="rememberLetterEditorSelection()" onclick="insertTagIntoLetterBody('{پیوست}');this.closest('ul').style.display='none';">📎 {پیوست}</a></li>
+                    <li><a class="dropdown-item small" href="javascript:void(0)" onmousedown="rememberLetterEditorSelection()" onclick="insertTagIntoLetterBody('{گیرنده}');this.closest('ul').style.display='none';">🏛️ {عنوان گیرنده}</a></li>
                   </ul>
                 </div>
 
