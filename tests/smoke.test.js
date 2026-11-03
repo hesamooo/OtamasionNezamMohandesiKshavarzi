@@ -466,6 +466,11 @@ test('Google Drive applicant document vault supports protected multi-file storag
   assert.match(vault, /action:'listCaseDocuments'/);
   assert.match(vault, /action:'deleteCaseDocument'/);
   assert.match(vault, /__nezam636_docs_access_key/);
+  assert.match(vault, /'readDatabase','listCaseDocuments'/);
+  assert.match(vault, /retryFailed:retryFailed/);
+  assert.match(html, /id="case-doc-retry-failed"/);
+  assert.match(html, /id="case-doc-upload-errors"/);
+  assert.match(html, /accessKey: window\.NezamDriveDocuments\.getAccessKey\(\)/);
   assert.doesNotMatch(vault, /NEZAM636_DOCS_ACCESS_KEY\s*=\s*['"][^'"]+['"]/);
 });
 
