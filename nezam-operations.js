@@ -228,12 +228,44 @@
   async function applyBackupPayload(payload, label) {
     var safeEntries = Object.entries(payload.storage || {});
     if (!safeEntries.length) throw new Error('هیچ داده‌ای برای بازیابی در فایل وجود ندارد.');
+
+    // نسخه‌های پشتیبان محلی قدیمی نباید فهرست حذف دائمی فعلی را پاک کنند.
+    var localDeletionManifest = typeof window.readNezamDeletionManifest === 'function'
+      ? window.readNezamDeletionManifest() : { version: 1, cases: [], letters: [] };
+    var backupDeletionManifest = { version: 1, cases: [], letters: [] };
+    try {
+      var backupManifestRaw = payload.storage.nezam636_deletion_manifest_v1;
+      if (typeof backupManifestRaw === 'string') backupDeletionManifest = JSON.parse(backupManifestRaw);
+    } catch (manifestError) {}
+    var mergedDeletionManifest = typeof window.mergeNezamDeletionManifests === 'function'
+      ? window.mergeNezamDeletionManifests(localDeletionManifest, backupDeletionManifest)
+      : localDeletionManifest;
+
     for (var i = 0; i < safeEntries.length; i++) {
       var key = safeEntries[i][0];
       var value = safeEntries[i][1];
       var allowed = key.indexOf('nezam636_') === 0 || key.indexOf('nezam_croquis_') === 0 || key === 'nezam_gemini_model';
       if (!allowed || /api.?key|password|token|secret/i.test(key) || typeof value !== 'string') continue;
+      if (key === 'nezam636_deletion_manifest_v1') continue;
+      if (typeof window.filterNezamRecordsByDeletionManifest === 'function' &&
+          (key === 'nezam636_unified_cases' || key === 'nezam636_letters')) {
+        try {
+          var decodedRecords = JSON.parse(value);
+          var filteredRecords = window.filterNezamRecordsByDeletionManifest(
+            key === 'nezam636_unified_cases' ? decodedRecords : [],
+            key === 'nezam636_letters' ? decodedRecords : [],
+            mergedDeletionManifest
+          );
+          value = JSON.stringify(key === 'nezam636_unified_cases' ? filteredRecords.cases : filteredRecords.letters);
+        } catch (dataError) {
+          throw new Error('ساختار پرونده یا نامه در نسخه پشتیبان معتبر نیست؛ بازیابی متوقف شد.');
+        }
+      }
       localStorage.setItem(key, value);
+    }
+    if (typeof window.persistNezamDeletionManifest === 'function' &&
+        !window.persistNezamDeletionManifest(mergedDeletionManifest)) {
+      throw new Error('فهرست حذف دائمی در حافظه مرورگر ذخیره نشد؛ بازیابی متوقف شد.');
     }
     if (payload.docs.length && typeof window.importIndexedDBDocs === 'function') {
       var imported = await window.importIndexedDBDocs(payload.docs);
