@@ -22,7 +22,7 @@ test('package and TypeScript configuration are valid JSON', () => {
 });
 
 test('main JavaScript modules have valid syntax', () => {
-  for (const file of ['nezam-core.js', 'nezam-customizer.js', 'nezam-ai-assistant.js']) {
+  for (const file of ['nezam-core.js', 'nezam-customizer.js', 'nezam-ai-assistant.js', 'nezam-operations.js', 'nezam-agent-engine.js']) {
     assert.doesNotThrow(() => new Function(read(file)), file);
   }
 });
