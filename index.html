@@ -3584,9 +3584,6 @@
         const localTs = Number(localStorage.getItem('__gdrive_sync_ts') || 0);
         const hasLocalData = Boolean(localStorage.getItem('__gdrive_has_local_data') && localStorage.getItem('nezam636_unified_cases'));
         let didRestore = false;
-        // اگر نسخه کامل دیتابیس وجود دارد، فقط همان مرجع معتبر است؛ نسخه‌های تک‌پرونده‌ای قدیمی نباید حذف‌ها را خنثی کنند.
-        const hasAuthoritativeFullSnapshot = Boolean(bestSyncRecord && bestSyncRecord.storage && typeof bestSyncRecord.storage === 'object');
-
         // ۱. بازگردانی نسخه کامل؛ فهرست حذف مرورگر و ابر ادغام می‌شود و بر همه داده‌ها اولویت دارد.
         if (bestSyncRecord && bestSyncRecord.storage) {
           const cloudTs = Number(bestSyncRecord.updatedAt || Date.now());
@@ -3651,6 +3648,11 @@
           setCloudStatus('☁️ گوگل درایو: بازخوانی شد', '#15803d');
           if (manualForce && typeof showToastMsg === 'function') {
             showToastMsg('✅ آخرین اطلاعات پرونده‌ها، کروکی‌ها و نامه‌ها از گوگل درایو بازخوانی شد.');
+          }
+        } else if (!bestSyncRecord && (recoveredCases.length || recoveredLetters.length)) {
+          setCloudStatus('⚠️ فقط پشتیبان‌های قدیمی Drive یافت شد', '#b45309');
+          if (manualForce && typeof showToastMsg === 'function') {
+            showToastMsg('فایل‌های قدیمی پوشه متقاضی خودکار وارد نشدند تا حذف‌های قبلی برنگردند. برای بازیابی امن، نسخه کامل پایگاه داده لازم است.', true);
           }
         } else {
           setCloudStatus('☁️ گوگل درایو: متصل', '#15803d');
