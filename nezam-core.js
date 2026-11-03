@@ -1882,12 +1882,17 @@ function renderActiveCaseDocsChecklist() {
   var banner = document.getElementById("case-missing-docs-banner");
   var folderLbl = document.getElementById("drive-folder-label");
   var toolbar = document.getElementById("case-docs-drive-toolbar");
+  var libraryBox = document.getElementById("case-docs-file-library");
+  var libraryBody = document.getElementById("case-docs-library-tbody");
+  var librarySummary = document.getElementById("case-docs-library-summary");
   if (!tbody || !banner) return;
 
   if (!c) {
     tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger py-3 fw-bold">ابتدا یک متقاضی را انتخاب نمایید.</td></tr>';
     banner.textContent = "";
     if (toolbar) toolbar.style.display = "none";
+    if (librarySummary) librarySummary.textContent = "ابتدا یک متقاضی را انتخاب کنید.";
+    if (libraryBody) libraryBody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">پرونده‌ای انتخاب نشده است.</td></tr>';
     return;
   }
 
@@ -1991,6 +1996,53 @@ function renderActiveCaseDocsChecklist() {
       }).finally(function() { renderActiveCaseDocsChecklist(); });
     });
   }
+  if (libraryBox && libraryBox.dataset.actionsBound !== "1") {
+    libraryBox.dataset.actionsBound = "1";
+    libraryBox.addEventListener("click", function(event) {
+      var refresh = event.target && event.target.closest ? event.target.closest("#case-docs-refresh-library") : null;
+      if (refresh) {
+        refresh.disabled = true;
+        renderActiveCaseDocsChecklist();
+        setTimeout(function() { refresh.disabled = false; }, 1200);
+        return;
+      }
+      var button = event.target && event.target.closest ? event.target.closest("button[data-library-action]") : null;
+      if (!button || !libraryBox.contains(button)) return;
+      var action = button.getAttribute("data-library-action");
+      var fileId = button.getAttribute("data-file-id");
+      var current = getActiveCase();
+      if (!current || !fileId || !window.NezamDriveDocuments) return;
+      if (action === "delete") {
+        if (!confirm("فایل انتخاب‌شده از Google Drive حذف شود؟")) return;
+        button.disabled = true;
+        window.NezamDriveDocuments.remove(fileId, {
+          caseId: String(current.id), fullName: String(current.name || ""),
+          nationalCode: String(current.nid || current.code || "")
+        }).catch(function(error) {
+          showToastMsg(error.message || "حذف فایل ناموفق بود.", true);
+        }).finally(function() {
+          renderActiveCaseDocsChecklist();
+        });
+      }
+    });
+    libraryBox.addEventListener("change", function(event) {
+      var input = event.target && event.target.closest
+        ? event.target.closest('input[data-library-action="replace"]') : null;
+      if (!input || !libraryBox.contains(input)) return;
+      var current = getActiveCase();
+      var code = input.getAttribute("data-doc-code");
+      var title = input.getAttribute("data-doc-title");
+      var fileId = input.getAttribute("data-file-id");
+      if (!current || !code || !title || !fileId || !input.files || !input.files.length) return;
+      if (input.files.length !== 1) {
+        showToastMsg("برای جایگزینی هر فایل، فقط یک فایل جدید انتخاب کنید.", true);
+        input.value = "";
+        return;
+      }
+      uploadCaseDocFile({ target: input }, code, title, fileId);
+    });
+  }
+
   var bulkSelect = document.getElementById("case-doc-bulk-code");
   if (bulkSelect) {
     var selectedBulk = bulkSelect.value;
@@ -2101,10 +2153,67 @@ function renderActiveCaseDocsChecklist() {
       }
 
       tbody.innerHTML = rows || '<tr><td colspan="4" class="text-center py-3 text-muted">چک‌لیست مدرک برای این فعالیت تعریف نشده است.</td></tr>';
+
+      // فهرست مستقل همه فایل‌های Drive؛ مستقل از چک‌لیست و عنوان مدرک.
+      if (libraryBody) {
+        var allFiles = (cloudFiles || []).slice().sort(function(a, b) {
+          return Number(b.updatedAt || b.uploadedAt || 0) - Number(a.updatedAt || a.uploadedAt || 0);
+        });
+        if (!allFiles.length) {
+          libraryBody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">هنوز فایلی در پوشه Google Drive این متقاضی پیدا نشد.</td></tr>';
+        } else {
+          libraryBody.innerHTML = allFiles.map(function(file, index) {
+            var fileId = String(file.fileId || file.id || "");
+            var safeId = escapeHtmlCore(fileId);
+            var fileName = escapeHtmlCore(file.fileName || file.name || "بدون نام");
+            var docTitle = escapeHtmlCore(file.docTitle || "فایل قدیمی / پیوست");
+            var docCode = escapeHtmlCore(file.docCode || "LEGACY");
+            var mimeType = String(file.mimeType || "نامشخص");
+            var extMatch = String(file.fileName || file.name || "").match(/\.([^.]+)$/);
+            var typeLabel = escapeHtmlCore(extMatch ? extMatch[1].toUpperCase() + " · " + mimeType : mimeType);
+            var size = Math.max(0, Number(file.size || 0));
+            var sizeLabel = size >= 1073741824 ? (size / 1073741824).toFixed(2) + " GB" :
+              (size >= 1048576 ? (size / 1048576).toFixed(2) + " MB" :
+              (size ? Math.max(1, Math.round(size / 1024)) + " KB" : "—"));
+            var dateValue = Number(file.uploadedAt || file.updatedAt || 0);
+            var dateLabel = dateValue ? new Date(dateValue).toLocaleString("fa-IR") : "—";
+            var version = Math.max(1, Number(file.version || 1));
+            var viewUrl = /^https:\/\/drive\.google\.com\//.test(String(file.webViewLink || "")) ? String(file.webViewLink) : "";
+            var downloadUrl = /^https:\/\/drive\.google\.com\//.test(String(file.downloadUrl || "")) ? String(file.downloadUrl) : "";
+            var links = (viewUrl ? '<a class="btn btn-sm btn-outline-primary py-0 px-2" target="_blank" rel="noopener noreferrer" href="' + escapeHtmlCore(viewUrl) + '">👁️ مشاهده</a>' : '') +
+              (downloadUrl ? '<a class="btn btn-sm btn-outline-secondary py-0 px-2" target="_blank" rel="noopener noreferrer" href="' + escapeHtmlCore(downloadUrl) + '">⬇️ دانلود</a>' : '');
+            var replace = (!file.legacy && docCode !== "LEGACY")
+              ? '<label class="btn btn-sm btn-outline-warning py-0 px-2 m-0">جایگزینی<input type="file" hidden data-library-action="replace" data-file-id="' + safeId + '" data-doc-code="' + docCode + '" data-doc-title="' + docTitle + '" accept=".pdf,.jpg,.jpeg,.png,.webp,.gif,.tif,.tiff,.bmp,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.rtf,.odt,.ods,.odp"></label>'
+              : '';
+            return '<tr class="case-drive-file-row">' +
+              '<td><div class="fw-bold">' + fileName + '</div><small class="text-muted">' + docTitle + '</small></td>' +
+              '<td><span class="badge bg-light text-dark border">' + typeLabel + '</span></td>' +
+              '<td class="text-nowrap">' + escapeHtmlCore(sizeLabel) + '</td>' +
+              '<td class="text-nowrap small">' + escapeHtmlCore(dateLabel) + '</td>' +
+              '<td class="text-center">' + escapeHtmlCore(toFa(version)) + '</td>' +
+              '<td><div class="d-flex flex-wrap gap-1">' + links + replace +
+                '<button type="button" class="btn btn-sm btn-outline-danger py-0 px-2" data-library-action="delete" data-file-id="' + safeId + '">🗑️ حذف</button>' +
+              '</div></td></tr>';
+          }).join("");
+        }
+      }
+
+      if (librarySummary) {
+        var libraryBytes = (cloudFiles || []).reduce(function(sum, file) { return sum + Math.max(0, Number(file.size || 0)); }, 0);
+        var librarySize = libraryBytes >= 1073741824 ? (libraryBytes / 1073741824).toFixed(2) + " GB" :
+          (libraryBytes >= 1048576 ? (libraryBytes / 1048576).toFixed(2) + " MB" :
+          (libraryBytes ? Math.max(1, Math.round(libraryBytes / 1024)) + " KB" : "۰ بایت"));
+        librarySummary.textContent = toFa((cloudFiles || []).length) + " فایل در پوشه این متقاضی · مجموع حجم: " + librarySize +
+          (cloudError ? " · خطا در دریافت اطلاعات" : " · آخرین بازخوانی: " + new Date().toLocaleTimeString("fa-IR"));
+      }
+
       var searchInput = document.getElementById("case-doc-search");
       if (searchInput && searchInput.value) {
         var searchQuery = String(searchInput.value).trim().toLocaleLowerCase();
         Array.prototype.forEach.call(tbody.querySelectorAll("tr"), function(row) {
+          row.style.display = String(row.textContent || "").toLocaleLowerCase().indexOf(searchQuery) !== -1 ? "" : "none";
+        });
+        if (libraryBody) Array.prototype.forEach.call(libraryBody.querySelectorAll(".case-drive-file-row"), function(row) {
           row.style.display = String(row.textContent || "").toLocaleLowerCase().indexOf(searchQuery) !== -1 ? "" : "none";
         });
       }
