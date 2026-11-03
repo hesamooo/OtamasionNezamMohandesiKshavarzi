@@ -19,7 +19,41 @@
     return key;
   }
 
+  var readyPromise = null;
+  async function ensureReady() {
+    if (readyPromise) return readyPromise;
+    readyPromise = (async function() {
+      var key = getAccessKey(false);
+      var response = await fetch(DRIVE_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: 'sync',
+          healthCheck: true,
+          fullDatabase: { storage: {} },
+          accessKey: key
+        }),
+        redirect: 'follow'
+      });
+      var raw = await response.text();
+      var data;
+      try { data = JSON.parse(raw); }
+      catch (e) { throw new Error('پاسخ سرور قابل‌خواندن نیست؛ نسخه جدید Code.gs را نصب کنید.'); }
+      if (!response.ok || !data || data.status !== 'success' || Number(data.apiVersion) !== 1) {
+        throw new Error('نسخه جدید Google Apps Script هنوز منتشر نشده است. ابتدا Code.gs جدید را جایگزین و Web App را به‌روزرسانی کنید.');
+      }
+      return true;
+    })();
+    try {
+      return await readyPromise;
+    } catch (error) {
+      readyPromise = null;
+      throw error;
+    }
+  }
+
   async function request(payload, allowKeyRetry) {
+    await ensureReady();
     var key = getAccessKey(false);
     var response = await fetch(DRIVE_API_URL, {
       method: 'POST',
@@ -211,7 +245,7 @@
 
   window.NezamDriveDocuments={
     list:list,readDatabase:readDatabase,uploadFiles:uploadFiles,retryFailed:retryFailed,remove:remove,migrateLegacyDocs:migrateLegacyDocs,
-    getCaseContext:getCaseContext,getAccessKey:function(){return getAccessKey(false);},
+    getCaseContext:getCaseContext,getAccessKey:function(){return getAccessKey(false);},ensureReady:ensureReady,
     clearAccessKey:function(){try{localStorage.removeItem(ACCESS_KEY_STORAGE);}catch(e){}},
     maxFileBytes:MAX_FILE_BYTES
   };
