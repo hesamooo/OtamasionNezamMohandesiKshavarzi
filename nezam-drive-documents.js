@@ -135,6 +135,11 @@
     return {successes:successes,failures:failures};
   }
 
+  async function readDatabase() {
+    var response = await request({ action: 'readDatabase' }, true);
+    return response.data || [];
+  }
+
   async function list(context) {
     if (!context || !context.caseId) throw new Error('شناسه پرونده برای دریافت فهرست مدارک موجود نیست.');
     return request({action:'listCaseDocuments',caseId:String(context.caseId),fullName:String(context.fullName||''),nationalCode:String(context.nationalCode||'')},true);
@@ -184,8 +189,9 @@
   }
 
   window.NezamDriveDocuments={
-    list:list,uploadFiles:uploadFiles,remove:remove,migrateLegacyDocs:migrateLegacyDocs,
-    getCaseContext:getCaseContext,clearAccessKey:function(){try{localStorage.removeItem(ACCESS_KEY_STORAGE);}catch(e){}},
+    list:list,readDatabase:readDatabase,uploadFiles:uploadFiles,remove:remove,migrateLegacyDocs:migrateLegacyDocs,
+    getCaseContext:getCaseContext,getAccessKey:function(){return getAccessKey(false);},
+    clearAccessKey:function(){try{localStorage.removeItem(ACCESS_KEY_STORAGE);}catch(e){}},
     maxFileBytes:MAX_FILE_BYTES
   };
 })();
