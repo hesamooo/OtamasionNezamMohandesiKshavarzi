@@ -3357,7 +3357,7 @@
         console.error('Google Drive Sync Error:', err);
         setCloudStatus('⚠️ خطا در ارتباط با درایو', '#dc2626');
         if (showAlert) {
-          alert('خطا در ارتباط با گوگل درایو. لطفاً اتصال اینترنت خود را بررسی نمایید.');
+          alert('ارتباط با Google Drive برقرار نشد.\nعلت فنی: ' + String(err && err.message ? err.message : err || 'خطای نامشخص').slice(0, 500) + '\n\nاین پیام را برای بررسی ارسال کنید.');
         }
         return false;
       } finally {
