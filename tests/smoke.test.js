@@ -304,19 +304,76 @@ test('standalone office correspondence is available without an applicant', () =>
 });
 
 
-test('authoritative Google Drive snapshots prevent deleted applicants and letters from legacy backups being restored', () => {
+test('deleted records are tombstoned and stale Drive folder backups are never auto-merged', () => {
   const html = read('index.html');
-  const start = html.indexOf('async function loadFromDriveOnStartup');
-  const end = html.indexOf('// ۳. اعمال فوری اطلاعات بازخوانی‌شده', start);
-  assert.notEqual(start, -1, 'Drive restore routine must exist');
-  assert.notEqual(end, -1, 'Drive restore UI refresh section must exist');
-  const restore = html.slice(start, end);
+  const core = read('nezam-core.js');
+  const restoreStart = html.indexOf('async function loadFromDriveOnStartup');
+  const restoreEnd = html.indexOf('// ۳. اعمال فوری اطلاعات بازخوانی‌شده', restoreStart);
+  assert.notEqual(restoreStart, -1);
+  assert.notEqual(restoreEnd, -1);
+  const restore = html.slice(restoreStart, restoreEnd);
 
-  assert.ok(restore.includes('const hasAuthoritativeFullSnapshot = Boolean(bestSyncRecord && bestSyncRecord.storage'), 'full database snapshot must be detected');
-  assert.ok(restore.includes('if (!hasAuthoritativeFullSnapshot && recoveredCases.length > 0)'), 'legacy applicant backups must only be used without a full snapshot');
-  assert.ok(restore.includes('if (!hasAuthoritativeFullSnapshot && recoveredLetters.length > 0)'), 'legacy letter backups must only be used without a full snapshot');
+  assert.match(core, /function recordNezamDeletions/);
+  assert.match(core, /function filterNezamRecordsByDeletionManifest/);
+  assert.match(core, /recordNezamDeletions\(\[c\], lettersToDelete\)/);
+  assert.match(core, /recordNezamDeletions\(\[\], \[deletedLetterRecord\]\)/);
+  assert.match(restore, /mergeNezamDeletionManifests\(localDeletionManifest, cloudDeletionManifest\)/);
+  assert.match(restore, /filterNezamRecordsByDeletionManifest/);
+  assert.match(restore, /Legacy applicant-folder backups were detected and intentionally not merged/);
+  assert.doesNotMatch(restore, /currentCases\.unshift\(rc\)|currentLetters\.unshift\(rl\)/);
 });
 
+test('deletion manifest filters restored records and persists case and letter tombstones', () => {
+  const core = read('nezam-core.js');
+  const start = core.indexOf('var NEZAM_DELETION_MANIFEST_KEY');
+  const end = core.indexOf('/* بارگذاری و مهاجرت یک‌باره', start);
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+  const helperSource = core.slice(start, end);
+  const data = {};
+  const localStorage = {
+    getItem(key) { return Object.prototype.hasOwnProperty.call(data, key) ? data[key] : null; },
+    setItem(key, value) { data[key] = String(value); }
+  };
+  const api = new Function('localStorage', 'window', 'console', 'casesDB', 'lettersDB',
+    helperSource + '\nreturn { recordNezamDeletions, readNezamDeletionManifest, filterNezamRecordsByDeletionManifest };'
+  )(localStorage, {}, { error() {} }, [], []);
+
+  assert.equal(api.recordNezamDeletions(
+    [{ id: 'case-deleted', nid: '123', name: 'متقاضی حذف‌شده' }],
+    [{ id: 'letter-deleted', number: '1405010101', recipient: 'اداره' }]
+  ), true);
+  const manifest = api.readNezamDeletionManifest();
+  const filtered = api.filterNezamRecordsByDeletionManifest(
+    [{ id: 'case-deleted', nid: '123' }, { id: 'case-live', nid: '456' }],
+    [{ id: 'letter-deleted', number: '1405010101' }, { id: 'letter-live', number: '1405010102' }],
+    manifest
+  );
+
+  assert.deepEqual(filtered.cases.map((x) => x.id), ['case-live']);
+  assert.deepEqual(filtered.letters.map((x) => x.id), ['letter-live']);
+  assert.ok(data.nezam636_deletion_manifest_v1, 'deletion manifest must be saved in browser storage');
+});
+
+test('Drive sync only reports success after a matching snapshot is read back', () => {
+  const html = read('index.html');
+  assert.match(html, /async function verifyDriveSnapshot\(snapshot, expectedTs\)/);
+  assert.match(html, /await verifyDriveSnapshot\(snapshot, ts\)/);
+  assert.match(html, /گوگل پاسخ اولیه را پذیرفت، اما نسخه جدید/);
+  assert.match(html, /پاسخ گوگل صریحاً موفقیت ذخیره را تأیید نکرد/);
+});
+
+test('canonical browser storage no longer falls back to stale v6 keys after migration', () => {
+  const core = read('nezam-core.js');
+  const reloadStart = core.indexOf('window.reloadAllStateFromLocalStorage = function()');
+  const reloadEnd = core.indexOf('\n};', reloadStart);
+  assert.notEqual(reloadStart, -1);
+  assert.notEqual(reloadEnd, -1);
+  const reload = core.slice(reloadStart, reloadEnd);
+  assert.match(reload, /localStorage\.getItem\("nezam636_unified_cases"\)/);
+  assert.doesNotMatch(reload, /localStorage\.getItem\("nezam636_cases_v6"\)/);
+  assert.match(reload, /if \(Array\.isArray\(loadedCases\)\) casesDB = loadedCases/);
+});
 
 test('Drive sync queues a second snapshot when a write arrives during an active sync', () => {
   const html = read('index.html');
