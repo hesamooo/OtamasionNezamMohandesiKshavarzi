@@ -606,91 +606,227 @@ window.setPaperSize = function(size, skipSave) {
   updatePaperActionButtons();
 };
 
+function waitForPrintAssets(root, timeoutMs) {
+  var doc = root && (root.nodeType === 9 ? root : root.ownerDocument);
+  var urls = [];
+  var seen = Object.create(null);
+  function addUrl(value) {
+    var url = String(value || "").trim();
+    if (!url || url.charAt(0) === "#" || seen[url]) return;
+    seen[url] = true;
+    urls.push(url);
+  }
+  if (root && typeof root.querySelectorAll === "function") {
+    var images = root.querySelectorAll("img[src]");
+    for (var i = 0; i < images.length; i++) addUrl(images[i].getAttribute("src"));
+    var svgImages = root.querySelectorAll("svg image");
+    for (var j = 0; j < svgImages.length; j++) {
+      var svgImage = svgImages[j];
+      var href = svgImage.getAttribute("href") ||
+        svgImage.getAttributeNS("http://www.w3.org/1999/xlink", "href") ||
+        svgImage.getAttribute("xlink:href");
+      addUrl(href);
+    }
+  }
+
+  var limit = Math.max(3000, Number(timeoutMs) || 12000);
+  var checks = urls.map(function(url) {
+    return new Promise(function(resolve) {
+      var settled = false;
+      var probe = new Image();
+      var timer = setTimeout(function() { finish(false, "timeout"); }, limit);
+      function finish(ok, reason) {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        probe.onload = null;
+        probe.onerror = null;
+        resolve({ url: url, ok: !!ok, reason: reason || "" });
+      }
+      probe.onload = function() { finish(true); };
+      probe.onerror = function() { finish(false, "load-error"); };
+      probe.src = url;
+      if (probe.complete) finish(probe.naturalWidth > 0, probe.naturalWidth > 0 ? "" : "cached-error");
+    });
+  });
+
+  var fontPromise = Promise.resolve();
+  if (doc && doc.fonts && doc.fonts.ready) {
+    fontPromise = Promise.race([
+      Promise.resolve(doc.fonts.ready).catch(function() {}),
+      new Promise(function(resolve) { setTimeout(resolve, 4000); })
+    ]);
+  }
+  return Promise.all([Promise.all(checks), fontPromise]).then(function(result) {
+    var imageResults = result[0] || [];
+    return {
+      total: imageResults.length,
+      failed: imageResults.filter(function(item) { return !item.ok; }),
+      ready: imageResults.every(function(item) { return item.ok; })
+    };
+  });
+}
+
+function buildIsolatedPrintDocument(stage, paperSize, title) {
+  var css = buildPaperExportCss(paperSize, false) +
+    "\n@media print{.no-print,[data-no-print='true']{display:none!important;}html,body{overflow:visible!important;} .a4-page{break-inside:avoid!important;page-break-inside:avoid!important;} .a4-page:last-child{break-after:auto!important;page-break-after:auto!important;}}";
+  var baseHref = String(document.baseURI || location.href).replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+  return '<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="UTF-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<base href="' + baseHref + '">' +
+    '<title>' + safeHtmlText(title) + '</title><style>' + css + '</style></head><body>' +
+    stage.innerHTML + '</body></html>';
+}
+
 window.doPrintPaperSheet = function() {
   if (printRequestActive) return false;
   if (currentPreviewMode === "EDITOR") {
     showToastMsg("پیش‌نویس هنوز پیش‌نمایش نشده است؛ ابتدا «پیش‌نمایش پیش‌نویس نامه» را بزنید.", true);
     return false;
   }
-
   if ((currentPreviewMode === "LETTER" || currentPreviewMode === "LETTER_DRAFT") && letterDraftDirty) {
     showToastMsg("فرم نامه بعد از آخرین پیش‌نمایش تغییر کرده است؛ ابتدا دوباره پیش‌نمایش بگیرید.", true);
     return false;
   }
+
   var stage = document.getElementById("a4-preview-stage");
   if (!stage || !stage.querySelector(".a4-page")) {
     showToastMsg("هیچ برگه‌ای برای چاپ آماده نیست؛ ابتدا نامه، فرم یا کروکی را پیش‌نمایش بگیرید.", true);
     return false;
   }
 
-  switchMainPane("pane-print");
-  applyDynamicPrintPageSizeCSS(currentPaperSize);
-
-  var attempts = 0;
-  function scheduleFrame(callback) {
-    if (typeof window.requestAnimationFrame === "function") window.requestAnimationFrame(callback);
-    else setTimeout(callback, 40);
+  var paperSize = currentPaperSize === "A5" ? "A5" : "A4";
+  var previewMode = currentPreviewMode;
+  var pages = stage.querySelectorAll(".a4-page");
+  for (var i = 0; i < pages.length; i++) {
+    pages[i].setAttribute("data-paper-size", paperSize);
+    pages[i].classList.toggle("paper-a5", paperSize === "A5");
   }
 
-  function prepareAndPrint() {
-    var firstPage = stage.querySelector(".a4-page");
-    var rect = firstPage ? firstPage.getBoundingClientRect() : null;
-    if ((!rect || rect.width < 100 || rect.height < 100) && attempts < 12) {
-      attempts++;
-      scheduleFrame(prepareAndPrint);
-      return;
-    }
-    if (!rect || rect.width < 100 || rect.height < 100) {
-      showToastMsg("صفحه چاپ هنوز قابل اندازه‌گیری نیست؛ دوباره پیش‌نمایش را باز کنید.", true);
-      return;
-    }
+  switchMainPane("pane-print");
+  applyDynamicPrintPageSizeCSS(paperSize);
 
-    var fitResult = currentPreviewMode === "CROQUIS"
-      ? { overflowCount: 0, pendingCount: 0 }
-      : autoFitPaperContent(stage);
+  var fitResult = autoFitPaperContent(stage);
+  if (fitResult.pendingCount) {
+    showToastMsg("اندازه‌گیری صفحات کامل نشده است؛ پیش‌نمایش را باز نگه دارید و دوباره چاپ را بزنید.", true);
+    return false;
+  }
+  if (previewMode !== "CROQUIS" && fitResult.overflowCount) {
+    showToastMsg("چاپ متوقف شد؛ محتوای یک یا چند صفحه از محدوده کاغذ بیرون می‌زند.", true);
+    return false;
+  }
 
-    if (fitResult.pendingCount) {
-      if (attempts < 12) {
-        attempts++;
-        scheduleFrame(prepareAndPrint);
-        return;
-      }
-      showToastMsg("اندازه‌گیری صفحه چاپ کامل نشد؛ از نمایش بودن پیش‌نمایش اطمینان حاصل کنید.", true);
-      return;
-    }
-    if (currentPreviewMode !== "CROQUIS" && fitResult.overflowCount) {
-      showToastMsg("چاپ متوقف شد؛ یک یا چند برگه از محدوده کاغذ بیرون می‌زنند. اندازه کاغذ یا چیدمان محتوا را اصلاح کنید.", true);
-      return;
-    }
+  // باز کردن پنجره در همان رویداد کاربر تا مسدودکننده Popup مانع چاپ مستقل نشود.
+  var printWindow = null;
+  try { printWindow = window.open("", "_blank"); } catch (openError) {
+    console.warn("Could not open isolated print window:", openError);
+  }
 
-    // چاپ فقط خروجی می‌گیرد؛ ایجاد یا ویرایش سابقه دبیرخانه با دکمه ثبت جداگانه انجام می‌شود.
+  printRequestActive = true;
+  if (window.__nezam636PrintFailsafe) clearTimeout(window.__nezam636PrintFailsafe);
+  window.__nezam636PrintFailsafe = setTimeout(function() {
+    printRequestActive = false;
+    window.__nezam636PrintFailsafe = null;
+  }, 60000);
 
-    printRequestActive = true;
-    if (window.__nezam636PrintFailsafe) clearTimeout(window.__nezam636PrintFailsafe);
-    window.__nezam636PrintFailsafe = setTimeout(function () {
-      printRequestActive = false;
+  function releasePrintLock() {
+    printRequestActive = false;
+    if (window.__nezam636PrintFailsafe) {
+      clearTimeout(window.__nezam636PrintFailsafe);
       window.__nezam636PrintFailsafe = null;
-    }, 30000);
-    applyDynamicPrintPageSizeCSS(currentPaperSize);
-    try {
-      scheduleFrame(function () {
+    }
+  }
+
+  function rejectIncompleteAssets(result, targetWindow) {
+    var failedCount = result && result.failed ? result.failed.length : 0;
+    if (targetWindow && !targetWindow.closed) {
+      try { targetWindow.close(); } catch (closeError) {}
+    }
+    releasePrintLock();
+    if (failedCount) {
+      showToastMsg("چاپ انجام نشد؛ " + toFa(failedCount) +
+        " تصویر یا کاشی نقشه بارگذاری نشده است. اتصال اینترنت و حالت نقشه را بررسی و دوباره تلاش کنید.", true);
+    } else {
+      showToastMsg("آماده‌سازی فایل چاپ ناموفق بود؛ دوباره پیش‌نمایش بگیرید.", true);
+    }
+  }
+
+  waitForPrintAssets(stage, 12000).then(function(sourceAssets) {
+    if (!sourceAssets.ready) {
+      rejectIncompleteAssets(sourceAssets, printWindow);
+      return;
+    }
+
+    var title = "چاپ " + (previewMode === "CROQUIS" ? "کروکی UTM" : "برگه رسمی") +
+      " - مرکز خدمات ۶۳۶ خفر";
+    if (printWindow && !printWindow.closed) {
+      try {
+        var html = buildIsolatedPrintDocument(stage, paperSize, title);
+        printWindow.document.open();
+        printWindow.document.write(html);
+        printWindow.document.close();
+
+        waitForPrintAssets(printWindow.document, 12000).then(function(windowAssets) {
+          if (!windowAssets.ready) {
+            rejectIncompleteAssets(windowAssets, printWindow);
+            return;
+          }
+          var afterPrintHandler = function() {
+            releasePrintLock();
+            setTimeout(function() {
+              try { if (!printWindow.closed) printWindow.close(); } catch (closeError) {}
+            }, 250);
+          };
+          printWindow.addEventListener("afterprint", afterPrintHandler, { once: true });
+          setTimeout(function() {
+            try {
+              if (!printWindow.closed) {
+                printWindow.focus();
+                printWindow.print();
+              } else {
+                releasePrintLock();
+                showToastMsg("پنجره چاپ بسته شد؛ دوباره فرمان چاپ را اجرا کنید.", true);
+              }
+            } catch (printError) {
+              console.error("Isolated print failed:", printError);
+              releasePrintLock();
+              try { if (!printWindow.closed) printWindow.close(); } catch (closeError) {}
+              showToastMsg("باز کردن پنجره چاپ ناموفق بود: " +
+                (printError.message || printError), true);
+            }
+          }, 180);
+        }).catch(function(error) {
+          console.error("Print-window asset check failed:", error);
+          rejectIncompleteAssets({ failed: [{ url: "print-window" }] }, printWindow);
+        });
+      } catch (documentError) {
+        console.error("Could not build isolated print document:", documentError);
+        rejectIncompleteAssets({ failed: [{ url: "print-document" }] }, printWindow);
+      }
+      return;
+    }
+
+    // مسیر جایگزین در صورت مسدودبودن پنجره جدید: چاپ ایمن در همان صفحه.
+    showToastMsg("مرورگر پنجره مستقل چاپ را مسدود کرد؛ چاپ در همین صفحه انجام می‌شود.");
+    applyDynamicPrintPageSizeCSS(paperSize);
+    requestAnimationFrame(function() {
+      requestAnimationFrame(function() {
         try { window.print(); }
         catch (printError) {
-          printRequestActive = false;
-          console.error("Nezam636 print failed:", printError);
-          showToastMsg("باز کردن پنجره چاپ ناموفق بود: " + (printError.message || printError), true);
+          console.error("Fallback print failed:", printError);
+          showToastMsg("باز کردن پنجره چاپ ناموفق بود: " +
+            (printError.message || printError), true);
+          releasePrintLock();
         }
       });
-    } catch (scheduleError) {
-      printRequestActive = false;
-      showToastMsg("آماده‌سازی چاپ ناموفق بود: " + (scheduleError.message || scheduleError), true);
-    }
-  }
+    });
+  }).catch(function(error) {
+    console.error("Print asset preparation failed:", error);
+    rejectIncompleteAssets({ failed: [{ url: "print-assets" }] }, printWindow);
+  });
 
-  scheduleFrame(prepareAndPrint);
   return true;
 };
-
 window.addEventListener("beforeprint", function() {
   applyDynamicPrintPageSizeCSS(currentPaperSize);
   var pages = document.querySelectorAll("#a4-preview-stage .a4-page");
@@ -1277,6 +1413,10 @@ function buildPaperExportCss(paperSize, wordMode) {
     ".sign-area{display:flex;justify-content:flex-end;margin-top:3mm;padding-left:6mm;flex-shrink:0;}.sign-box{text-align:center;font-weight:800;font-size:9.8pt;line-height:1.7;min-width:55mm;}",
     ".lh-foot{color:#fff;padding:3.5mm 8mm;border-top:2.5px solid #f3e06b;font-size:8pt;flex-shrink:0;}.f-warn{text-align:center;font-weight:800;color:#f3e06b;margin-bottom:1mm;}.f-info{display:flex;justify-content:space-between;align-items:center;gap:4mm;}",
     ".qr-verify-box{background:#fff;padding:2px;text-align:center;margin-top:2px;}",
+    ".printed-croquis-satellite-box{position:relative;width:100%!important;max-width:100%!important;overflow:hidden!important;box-sizing:border-box!important;}",
+    ".printed-croquis-satellite-box>svg{display:block!important;width:100%!important;max-width:100%!important;height:auto!important;max-height:none!important;}",
+    "#printed-croquis-map-holder{display:block!important;width:100%!important;max-width:100%!important;margin-left:auto!important;margin-right:auto!important;}",
+
     "@page{size:" + w + " " + h + ";margin:0;}",
     "@media print{*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}html,body{width:" + w + "!important;margin:0!important;padding:0!important;background:#fff!important;display:block!important;}.a4-page,.a4-page.paper-a5{width:" + w + "!important;min-width:" + w + "!important;max-width:" + w + "!important;height:" + h + "!important;min-height:" + h + "!important;max-height:" + h + "!important;margin:0!important;box-shadow:none!important;page-break-inside:avoid!important;break-inside:avoid!important;page-break-after:always!important;break-after:page!important;}.a4-page:last-child,.a4-page.paper-a5:last-child{page-break-after:auto!important;break-after:auto!important;}}"
   ].join("\n");
@@ -3910,7 +4050,7 @@ function buildPrintedCroquisMap(m, svgW, svgH, mode) {
       var tLeft = Math.round(tx * tileSizePx - boxLeft);
       var tTop = Math.round(ty * tileSizePx - boxTop);
       var tileUrl = "https://mt1.google.com/vt/lyrs=" + lyrsParam + "&hl=fa&x=" + tx + "&y=" + ty + "&z=" + tileZoom;
-      svgTilesMarkup += '<image href="' + tileUrl + '" xlink:href="' + tileUrl + '" x="' + tLeft + '" y="' + tTop + '" width="' + (tileSizePx + 0.6) + '" height="' + (tileSizePx + 0.6) + '" preserveAspectRatio="none" crossorigin="anonymous" />';
+      svgTilesMarkup += '<image href="' + tileUrl + '" xlink:href="' + tileUrl + '" x="' + tLeft + '" y="' + tTop + '" width="' + (tileSizePx + 0.6) + '" height="' + (tileSizePx + 0.6) + '" preserveAspectRatio="none" />';
     }
   }
 
