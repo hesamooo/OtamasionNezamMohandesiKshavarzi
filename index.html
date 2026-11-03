@@ -3192,11 +3192,8 @@
       for (let attempt = 0; attempt < delays.length; attempt++) {
         if (delays[attempt]) await new Promise(resolve => setTimeout(resolve, delays[attempt]));
         try {
-          const verifyUrl = DRIVE_API_URL + (DRIVE_API_URL.includes('?') ? '&' : '?') +
-            'verify=' + encodeURIComponent(String(expectedTs)) + '&t=' + Date.now();
-          const response = await fetch(verifyUrl, { method: 'GET', redirect: 'follow', cache: 'no-store' });
-          if (!response.ok) continue;
-          const remote = parseCloudResponse(await response.json()).bestSyncRecord;
+          const authenticatedSnapshot = await window.NezamDriveDocuments.readDatabase();
+          const remote = parseCloudResponse(authenticatedSnapshot).bestSyncRecord;
           if (!remote || !remote.storage || Number(remote.updatedAt || 0) < expectedTs) continue;
           const matches = verifyKeys.every(key =>
             typeof snapshot.storage[key] === 'string' &&
@@ -3246,6 +3243,7 @@
         // ارسال همزمان در فرمت db (برای اسکریپت sync) و فرمت driveForm (برای اسکریپت پوشه‌ساز)
         const payload = {
           action: 'sync',
+          accessKey: window.NezamDriveDocuments.getAccessKey(),
           updatedAt: ts,
           fullDatabase: syncRecord,
           db: [syncRecord],
@@ -3378,6 +3376,7 @@
 
       const applicantPayload = {
         action: 'saveApplicant',
+        accessKey: window.NezamDriveDocuments.getAccessKey(),
         caseId: activeCase ? String(activeCase.id) : '',
         fullName: fullName || 'متقاضی',
         nationalCode: nationalCode || String(Date.now()),
@@ -3435,6 +3434,7 @@
       }
       const payload = {
         action: 'saveApplicant',
+        accessKey: window.NezamDriveDocuments.getAccessKey(),
         fullName: 'کتابخانه دانش مرکز ۶۳۶ خفر',
         nationalCode: 'NEZAM636_KNOWLEDGE_VAULT',
         phone: 'NEZAM636-KNOWLEDGE',
@@ -3584,10 +3584,7 @@
       let cloudReadSucceeded = false;
       try {
         setCloudStatus('🔄 دریافت اطلاعات از درایو...', '#0284c7');
-        const fetchUrl = DRIVE_API_URL + (DRIVE_API_URL.includes('?') ? '&' : '?') + 't=' + Date.now();
-        const res = await fetch(fetchUrl, { method: 'GET', redirect: 'follow' });
-        if (!res.ok) throw new Error('پاسخ HTTP ناموفق هنگام بازخوانی از درایو: ' + res.status);
-        const rawData = await res.json();
+        const rawData = await window.NezamDriveDocuments.readDatabase();
 
         const { bestSyncRecord, recoveredCases, recoveredLetters } = parseCloudResponse(rawData);
         cloudReadSucceeded = true;
