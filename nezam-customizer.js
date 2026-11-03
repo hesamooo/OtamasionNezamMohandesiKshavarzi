@@ -382,7 +382,6 @@ function getLetterDraftFromEditor() {
   var dateEl = document.getElementById("l-date");
   var attachEl = document.getElementById("l-attach");
   var directionEl = document.getElementById("l-direction");
-  var paperEl = document.getElementById("l-paper-size");
   var includeEl = document.getElementById("l-include-utm");
   if (!recipientEl || (!editor && !bodyField)) {
     showToastMsg("فرم نامه کامل بارگذاری نشده است.", true);
@@ -444,7 +443,7 @@ function getLetterDraftFromEditor() {
     croquisMapId: officeMode ? "" : (snapshotMapId || ""),
     utmAttachmentHtml: officeMode ? "" : (includeUtm ? coordinateHtml : preservedUtmSnapshot),
     body: body,
-    paperSize: paperEl && paperEl.value === "A5" ? "A5" : (currentPaperSize || "A4"),
+    paperSize: currentPaperSize === "A5" ? "A5" : "A4",
     includeUtm: includeUtm
   };
 }
@@ -500,17 +499,11 @@ function renderLetterPreviewObject(letter, forcedPaperSize, mode) {
 
 function updatePaperActionButtons() {
   var supported = currentPreviewMode === "LETTER" || currentPreviewMode === "LETTER_DRAFT";
-  var previewDraftSupported = currentPreviewMode === "EDITOR" || currentPreviewMode === "LETTER_DRAFT" || !!editingLetterId || letterDraftDirty;
   var saveBtn = document.getElementById("btn-save-print-edits");
-  var previewDraftBtn = document.getElementById("btn-preview-letter-draft");
   var utmBtn = document.getElementById("btn-toggle-print-utm");
   if (saveBtn) {
     saveBtn.disabled = !supported;
     saveBtn.title = supported ? "ثبت پیش‌نویس جدید یا ذخیره تغییرات نامه و پیوست در دفتر اندیکاتور" : "این دکمه فقط برای نامه‌ها فعال است؛ فرم و کروکی را با خروجی چاپ یا فایل ذخیره کنید.";
-  }
-  if (previewDraftBtn) {
-    previewDraftBtn.disabled = !previewDraftSupported;
-    previewDraftBtn.title = previewDraftSupported ? "پیش‌نمایش پیش‌نویس جاری و آماده‌سازی آن برای ثبت یا چاپ" : "برای ساخت پیش‌نویس، ابتدا قالب نامه را انتخاب یا متن نامه را ویرایش کنید.";
   }
   if (utmBtn) {
     utmBtn.disabled = !supported;
@@ -524,17 +517,13 @@ window.setPaperSize = function(size, skipSave) {
     if (paperPreviewDirty) {
       showToastMsg("ابتدا تغییرات روی خود برگه را ذخیره کنید؛ سپس اندازه کاغذ را عوض کنید.", true);
       var printSelectNow = document.getElementById("print-paper-size-select");
-      var letterSelectNow = document.getElementById("l-paper-size");
       if (printSelectNow) printSelectNow.value = currentPaperSize;
-      if (letterSelectNow) letterSelectNow.value = currentPaperSize;
       return false;
     }
     if (letterDraftDirty && (currentPreviewMode === "LETTER" || currentPreviewMode === "LETTER_DRAFT")) {
       showToastMsg("فرم نامه بعد از آخرین پیش‌نمایش تغییر کرده است؛ ابتدا دوباره پیش‌نمایش بگیرید.", true);
       var printSelectDraft = document.getElementById("print-paper-size-select");
-      var letterSelectDraft = document.getElementById("l-paper-size");
       if (printSelectDraft) printSelectDraft.value = currentPaperSize;
-      if (letterSelectDraft) letterSelectDraft.value = currentPaperSize;
       return false;
     }
   }
@@ -543,15 +532,8 @@ window.setPaperSize = function(size, skipSave) {
   try { localStorage.setItem("nezam636_paper_size", currentPaperSize); } catch (e) {}
   applyDynamicPrintPageSizeCSS(currentPaperSize);
 
-  var letterSelect = document.getElementById("l-paper-size");
   var printSelect = document.getElementById("print-paper-size-select");
-  if (letterSelect && letterSelect.value !== currentPaperSize) letterSelect.value = currentPaperSize;
   if (printSelect && printSelect.value !== currentPaperSize) printSelect.value = currentPaperSize;
-
-  var btnA4 = document.getElementById("btn-paper-a4");
-  var btnA5 = document.getElementById("btn-paper-a5");
-  if (btnA4) btnA4.className = "btn btn-sm " + (currentPaperSize === "A4" ? "btn-success fw-bold" : "btn-outline-success fw-bold");
-  if (btnA5) btnA5.className = "btn btn-sm " + (currentPaperSize === "A5" ? "btn-success fw-bold" : "btn-outline-success fw-bold");
 
   var badge = document.getElementById("active-paper-size-badge");
   if (badge) badge.textContent = currentPaperSize === "A5"
@@ -669,7 +651,7 @@ function waitForPrintAssets(root, timeoutMs) {
 
 function buildIsolatedPrintDocument(stage, paperSize, title) {
   var css = buildPaperExportCss(paperSize, false) +
-    "\n@media print{.no-print,[data-no-print='true']{display:none!important;}html,body{overflow:visible!important;} .a4-page{break-inside:avoid!important;page-break-inside:avoid!important;} .a4-page:last-child{break-after:auto!important;page-break-after:auto!important;}.no-print,[data-no-print='true']{display:none!important;}}";
+    "\n@media print{.no-print,[data-no-print='true']{display:none!important;}html,body{overflow:visible!important;} .a4-page{break-inside:avoid!important;page-break-inside:avoid!important;} .a4-page:last-child{break-after:auto!important;page-break-after:auto!important;}}";
   var baseHref = String(document.baseURI || location.href).replace(/&/g, "&amp;").replace(/"/g, "&quot;");
   return '<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="UTF-8">' +
     '<meta name="viewport" content="width=device-width,initial-scale=1">' +
@@ -681,7 +663,7 @@ function buildIsolatedPrintDocument(stage, paperSize, title) {
 window.doPrintPaperSheet = function() {
   if (printRequestActive) return false;
   if (currentPreviewMode === "EDITOR") {
-    showToastMsg("پیش‌نویس هنوز پیش‌نمایش نشده است؛ ابتدا «پیش‌نمایش پیش‌نویس نامه» را بزنید.", true);
+    showToastMsg("ابتدا از دبیرخانه پیش‌نمایش نامه را آماده کنید.", true);
     return false;
   }
   if ((currentPreviewMode === "LETTER" || currentPreviewMode === "LETTER_DRAFT") && letterDraftDirty) {
@@ -705,18 +687,18 @@ window.doPrintPaperSheet = function() {
 
   switchMainPane("pane-print");
   applyDynamicPrintPageSizeCSS(paperSize);
-
   var fitResult = autoFitPaperContent(stage);
   if (fitResult.pendingCount) {
-    showToastMsg("اندازه‌گیری صفحات کامل نشده است؛ پیش‌نمایش را باز نگه دارید و دوباره چاپ را بزنید.", true);
+    showToastMsg("اندازه‌گیری صفحه کامل نشده است؛ یک لحظه صبر کنید و دوباره چاپ را بزنید.", true);
     return false;
   }
-  if (fitResult.overflowCount) {
-    showToastMsg("چاپ متوقف شد؛ محتوای یک یا چند صفحه از محدوده کاغذ بیرون می‌زند. اندازه قلم، تعداد ردیف‌ها یا چیدمان را اصلاح کنید تا اطلاعات ناقص چاپ نشود.", true);
-    return false;
-  }
+  if (fitResult.overflowCount && !window.confirm(
+    "هشدار: بخشی از محتوا در یک یا چند صفحه از محدوده کاغذ بیرون زده است و ممکن است بریده شود. " +
+    "ابتدا می‌توانید «تنظیم خودکار تک‌برگی» یا کوتاه‌کردن متن را انجام دهید. با وجود این هشدار چاپ ادامه یابد؟"
+  )) return false;
+  if (fitResult.overflowCount) showToastMsg("چاپ با تأیید شما و احتمال سرریز محتوا ادامه می‌یابد.", true);
 
-  // باز کردن پنجره در همان رویداد کاربر تا مسدودکننده Popup مانع چاپ مستقل نشود.
+  // پنجره در همان رویداد کلیک باز می‌شود تا مسدودکننده Popup مانع نشود.
   var printWindow = null;
   try { printWindow = window.open("", "_blank"); } catch (openError) {
     console.warn("Could not open isolated print window:", openError);
@@ -736,96 +718,104 @@ window.doPrintPaperSheet = function() {
       window.__nezam636PrintFailsafe = null;
     }
   }
-
-  function rejectIncompleteAssets(result, targetWindow) {
-    var failedCount = result && result.failed ? result.failed.length : 0;
-    if (targetWindow && !targetWindow.closed) {
-      try { targetWindow.close(); } catch (closeError) {}
+  function askToContinueWithMissingAssets(result) {
+    var count = result && result.failed ? result.failed.length : 0;
+    if (!count) return true;
+    var accepted = window.confirm(
+      toFa(count) + " تصویر یا کاشی نقشه بارگذاری نشده است. ممکن است لوگو یا بخشی از نقشه در خروجی دیده نشود. " +
+      "چاپ را با همین وضعیت ادامه می‌دهید؟"
+    );
+    if (accepted) showToastMsg("چاپ با هشدار بارگذاری ناقص تصاویر ادامه می‌یابد.", true);
+    return accepted;
+  }
+  function abortPrint(message, closeWindow) {
+    if (closeWindow && printWindow && !printWindow.closed) {
+      try { printWindow.close(); } catch (closeError) {}
     }
     releasePrintLock();
-    if (failedCount) {
-      showToastMsg("چاپ انجام نشد؛ " + toFa(failedCount) +
-        " تصویر یا کاشی نقشه بارگذاری نشده است. اتصال اینترنت و حالت نقشه را بررسی و دوباره تلاش کنید.", true);
-    } else {
-      showToastMsg("آماده‌سازی فایل چاپ ناموفق بود؛ دوباره پیش‌نمایش بگیرید.", true);
+    if (message) showToastMsg(message, true);
+  }
+  function printInPopup() {
+    if (!printWindow || printWindow.closed) {
+      abortPrint("پنجره چاپ بسته شد؛ دوباره فرمان چاپ را اجرا کنید.", false);
+      return;
     }
+    printWindow.addEventListener("afterprint", function() {
+      releasePrintLock();
+      setTimeout(function() {
+        try { if (!printWindow.closed) printWindow.close(); } catch (closeError) {}
+      }, 250);
+    }, { once: true });
+    setTimeout(function() {
+      try {
+        if (!printWindow.closed) {
+          printWindow.focus();
+          printWindow.print();
+        } else abortPrint("پنجره چاپ بسته شد؛ دوباره فرمان چاپ را اجرا کنید.", false);
+      } catch (printError) {
+        console.error("Isolated print failed:", printError);
+        abortPrint("باز کردن پنجره چاپ ناموفق بود: " + (printError.message || printError), true);
+      }
+    }, 180);
   }
 
-  waitForPrintAssets(stage, 12000).then(function(sourceAssets) {
-    if (!sourceAssets.ready) {
-      rejectIncompleteAssets(sourceAssets, printWindow);
+  var title = "چاپ " + (previewMode === "CROQUIS" ? "کروکی UTM" : "برگه رسمی") +
+    " - مرکز خدمات ۶۳۶ خفر";
+  if (printWindow && !printWindow.closed) {
+    // پنجره مستقل فقط یک بار بررسی تصویرها و فونت‌ها را انجام می‌دهد.
+    try {
+      printWindow.document.open();
+      printWindow.document.write(buildIsolatedPrintDocument(stage, paperSize, title));
+      printWindow.document.close();
+      waitForPrintAssets(printWindow.document, 12000).then(function(result) {
+        if (!askToContinueWithMissingAssets(result)) {
+          abortPrint("چاپ به درخواست شما لغو شد.", true);
+          return;
+        }
+        printInPopup();
+      }).catch(function(error) {
+        console.error("Print-window asset check failed:", error);
+        if (!askToContinueWithMissingAssets({ failed: [{ url: "print-window" }] })) {
+          abortPrint("آماده‌سازی چاپ لغو شد.", true);
+          return;
+        }
+        printInPopup();
+      });
+    } catch (documentError) {
+      console.error("Could not build isolated print document:", documentError);
+      abortPrint("ساخت پنجره چاپ ناموفق بود: " + (documentError.message || documentError), true);
+    }
+    return true;
+  }
+
+  // اگر مرورگر Popup را بست، دارایی‌های برگه اصلی بررسی و از همان صفحه چاپ می‌شود.
+  showToastMsg("پنجره مستقل چاپ باز نشد؛ چاپ در همین صفحه آماده می‌شود.");
+  waitForPrintAssets(stage, 12000).then(function(result) {
+    if (!askToContinueWithMissingAssets(result)) {
+      abortPrint("چاپ به درخواست شما لغو شد.", false);
       return;
     }
-
-    var title = "چاپ " + (previewMode === "CROQUIS" ? "کروکی UTM" : "برگه رسمی") +
-      " - مرکز خدمات ۶۳۶ خفر";
-    if (printWindow && !printWindow.closed) {
-      try {
-        var html = buildIsolatedPrintDocument(stage, paperSize, title);
-        printWindow.document.open();
-        printWindow.document.write(html);
-        printWindow.document.close();
-
-        waitForPrintAssets(printWindow.document, 12000).then(function(windowAssets) {
-          if (!windowAssets.ready) {
-            rejectIncompleteAssets(windowAssets, printWindow);
-            return;
-          }
-          var afterPrintHandler = function() {
-            releasePrintLock();
-            setTimeout(function() {
-              try { if (!printWindow.closed) printWindow.close(); } catch (closeError) {}
-            }, 250);
-          };
-          printWindow.addEventListener("afterprint", afterPrintHandler, { once: true });
-          setTimeout(function() {
-            try {
-              if (!printWindow.closed) {
-                printWindow.focus();
-                printWindow.print();
-              } else {
-                releasePrintLock();
-                showToastMsg("پنجره چاپ بسته شد؛ دوباره فرمان چاپ را اجرا کنید.", true);
-              }
-            } catch (printError) {
-              console.error("Isolated print failed:", printError);
-              releasePrintLock();
-              try { if (!printWindow.closed) printWindow.close(); } catch (closeError) {}
-              showToastMsg("باز کردن پنجره چاپ ناموفق بود: " +
-                (printError.message || printError), true);
-            }
-          }, 180);
-        }).catch(function(error) {
-          console.error("Print-window asset check failed:", error);
-          rejectIncompleteAssets({ failed: [{ url: "print-window" }] }, printWindow);
-        });
-      } catch (documentError) {
-        console.error("Could not build isolated print document:", documentError);
-        rejectIncompleteAssets({ failed: [{ url: "print-document" }] }, printWindow);
-      }
-      return;
-    }
-
-    // مسیر جایگزین در صورت مسدودبودن پنجره جدید: چاپ ایمن در همان صفحه.
-    showToastMsg("مرورگر پنجره مستقل چاپ را مسدود کرد؛ چاپ در همین صفحه انجام می‌شود.");
     applyDynamicPrintPageSizeCSS(paperSize);
-    var nextFrame = window.requestAnimationFrame || function(callback) { return setTimeout(callback, 40); };
-    nextFrame(function() {
-      nextFrame(function() {
+    var raf = window.requestAnimationFrame || function(callback) { return setTimeout(callback, 40); };
+    raf(function() {
+      raf(function() {
         try { window.print(); }
         catch (printError) {
           console.error("Fallback print failed:", printError);
-          showToastMsg("باز کردن پنجره چاپ ناموفق بود: " +
-            (printError.message || printError), true);
-          releasePrintLock();
+          abortPrint("باز کردن پنجره چاپ ناموفق بود: " + (printError.message || printError), false);
         }
       });
     });
   }).catch(function(error) {
     console.error("Print asset preparation failed:", error);
-    rejectIncompleteAssets({ failed: [{ url: "print-assets" }] }, printWindow);
+    if (!askToContinueWithMissingAssets({ failed: [{ url: "print-assets" }] })) {
+      abortPrint("آماده‌سازی چاپ لغو شد.", false);
+      return;
+    }
+    applyDynamicPrintPageSizeCSS(paperSize);
+    var nextFrame = window.requestAnimationFrame || function(callback) { return setTimeout(callback, 40); };
+    nextFrame(function() { nextFrame(function() { try { window.print(); } catch (printError) { abortPrint("چاپ ناموفق بود: " + (printError.message || printError), false); } }); });
   });
-
   return true;
 };
 window.addEventListener("beforeprint", function() {
@@ -986,8 +976,6 @@ window.startIndependentOfficeLetter = function() {
   if (body) body.value = "";
   var rich = document.getElementById("l-body-rich");
   if (rich) rich.innerHTML = "";
-  var paper = document.getElementById("l-paper-size");
-  if (paper) paper.value = currentPaperSize || "A4";
   currentPreviewMode = "EDITOR";
   currentPreviewDraft = null;
   currentPreviewLetterId = null;
@@ -1023,7 +1011,7 @@ window.startCaseLinkedLetter = function() {
 
 
 function bindLetterEditorDirtyTracking() {
-  var ids = ["l-direction","l-number","l-date","l-attach","l-recipient","l-include-utm","l-paper-size","l-body"];
+  var ids = ["l-direction","l-number","l-date","l-attach","l-recipient","l-include-utm","l-body"];
   ids.forEach(function (id) {
     var el = document.getElementById(id);
     if (!el || el.dataset.letterDirtyTrackingBound === "1") return;
@@ -1372,8 +1360,6 @@ window.savePaperEditsToSecretariat = function(options) {
   if (rich) rich.innerHTML = newBodyHtml;
   var includeEl = document.getElementById("l-include-utm");
   if (includeEl) includeEl.checked = includeUtm;
-  var paperEl = document.getElementById("l-paper-size");
-  if (paperEl) paperEl.value = currentPaperSize;
 
   updatePrintUtmBtnState(includeUtm);
   updatePaperActionButtons();
@@ -1441,10 +1427,11 @@ window.downloadPaperSheetFile = function(forcedSize) {
     return false;
   }
   var fitResult = autoFitPaperContent(stage);
-  if (fitResult.pendingCount || fitResult.overflowCount) {
-    showToastMsg("خروجی HTML ساخته نشد؛ صفحه هنوز کامل قابل اندازه‌گیری نیست یا محتوا از محدوده بیرون می‌زند.", true);
+  if (fitResult.pendingCount) {
+    showToastMsg("خروجی HTML ساخته نشد؛ صفحه هنوز کامل قابل اندازه‌گیری نیست.", true);
     return false;
   }
+  if (fitResult.overflowCount && !window.confirm("هشدار: بخشی از محتوا ممکن است در فایل خروجی از محدوده برگه بیرون بزند یا بریده شود. با وجود این خطر فایل را ایجاد کنم؟")) return false;
   // دانلود HTML به‌تنهایی هیچ رکوردی در دفتر اندیکاتور ایجاد یا ویرایش نمی‌کند.
   var pSize = currentPaperSize || "A4";
   var c = window.__nezamOfficeLetterDraftMode === true ? null : getActiveCase();
@@ -1460,7 +1447,7 @@ window.downloadPaperSheetFile = function(forcedSize) {
   a.click();
   a.remove();
   setTimeout(function () { URL.revokeObjectURL(objectUrl); }, 1500);
-  showToastMsg("فایل HTML مستقل با قالب و اندازه " + pSize + " آماده شد.");
+  showToastMsg(fitResult.overflowCount ? "فایل HTML ساخته شد؛ محتوای سرریزدار ممکن است در چاپ بریده شود." : "فایل HTML مستقل با قالب و اندازه " + pSize + " آماده شد.", !!fitResult.overflowCount);
   return true;
 };
 
