@@ -241,7 +241,7 @@ test('form and secretariat print engine keeps paper geometry, binder padding, an
   assert.ok(customizer.includes('letterPageIndex === 0 ? "letter" : "letter-appendix"'));
   assert.ok(html.includes('main {\n        width: 100% !important;\n        max-width: none !important;\n        margin: 0 !important;\n        padding: 0 !important;'));
   assert.ok(html.includes('.a4-page[data-page-kind="binder-label"] {\n        padding: 15mm !important;'));
-  assert.ok(html.includes('nezam-customizer.js?v=20261102-print-engine-r11'));
+  assert.ok(html.includes('nezam-customizer.js?v=20261103-print-engine-r13'));
 });
 
 
@@ -265,8 +265,8 @@ test('letter printing and exports do not silently register archive entries', () 
   assert.doesNotMatch(htmlExport, /savePaperEditsToSecretariat/);
   assert.doesNotMatch(wordExport, /savePaperEditsToSecretariat/);
   assert.match(customizer, /window\.printCurrentLetterDraft = function\(forcedPaperSize\)/);
-  assert.match(html, /onclick="printCurrentLetterDraft\('A4'\)"/);
-  assert.match(html, /onclick="printCurrentLetterDraft\('A5'\)"/);
+  assert.match(html, /onclick="previewCurrentLetterDraft\(\)">پیش‌نمایش و ادامه به چاپ/);
+  assert.doesNotMatch(html, /onclick="printCurrentLetterDraft/);
   assert.match(html, /onclick="saveLetterToSecretariat\(false\)">ثبت در دبیرخانه/);
   assert.match(html, /فقط نامه‌های ثبت‌شده نمایش داده می‌شوند؛ چاپ و دانلود به‌تنهایی سابقه ایجاد نمی‌کند/);
 });
@@ -299,8 +299,8 @@ test('standalone office correspondence is available without an applicant', () =>
   assert.match(html, /id="btn-letter-case-mode"[^>]*onclick="startCaseLinkedLetter\(\)"/);
   assert.match(html, /id="btn-letter-office-mode"[^>]*onclick="startIndependentOfficeLetter\(\)"/);
   assert.match(html, /<th>گیرنده \/ ارتباط با پرونده<\/th>/);
-  assert.match(html, /nezam-core\.js\?v=20261103-delete-tombstone-r2/);
-  assert.match(html, /nezam-customizer\.js\?v=20261102-print-engine-r11/);
+  assert.match(html, /nezam-core\.js\?v=20261103-drive-docs-r8/);
+  assert.match(html, /nezam-customizer\.js\?v=20261103-print-engine-r13/);
 });
 
 
@@ -429,7 +429,7 @@ test('print pipeline isolates the printable document and waits for map image til
   assert.ok(customizer.includes('waitForPrintAssets(printWindow.document, 12000)'));
   assert.ok(customizer.includes('.printed-croquis-satellite-box>svg{display:block!important;width:100%!important;'));
   assert.ok(customizer.includes("@media print{.no-print,[data-no-print='true']{display:none!important;}"));
-  assert.ok(customizer.includes('if (fitResult.overflowCount)'));
+  assert.ok(customizer.includes('if (fitResult.overflowCount && !window.confirm'));
   assert.ok(!customizer.includes('crossorigin="anonymous"'));
   assert.ok(!customizer.includes('currentPreviewMode !== "CROQUIS" && (fitResult.pendingCount || fitResult.overflowCount)'));
 
@@ -446,6 +446,30 @@ test('print pipeline isolates the printable document and waits for map image til
   assert.ok(a4Css.includes(".no-print,[data-no-print='true']{display:none!important;}"));
 });
 
+
+
+test('navigation and printing have one clear control path', () => {
+  const html = read('index.html');
+  const customizer = read('nezam-customizer.js');
+  const core = read('nezam-core.js');
+  const operations = read('nezam-operations.js');
+
+  assert.doesNotMatch(html, /var SUB_TABS_MAP\\s*=|function renderSubBar\\s*\\(/);
+  assert.doesNotMatch(html, /id\\s*=\\s*'nezam-top-subbar'/);
+  assert.match(html, /id="sub-docs"/);
+  assert.equal((html.match(/id="print-paper-size-select"/g) || []).length, 1);
+  assert.doesNotMatch(html, /id="l-paper-size"|id="btn-paper-a4"|id="btn-paper-a5"|id="btn-preview-letter-draft"/);
+  assert.doesNotMatch(customizer, /l-paper-size|btn-paper-a4|btn-paper-a5|btn-preview-letter-draft/);
+  assert.match(core, /data-letter-action='preview'/);
+  assert.doesNotMatch(core, /data-letter-action='a4'|data-letter-action='a5'/);
+  assert.equal((customizer.match(/waitForPrintAssets\\(printWindow\\.document, 12000\\)/g) || []).length, 1);
+  assert.equal((customizer.match(/waitForPrintAssets\\(stage, 12000\\)/g) || []).length, 1);
+  assert.match(customizer, /askToContinueWithMissingAssets/);
+  assert.match(html, /<script defer src="\\.\\/nezam-agent-engine\\.js/);
+  assert.doesNotMatch(operations, /پرونده‌های ثبت‌شده|نامه‌های ثبت‌شده:/);
+  assert.match(operations, /پیگیری‌های عقب‌افتاده/);
+  assert.match(operations, /استعلام‌های غیرقطعی/);
+});
 
 test('Google Drive applicant document vault supports protected multi-file storage', () => {
   const html = read('index.html');
