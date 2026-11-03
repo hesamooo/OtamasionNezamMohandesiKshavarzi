@@ -3510,6 +3510,8 @@
         const localTs = Number(localStorage.getItem('__gdrive_sync_ts') || 0);
         const hasLocalData = Boolean(localStorage.getItem('__gdrive_has_local_data') && localStorage.getItem('nezam636_unified_cases'));
         let didRestore = false;
+        // اگر نسخه کامل دیتابیس وجود دارد، فقط همان مرجع معتبر است؛ نسخه‌های تک‌پرونده‌ای قدیمی نباید حذف‌ها را خنثی کنند.
+        const hasAuthoritativeFullSnapshot = Boolean(bestSyncRecord && bestSyncRecord.storage && typeof bestSyncRecord.storage === 'object');
 
         // ۱. بازگردانی از رکورد کامل دیتابیس (FULL_STORAGE_SYNC)
         if (bestSyncRecord && bestSyncRecord.storage) {
@@ -3533,8 +3535,9 @@
           }
         }
 
-        // ۲. ادغام پرونده‌های تکی ذخیره‌شده در پوشه‌های درایو
-        if (recoveredCases.length > 0) {
+        // ۲. بازیابی از پوشه‌های قدیمی فقط زمانی مجاز است که هنوز هیچ نسخه کامل دیتابیسی در درایو وجود نداشته باشد.
+        // در غیر این صورت، ادغام این فایل‌های قدیمی باعث بازگشت متقاضیان حذف‌شده می‌شود.
+        if (!hasAuthoritativeFullSnapshot && recoveredCases.length > 0) {
           let currentCases = [];
           try {
             currentCases = JSON.parse(localStorage.getItem('nezam636_unified_cases') || '[]');
@@ -3566,7 +3569,8 @@
           }
         }
 
-        if (recoveredLetters.length > 0) {
+        // نامه‌های موجود در پشتیبان‌های قدیمی پرونده نیز نباید حذف از دفتر اندیکاتور را خنثی کنند.
+        if (!hasAuthoritativeFullSnapshot && recoveredLetters.length > 0) {
           let currentLetters = [];
           try {
             currentLetters = JSON.parse(localStorage.getItem('nezam636_letters') || '[]');
