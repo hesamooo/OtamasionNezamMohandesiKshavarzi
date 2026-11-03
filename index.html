@@ -1929,7 +1929,7 @@
             </div>
             <div class="d-flex flex-wrap gap-2">
               <button type="button" class="btn btn-sm btn-outline-success" onclick="addCustomDocToChecklist()">➕ افزودن مدرک جدید به چک‌لیست</button>
-              <button type="button" class="btn btn-sm btn-primary" onclick="syncActiveCaseFolderToDrive()">💻 ساخت پوشه فیزیکی متقاضی در ویندوز / درایو</button>
+              <button type="button" class="btn btn-sm btn-primary" onclick="syncActiveCaseFolderToDrive()">☁️ ساخت/به‌روزرسانی پوشه متقاضی در Google Drive</button>
               <button type="button" class="btn btn-sm btn-outline-dark" onclick="downloadWindowsBatFolderCreator()">📦 دانلود اسکریپت پوشه‌ساز (.bat)</button>
             </div>
           </div>
@@ -3762,13 +3762,15 @@
 
       // اتصال به دکمه ساخت پوشه متقاضی در تب مدارک
       if (typeof window.syncActiveCaseFolderToDrive === 'function') {
-        const origSyncFolder = window.syncActiveCaseFolderToDrive;
-        window.syncActiveCaseFolderToDrive = function() {
-          (async function() {
-            await saveApplicantFolderToDrive(true);
-            await syncAllDataToDrive(true);
-          })();
-          return origSyncFolder.apply(this, arguments);
+        window.syncActiveCaseFolderToDrive = async function() {
+          const folderSaved = await saveApplicantFolderToDrive(true);
+          const dataSaved = await syncAllDataToDrive(true);
+          if (folderSaved && dataSaved) {
+            showToastMsg('پوشه و مشخصات پرونده در Google Drive به‌روزرسانی شد.');
+            return true;
+          }
+          showToastMsg('به‌روزرسانی پوشه کامل تأیید نشد؛ وضعیت اتصال Drive را بررسی کنید.', true);
+          return false;
         };
       }
     });
