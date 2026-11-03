@@ -40,19 +40,191 @@
     })(), timeoutMs || 15000, 'پاسخ Apps Script برای ورود دریافت نشد.');
   }
 
+  function normalizeOtpDigits(value) {
+    return String(value || '')
+      .replace(/[۰-۹]/g, function (d) { return String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)); })
+      .replace(/[٠-٩]/g, function (d) { return String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)); })
+      .replace(/\\D/g, '');
+  }
+
   async function loginByEmailOtp() {
-    var email = window.prompt('ایمیل مجاز ورود به اتوماسیون را وارد کنید:', 'khajehpourhesam@gmail.com');
-    email = String(email || '').trim().toLowerCase();
-    if (!email) throw new Error('ورود لغو شد؛ ایمیل وارد نشد.');
-    var sent = await postPublic({ action: 'requestLoginCode', email: email }, 15000);
-    var code = window.prompt((sent.message || 'کد ورود ارسال شد.') + '\\nکد ۶ رقمی ارسال‌شده به ایمیل را وارد کنید:');
-    code = String(code || '').replace(/\\D/g, '');
-    if (!/^\\d{6}$/.test(code)) throw new Error('کد ورود باید دقیقاً ۶ رقم باشد.');
-    var verified = await postPublic({ action: 'verifyLoginCode', email: email, code: code }, 15000);
-    if (Number(verified.apiVersion) !== 2 || !verified.sessionToken) throw new Error('پاسخ احراز هویت معتبر نیست؛ Code.gs نسخه ۲ را منتشر کنید.');
-    try { sessionStorage.setItem(SESSION_STORAGE, verified.sessionToken); }
-    catch (e) { throw new Error('مرورگر اجازه ذخیره نشست موقت را نمی‌دهد.'); }
-    return verified.sessionToken;
+    return new Promise(function (resolve, reject) {
+      var overlay = document.createElement('div');
+      overlay.id = 'nezam636-otp-login-overlay';
+      overlay.dir = 'rtl';
+      overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483000;background:rgba(15,23,42,.72);display:flex;align-items:center;justify-content:center;padding:18px;font-family:Tahoma,Arial,sans-serif;';
+      overlay.innerHTML =
+        '<div role="dialog" aria-modal="true" aria-labelledby="nezam636-otp-title" style="width:100%;max-width:440px;background:#fff;border-radius:16px;padding:22px;box-shadow:0 22px 70px rgba(0,0,0,.35);color:#1f2937;">' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;">' +
+            '<h3 id="nezam636-otp-title" style="margin:0;font-size:18px;">ورود امن به اتوماسیون</h3>' +
+            '<span aria-hidden="true" style="font-size:24px;color:#52796f;">🔐</span>' +
+          '</div>' +
+          '<p style="font-size:13px;line-height:1.9;color:#64748b;margin:0 0 16px;">برای اتصال به بایگانی Google Drive، کد یک‌بارمصرف به ایمیل مجاز شما ارسال می‌شود. این پنجره را باز نگه دارید.</p>' +
+          '<section id="nezam636-otp-email-step">' +
+            '<label for="nezam636-otp-email" style="display:block;font-size:13px;font-weight:bold;margin-bottom:6px;">ایمیل مجاز</label>' +
+            '<input id="nezam636-otp-email" type="email" autocomplete="email" value="khajehpourhesam@gmail.com" style="width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:9px;padding:11px;direction:ltr;text-align:left;font-size:15px;">' +
+            '<button id="nezam636-otp-send" type="button" style="width:100%;margin-top:12px;border:0;border-radius:9px;background:#1b6b4b;color:#fff;padding:12px;font-size:14px;font-weight:bold;cursor:pointer;">ارسال کد ورود</button>' +
+          '</section>' +
+          '<section id="nezam636-otp-code-step" hidden>' +
+            '<p style="font-size:13px;margin:0 0 10px;">کد به نشانی <b id="nezam636-otp-sent-email" dir="ltr"></b> ارسال شده است.</p>' +
+            '<a href="https://mail.google.com/mail/u/0/#inbox" target="_blank" rel="noopener noreferrer" style="display:block;text-align:center;border:1px solid #cbd5e1;border-radius:9px;padding:10px;color:#166534;text-decoration:none;font-weight:bold;">بازکردن Gmail در زبانه جدید ↗</a>' +
+            '<label for="nezam636-otp-code" style="display:block;font-size:13px;font-weight:bold;margin:14px 0 6px;">کد ۶ رقمی ایمیل</label>' +
+            '<input id="nezam636-otp-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="مثلاً 123456" style="width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:9px;padding:12px;direction:ltr;text-align:center;letter-spacing:7px;font-size:22px;">' +
+            '<button id="nezam636-otp-verify" type="button" style="width:100%;margin-top:12px;border:0;border-radius:9px;background:#1b6b4b;color:#fff;padding:12px;font-size:14px;font-weight:bold;cursor:pointer;">تأیید کد و ورود</button>' +
+            '<div style="display:flex;gap:8px;margin-top:10px;">' +
+              '<button id="nezam636-otp-resend" type="button" disabled style="flex:1;border:1px solid #cbd5e1;border-radius:8px;background:#f1f5f9;color:#64748b;padding:9px;cursor:not-allowed;">ارسال مجدد (۶۰)</button>' +
+              '<button id="nezam636-otp-change" type="button" style="flex:1;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#334155;padding:9px;cursor:pointer;">تغییر ایمیل</button>' +
+            '</div>' +
+          '</section>' +
+          '<div id="nezam636-otp-status" role="status" aria-live="polite" style="font-size:12px;line-height:1.8;margin-top:12px;color:#475569;min-height:22px;"></div>' +
+          '<button id="nezam636-otp-cancel" type="button" style="display:block;margin:8px auto 0;border:0;background:transparent;color:#64748b;padding:7px;cursor:pointer;">انصراف</button>' +
+        '</div>';
+
+      document.body.appendChild(overlay);
+      var emailStep = overlay.querySelector('#nezam636-otp-email-step');
+      var codeStep = overlay.querySelector('#nezam636-otp-code-step');
+      var emailInput = overlay.querySelector('#nezam636-otp-email');
+      var codeInput = overlay.querySelector('#nezam636-otp-code');
+      var sendButton = overlay.querySelector('#nezam636-otp-send');
+      var verifyButton = overlay.querySelector('#nezam636-otp-verify');
+      var resendButton = overlay.querySelector('#nezam636-otp-resend');
+      var statusBox = overlay.querySelector('#nezam636-otp-status');
+      var sentEmailBox = overlay.querySelector('#nezam636-otp-sent-email');
+      var cooldownTimer = null;
+      var settled = false;
+      var currentEmail = '';
+
+      function setStatus(message, isError) {
+        statusBox.textContent = String(message || '');
+        statusBox.style.color = isError ? '#b91c1c' : '#475569';
+      }
+
+      function cleanup() {
+        if (cooldownTimer) clearInterval(cooldownTimer);
+        document.removeEventListener('keydown', onKeyDown);
+        if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+      }
+
+      function fail(error) {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(error instanceof Error ? error : new Error(String(error || 'ورود لغو شد.')));
+      }
+
+      function startCooldown(seconds) {
+        var remaining = seconds;
+        resendButton.disabled = true;
+        resendButton.style.background = '#f1f5f9';
+        resendButton.style.color = '#64748b';
+        resendButton.style.cursor = 'not-allowed';
+        resendButton.textContent = 'ارسال مجدد (' + remaining + ')';
+        if (cooldownTimer) clearInterval(cooldownTimer);
+        cooldownTimer = setInterval(function () {
+          remaining -= 1;
+          if (remaining <= 0) {
+            clearInterval(cooldownTimer);
+            cooldownTimer = null;
+            resendButton.disabled = false;
+            resendButton.style.background = '#fff';
+            resendButton.style.color = '#166534';
+            resendButton.style.cursor = 'pointer';
+            resendButton.textContent = 'ارسال مجدد کد';
+          } else {
+            resendButton.textContent = 'ارسال مجدد (' + remaining + ')';
+          }
+        }, 1000);
+      }
+
+      async function sendCode(isResend) {
+        var enteredEmail = String(emailInput.value || '').trim().toLowerCase();
+        if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(enteredEmail)) {
+          setStatus('نشانی ایمیل معتبر وارد کنید.', true);
+          emailInput.focus();
+          return;
+        }
+        if (isResend) resendButton.disabled = true;
+        else sendButton.disabled = true;
+        setStatus('در حال ارسال کد به ایمیل...', false);
+        try {
+          var sent = await postPublic({ action: 'requestLoginCode', email: enteredEmail }, 20000);
+          currentEmail = enteredEmail;
+          sentEmailBox.textContent = currentEmail;
+          emailStep.hidden = true;
+          codeStep.hidden = false;
+          codeInput.value = '';
+          setStatus(sent.message || 'کد ورود ارسال شد. Gmail را در زبانه جدید باز کنید و کد را اینجا وارد کنید.', false);
+          startCooldown(60);
+          codeInput.focus();
+        } catch (error) {
+          setStatus(error && error.message ? error.message : String(error), true);
+          if (isResend) resendButton.disabled = false;
+          else sendButton.disabled = false;
+        }
+      }
+
+      async function verifyCode() {
+        var code = normalizeOtpDigits(codeInput.value);
+        if (!/^\\d{6}$/.test(code)) {
+          setStatus('کد باید دقیقاً ۶ رقم باشد.', true);
+          codeInput.focus();
+          return;
+        }
+        verifyButton.disabled = true;
+        verifyButton.style.opacity = '.65';
+        setStatus('در حال بررسی کد ورود...', false);
+        try {
+          var verified = await postPublic({ action: 'verifyLoginCode', email: currentEmail, code: code }, 20000);
+          if (Number(verified.apiVersion) !== 2 || !verified.sessionToken) {
+            throw new Error('پاسخ احراز هویت معتبر نیست؛ Code.gs نسخه ۲ را منتشر کنید.');
+          }
+          try { sessionStorage.setItem(SESSION_STORAGE, verified.sessionToken); }
+          catch (storageError) { throw new Error('مرورگر اجازه ذخیره نشست موقت را نمی‌دهد.'); }
+          settled = true;
+          cleanup();
+          resolve(verified.sessionToken);
+        } catch (error) {
+          setStatus(error && error.message ? error.message : String(error), true);
+          verifyButton.disabled = false;
+          verifyButton.style.opacity = '1';
+          codeInput.focus();
+        }
+      }
+
+      function changeEmail() {
+        if (cooldownTimer) clearInterval(cooldownTimer);
+        cooldownTimer = null;
+        emailInput.disabled = false;
+        emailInput.value = currentEmail || emailInput.value;
+        codeStep.hidden = true;
+        emailStep.hidden = false;
+        sendButton.disabled = false;
+        setStatus('ایمیل را بررسی کنید و در صورت نیاز تغییر دهید.', false);
+        emailInput.focus();
+      }
+
+      function onKeyDown(event) {
+        if (event.key === 'Escape') fail(new Error('ورود توسط کاربر لغو شد.'));
+      }
+
+      sendButton.addEventListener('click', function () { sendCode(false); });
+      resendButton.addEventListener('click', function () { sendCode(true); });
+      verifyButton.addEventListener('click', verifyCode);
+      overlay.querySelector('#nezam636-otp-change').addEventListener('click', changeEmail);
+      overlay.querySelector('#nezam636-otp-cancel').addEventListener('click', function () { fail(new Error('ورود لغو شد.')); });
+      codeInput.addEventListener('input', function () {
+        codeInput.value = normalizeOtpDigits(codeInput.value).slice(0, 6);
+        if (codeInput.value.length === 6) verifyButton.focus();
+      });
+      codeInput.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter') verifyCode();
+      });
+      emailInput.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter') sendCode(false);
+      });
+      document.addEventListener('keydown', onKeyDown);
+      emailInput.focus();
+    });
   }
 
   function withTimeout(promise, timeoutMs, message) {
