@@ -299,7 +299,7 @@
       18000,
       'پاسخ Google Apps Script در ۱۸ ثانیه دریافت نشد؛ نسخه Web App یا اتصال اینترنت را بررسی کنید.'
     );
-    var documentActions = ['readDatabase','listCaseDocuments','uploadCaseDocument','replaceCaseDocument','deleteCaseDocument'];
+    var documentActions = ['readDatabase','listCaseDocuments','getCaseDocumentContent','uploadCaseDocument','replaceCaseDocument','deleteCaseDocument'];
     if (documentActions.indexOf(String(payload.action || '')) !== -1 && Number(data && data.apiVersion) !== 2) {
       throw new Error('Google Apps Script هنوز نسخه ۲ بایگانی مدارک را اجرا نمی‌کند؛ Code.gs را جایگزین و Web App را به‌روزرسانی کنید.');
     }
@@ -426,6 +426,20 @@
     return request({action:'listCaseDocuments',caseId:String(context.caseId),fullName:String(context.fullName||''),nationalCode:String(context.nationalCode||'')},true);
   }
 
+  async function getFileContent(fileId, context) {
+    if (!fileId) throw new Error('شناسه فایل برای دریافت محتوای پیوست مشخص نیست.');
+    if (!context || !context.caseId) throw new Error('پرونده برای دریافت محتوای پیوست مشخص نیست.');
+    var response = await request({
+      action:'getCaseDocumentContent',
+      caseId:String(context.caseId),
+      fullName:String(context.fullName||''),
+      nationalCode:String(context.nationalCode||''),
+      fileId:String(fileId)
+    }, true);
+    if (!response.document || !response.document.data) throw new Error('محتوای واقعی فایل از Google Drive دریافت نشد.');
+    return response.document;
+  }
+
   async function remove(fileId, context) {
     if (!fileId) throw new Error('شناسه فایل برای حذف مشخص نیست.');
     var result = await request({action:'deleteCaseDocument',caseId:String(context.caseId),fullName:String(context.fullName||''),nationalCode:String(context.nationalCode||''),fileId:String(fileId)},true);
@@ -478,7 +492,7 @@
 
   window.NezamDriveDocuments={
     list:list,readDatabase:readDatabase,uploadFiles:uploadFiles,retryFailed:retryFailed,remove:remove,migrateLegacyDocs:migrateLegacyDocs,
-    getCaseContext:getCaseContext,getAccessKey:function(){return getAccessKey(false);},ensureReady:ensureReady,
+    getCaseContext:getCaseContext,getFileContent:getFileContent,getAccessKey:function(){return getAccessKey(false);},ensureReady:ensureReady,
     clearAccessKey:clearSession,
     maxFileBytes:MAX_FILE_BYTES
   };
