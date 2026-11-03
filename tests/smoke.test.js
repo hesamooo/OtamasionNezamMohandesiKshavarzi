@@ -604,11 +604,11 @@ test('secretariat variable syntax supports old plain-text tags and double-brace 
 test('secretariat save from preview blocks unresolved variables before writing the archive record', () => {
   const customizer = read('nezam-customizer.js');
   const start = customizer.indexOf('window.savePaperEditsToSecretariat = function(options)');
-  const end = customizer.indexOf('\\n};', start);
   assert.notEqual(start, -1);
-  assert.notEqual(end, -1);
-  assert.match(customizer.slice(start, end), /ensureLetterVariablesResolvedForOutput/);
+  const savePath = customizer.slice(start, start + 3000);
+  assert.match(savePath, /if \(!ensureLetterVariablesResolvedForOutput\(\)\) return false;/);
 });
+
 
 test('secretariat archive search normalizes digits, Arabic letters and HTML body content', () => {
   const core = read('nezam-core.js');
