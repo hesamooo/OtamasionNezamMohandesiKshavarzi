@@ -72,7 +72,6 @@
     var host = byId('nezam-ops-suite');
     if (!host) return;
     var cases = Array.isArray(window.casesDB) ? window.casesDB : [];
-    var letters = Array.isArray(window.lettersDB) ? window.lettersDB : [];
     var tasks = Array.isArray(window.tasksDB) ? window.tasksDB : [];
     var pendingTasks = tasks.filter(function (t) { return t && t.status !== 'انجام شده'; });
     var today = currentJalaliKey();
@@ -96,21 +95,20 @@
       return { label: g.label, count: cases.filter(function (c) { return c && c.mainGroup === g.key; }).length };
     });
     var maxCount = Math.max(1, cases.length);
+    // فقط شاخص‌های تکمیلی نمایش داده می‌شوند؛ تعداد پرونده و پیگیری باز در پیشخوان اصلی وجود دارد.
     var metrics = [
-      { label: 'پرونده‌های ثبت‌شده', value: cases.length },
-      { label: 'پیگیری‌های باز', value: pendingTasks.length },
       { label: 'پیگیری‌های عقب‌افتاده', value: overdue.length },
       { label: 'استعلام‌های غیرقطعی', value: inquiryPending }
     ];
     var html = '<div class="row g-2 mb-3">';
     metrics.forEach(function (m) {
-      html += '<div class="col-6 col-md-3"><div class="nezam-op-stat"><small>' + m.label + '</small><b>' + fa(m.value) + '</b></div></div>';
+      html += '<div class="col-6 col-md-6"><div class="nezam-op-stat"><small>' + m.label + '</small><b>' + fa(m.value) + '</b></div></div>';
     });
     html += '</div><div class="row g-2"><div class="col-md-6"><div class="small fw-bold text-success mb-2">ترکیب پرونده‌ها در سه گروه تخصصی</div>';
     groupCounts.forEach(function (g) {
       html += '<div class="nezam-op-group"><span style="min-width:116px">' + g.label + '</span><div class="nezam-op-track"><i style="width:' + Math.round((g.count / maxCount) * 100) + '%"></i></div><b>' + fa(g.count) + '</b></div>';
     });
-    html += '<div class="small text-muted mt-2">نامه‌های ثبت‌شده: ' + fa(letters.length) + ' | پرونده‌های فعال: ' + fa(cases.filter(function (c) { return c && c.caseStatus !== 'ARCHIVED'; }).length) + '</div></div>';
+    html += '</div>';
     html += '<div class="col-md-6"><div class="small fw-bold text-success mb-2">کارمند هوشمند؛ ابزارهای آماده اقدام</div>';
     html += '<button class="nezam-ai-action" type="button" data-nezam-ai-action="review">🔎 <span>ارزیابی نقص‌ها و وضعیت پرونده فعال</span></button>';
     html += '<button class="nezam-ai-action" type="button" data-nezam-ai-action="letter">✉️ <span>تهیه پیش‌نویس نامه رسمی برای پرونده فعال</span></button>';
