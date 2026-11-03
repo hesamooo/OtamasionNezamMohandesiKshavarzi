@@ -1905,6 +1905,15 @@ function renderActiveCaseDocsChecklist() {
     var fileInput = document.getElementById("case-doc-bulk-files");
     var uploadBtn = document.getElementById("case-doc-bulk-upload");
     var migrateBtn = document.getElementById("case-doc-migrate-legacy");
+    var searchInput = document.getElementById("case-doc-search");
+    if (searchInput) searchInput.addEventListener("input", function() {
+      var query = String(searchInput.value || "").trim().toLocaleLowerCase();
+      var tableRows = tbody.querySelectorAll("tr");
+      for (var ri = 0; ri < tableRows.length; ri++) {
+        var haystack = String(tableRows[ri].textContent || "").toLocaleLowerCase();
+        tableRows[ri].style.display = !query || haystack.indexOf(query) !== -1 ? "" : "none";
+      }
+    });
     if (uploadBtn) uploadBtn.addEventListener("click", function() {
       var option = select && select.options[select.selectedIndex];
       if (!option || !option.value) {
@@ -2057,6 +2066,21 @@ function renderActiveCaseDocsChecklist() {
       }
 
       tbody.innerHTML = rows || '<tr><td colspan="4" class="text-center py-3 text-muted">چک‌لیست مدرک برای این فعالیت تعریف نشده است.</td></tr>';
+      var searchInput = document.getElementById("case-doc-search");
+      if (searchInput && searchInput.value) {
+        var searchQuery = String(searchInput.value).trim().toLocaleLowerCase();
+        Array.prototype.forEach.call(tbody.querySelectorAll("tr"), function(row) {
+          row.style.display = String(row.textContent || "").toLocaleLowerCase().indexOf(searchQuery) !== -1 ? "" : "none";
+        });
+      }
+      var usage = document.getElementById("case-docs-cloud-usage");
+      if (usage) {
+        var totalBytes = (cloudFiles || []).reduce(function(sum, file) { return sum + Math.max(0, Number(file.size || 0)); }, 0);
+        var totalLabel = totalBytes >= 1073741824 ? (totalBytes / 1073741824).toFixed(2) + " GB" :
+          (totalBytes >= 1048576 ? (totalBytes / 1048576).toFixed(2) + " MB" :
+          (totalBytes ? Math.max(1, Math.round(totalBytes / 1024)) + " KB" : "۰ بایت"));
+        usage.textContent = "تعداد فایل‌های Drive: " + toFa((cloudFiles || []).length) + " | حجم ثبت‌شده: " + totalLabel;
+      }
 
       var legacyBox = document.getElementById("case-docs-legacy-files");
       if (legacyBox) {
