@@ -449,6 +449,61 @@ function getLetterDraftFromEditor() {
 }
 
 
+
+function normalizeLetterVariableKey(value) {
+  return String(value == null ? "" : value).replace(/[يى]/g, "ی").replace(/ك/g, "ک").replace(/[\s\u200c\u200f\u0640]/g, "").toLowerCase();
+}
+function resolveOfficeLetterVariables(bodyHtml, letter, linkedCase) {
+  var record=letter||{}, caseData=linkedCase||{};
+  function pick(recordKeys,caseKeys){
+    var keys=Array.isArray(recordKeys)?recordKeys:[recordKeys];
+    for(var i=0;i<keys.length;i++){var v=record[keys[i]];if(v!==null&&v!==undefined&&String(v).trim()!=="")return String(v).trim();}
+    keys=Array.isArray(caseKeys)?caseKeys:[caseKeys||recordKeys];
+    for(var j=0;j<keys.length;j++){var cv=caseData[keys[j]];if(cv!==null&&cv!==undefined&&String(cv).trim()!=="")return String(cv).trim();}
+    return "";
+  }
+  function fa(v){return typeof toFa==="function"?toFa(String(v==null?"":v)):String(v==null?"":v);}
+  var values={
+    name:pick(["appName","name"],["name"]), nid:fa(pick(["appNid","nid","nationalId"],["nid","nationalId"])),
+    project:pick(["project","activity"],["project","activity"]), cap:fa(pick(["cap","capacity"],["cap","capacity"])),
+    land:fa(pick(["land","landArea"],["land","landArea"])), landParcel:pick(["landParcel","parcel"],["landParcel","parcel"]),
+    water:pick(["water","waterSource"],["water","waterSource"]), loc:pick(["loc","location"],["loc","location"]),
+    utm:fa(pick(["utm","coordinates"],["utm","coordinates"])), code:fa(pick(["caseCode","code"],["code","caseCode"])),
+    number:fa(pick(["number","num"],["number","num"])), date:fa(pick(["date"],["date"])),
+    attach:pick(["attach","attachment"],["attach","attachment"]), recipient:pick(["recipient","rec"],["recipient","rec"])
+  };
+  var aliases={
+    "نام":"name","ناممتقاضی":"name","ناموخانوادگی":"name","ناموخانودگی":"name",
+    "کدملی":"nid","کدملیشناسه":"nid","شناسهملی":"nid","کدملی/شناسه":"nid",
+    "طرح":"project","موضوعطرح":"project","فعالیت":"project","ظرفیت":"cap","ظرفیتطرح":"cap",
+    "مساحت":"land","مساحتزمین":"land","مساحتعرصه":"land","پلاک":"landParcel","پلاکثبتی":"landParcel",
+    "آب":"water","منبعآب":"water","موقعیت":"loc","موقعیتاراضی":"loc","محلاراضی":"loc",
+    "مختصات":"utm","مختصاتutm":"utm","utm":"utm","کلاسه":"code","کلاسهپرونده":"code","شمارهپرونده":"code",
+    "شماره":"number","شمارهنامه":"number","تاریخ":"date","تاریخنامه":"date","پیوست":"attach",
+    "گیرنده":"recipient","نامگیرنده":"recipient"
+  };
+  var customFields=Array.isArray(caseData.customFields)?caseData.customFields:[];
+  customFields.forEach(function(field){
+    if(!field||!field.label)return;
+    var key=normalizeLetterVariableKey(field.label);
+    if(key&&!Object.prototype.hasOwnProperty.call(aliases,key)&&field.value!=null)values["custom:"+key]=String(field.value);
+  });
+  var parsed=new DOMParser().parseFromString(String(bodyHtml||""),"text/html");
+  var walker=parsed.createTreeWalker(parsed.body,4,null), nodes=[], node;
+  while((node=walker.nextNode()))nodes.push(node);
+  var unresolved=[];
+  nodes.forEach(function(textNode){
+    if(!/\{[^{}]+\}/.test(textNode.nodeValue||""))return;
+    textNode.nodeValue=textNode.nodeValue.replace(/\{([^{}]+)\}/g,function(full,rawKey){
+      var key=normalizeLetterVariableKey(rawKey), valueKey=aliases[key];
+      var value=valueKey?values[valueKey]:values["custom:"+key];
+      if(value===null||value===undefined||String(value).trim()===""){if(unresolved.indexOf(full)===-1)unresolved.push(full);return "ــــــــ";}
+      return String(value);
+    });
+  });
+  return {html:parsed.body.innerHTML,unresolved:unresolved};
+}
+
 function renderLetterPreviewObject(letter, forcedPaperSize, mode) {
   var stage = document.getElementById("a4-preview-stage");
   if (!stage || !letter) return false;
@@ -466,15 +521,25 @@ function renderLetterPreviewObject(letter, forcedPaperSize, mode) {
   var linkedCase = letter.officeLetter === true ? null :
     ((Array.isArray(window.casesDB) ? window.casesDB : []).find(function (item) {
       return item && String(item.id) === String(letter.caseId);
-    }) || getActiveCase());
+    }) || (isDraft ? getActiveCase() : null));
   var coordinateHtml = letter.officeLetter === true ? "" :
     ((typeof letter.utmAttachmentHtml === "string" && letter.utmAttachmentHtml.trim())
       ? letter.utmAttachmentHtml
       : (includeUtm && linkedCase ? buildAllSelectedFeaturesUtmTableHTML(linkedCase, letter.utm || linkedCase.utm || "", isNat) : ""));
   var hasUtm = includeUtm && !!(coordinateHtml && coordinateHtml.trim());
   var attachmentLabel = getLetterAttachmentLabel(letter.attach, hasUtm);
+  var bodyResolution = resolveOfficeLetterVariables(sanitizeOfficeRichHtml(letter.body), letter, linkedCase);
+  window.__nezam636UnresolvedLetterVars = bodyResolution.unresolved.slice();
 
-  stage.innerHTML = buildSingleA4HTML(letter.recipient, sanitizeOfficeRichHtml(letter.body), letter.number, letter.date, attachmentLabel, letter.utm, isNat, true, pSize, false, "");
+  stage.innerHTML = buildSingleA4HTML(letter.recipient, bodyResolution.html, letter.number, letter.date, attachmentLabel, letter.utm, isNat, true, pSize, false, "");
+  if (bodyResolution.unresolved.length) {
+    var variableWarning = document.createElement("div");
+    variableWarning.className = "alert alert-warning no-print small fw-bold";
+    variableWarning.setAttribute("data-no-print", "true");
+    variableWarning.textContent = "چاپ تا تکمیل متغیرها مجاز نیست. اطلاعات زیر در این نامه پیدا نشد: " +
+      bodyResolution.unresolved.join("، ") + "؛ اطلاعات پرونده یا نام متغیر را بررسی کنید.";
+    stage.insertBefore(variableWarning, stage.firstChild);
+  }
   if (hasUtm) {
     var sheets = splitUtmAttachmentTableHtml(coordinateHtml, pSize);
     var intro = "جدول مختصات UTM مربوط به زمین و عوارض پرونده «" +
@@ -660,6 +725,13 @@ function buildIsolatedPrintDocument(stage, paperSize, title) {
     stage.innerHTML + '</body></html>';
 }
 
+function ensureLetterVariablesResolvedForOutput() {
+  if (currentPreviewMode !== "LETTER" && currentPreviewMode !== "LETTER_DRAFT") return true;
+  var unresolved = Array.isArray(window.__nezam636UnresolvedLetterVars) ? window.__nezam636UnresolvedLetterVars : [];
+  if (!unresolved.length) return true;
+  showToastMsg("چاپ/خروجی متوقف شد؛ ابتدا متغیرهای بدون مقدار را تکمیل کنید: " + unresolved.join("، "), true);
+  return false;
+}
 window.doPrintPaperSheet = function() {
   if (printRequestActive) return false;
   if (currentPreviewMode === "EDITOR") {
@@ -670,6 +742,7 @@ window.doPrintPaperSheet = function() {
     showToastMsg("فرم نامه بعد از آخرین پیش‌نمایش تغییر کرده است؛ ابتدا دوباره پیش‌نمایش بگیرید.", true);
     return false;
   }
+  if (!ensureLetterVariablesResolvedForOutput()) return false;
 
   var stage = document.getElementById("a4-preview-stage");
   if (!stage || !stage.querySelector(".a4-page")) {
@@ -1013,6 +1086,18 @@ window.startCaseLinkedLetter = function() {
 
 
 function bindLetterEditorDirtyTracking() {
+  var editor=document.getElementById("l-body-rich");
+  if(editor&&editor.dataset.letterKeyboardBound!=="1"){
+    editor.dataset.letterKeyboardBound="1";
+    editor.addEventListener("keyup",rememberLetterEditorSelection);
+    editor.addEventListener("mouseup",rememberLetterEditorSelection);
+    editor.addEventListener("keydown",function(event){
+      if(!(event.ctrlKey||event.metaKey)||event.altKey)return;
+      var key=String(event.key||"").toLowerCase();
+      var command=key==="b"?"bold":(key==="i"?"italic":(key==="u"?"underline":""));
+      if(command){event.preventDefault();window.execLetterFormat(command);}
+    });
+  }
   var ids = ["l-direction","l-number","l-date","l-attach","l-recipient","l-include-utm","l-body"];
   ids.forEach(function (id) {
     var el = document.getElementById(id);
@@ -1079,7 +1164,9 @@ function syncRichEditorToTextarea() {
   var editor = document.getElementById("l-body-rich");
   var ta = document.getElementById("l-body");
   if (editor && ta) {
-    editor.innerHTML = sanitizeOfficeRichHtml(editor.innerHTML);
+    var rawHtml = editor.innerHTML;
+    var safeHtml = sanitizeOfficeRichHtml(rawHtml);
+    if (safeHtml !== rawHtml) editor.innerHTML = safeHtml;
     ta.value = editor.innerText || editor.textContent;
     if (!window.__nezam636ProgrammaticLetterSync) letterDraftDirty = true;
   }
@@ -1428,6 +1515,7 @@ window.downloadPaperSheetFile = function(forcedSize) {
     showToastMsg("فرم نامه بعد از آخرین پیش‌نمایش تغییر کرده است؛ ابتدا دوباره پیش‌نمایش بگیرید.", true);
     return false;
   }
+  if (!ensureLetterVariablesResolvedForOutput()) return false;
   var fitResult = autoFitPaperContent(stage);
   if (fitResult.pendingCount) {
     showToastMsg("خروجی HTML ساخته نشد؛ صفحه هنوز کامل قابل اندازه‌گیری نیست.", true);
@@ -2108,58 +2196,73 @@ function updatePrintUtmBtnState(isOn) {
   btn.textContent = isOn ? "📎 پیوست مختصات: دارد" : "📎 پیوست مختصات: ندارد";
 }
 
-/* ابزارهای ویرایشگر متنی همانند مایکروسافت ورد (Rich Text Editor) */
-window.execLetterFormat = function(cmd, val) {
-  var editor = document.getElementById("l-body-rich");
-  if (!editor) return;
-  editor.focus();
-  document.execCommand(cmd, false, val || null);
-  syncRichEditorToTextarea();
-};
-
-window.applyLetterFontSize = function(size) {
-  var editor = document.getElementById("l-body-rich");
-  if (!editor) return;
-  editor.focus();
-  var sel = window.getSelection();
-  if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
-    var span = document.createElement("span");
-    span.style.fontSize = size;
-    var range = sel.getRangeAt(0);
-    span.appendChild(range.extractContents());
-    range.insertNode(span);
-  } else {
-    document.execCommand("fontSize", false, size === "16pt" ? "5" : (size === "13pt" ? "4" : "3"));
+/* ابزارهای ویرایشگر متنی غنی؛ حفظ نشانگر و درج دقیق در محل انتخاب‌شده */
+var letterEditorSavedRange=null;
+function rememberLetterEditorSelection(){
+  var editor=document.getElementById("l-body-rich"), selection=window.getSelection&&window.getSelection();
+  if(!editor||!selection||!selection.rangeCount||!selection.anchorNode)return;
+  if(editor===selection.anchorNode||editor.contains(selection.anchorNode))letterEditorSavedRange=selection.getRangeAt(0).cloneRange();
+}
+if(!window.__nezamLetterSelectionTrackingBound){
+  document.addEventListener("selectionchange",rememberLetterEditorSelection);
+  window.__nezamLetterSelectionTrackingBound=true;
+}
+function restoreLetterEditorSelection(editor){
+  if(!editor)return null;editor.focus();
+  var selection=window.getSelection&&window.getSelection();if(!selection)return null;
+  var range=null;
+  if(selection.rangeCount){
+    var active=selection.getRangeAt(0);
+    if(editor===active.commonAncestorContainer||editor.contains(active.commonAncestorContainer))range=active.cloneRange();
   }
+  if(!range&&letterEditorSavedRange&&editor.contains(letterEditorSavedRange.startContainer)&&editor.contains(letterEditorSavedRange.endContainer))range=letterEditorSavedRange.cloneRange();
+  if(!range){range=document.createRange();range.selectNodeContents(editor);range.collapse(false);}
+  try{selection.removeAllRanges();selection.addRange(range);}catch(e){return null;}
+  letterEditorSavedRange=range.cloneRange();return range;
+}
+function insertTextAtLetterSelection(text){
+  var editor=document.getElementById("l-body-rich");if(!editor)return false;
+  var range=restoreLetterEditorSelection(editor);if(!range)return false;
+  range.deleteContents();var node=document.createTextNode(String(text==null?"":text));
+  range.insertNode(node);range.setStartAfter(node);range.collapse(true);
+  var selection=window.getSelection();selection.removeAllRanges();selection.addRange(range);
+  letterEditorSavedRange=range.cloneRange();syncRichEditorToTextarea();editor.focus();return true;
+}
+function insertHtmlAtLetterSelection(html){
+  var editor=document.getElementById("l-body-rich");if(!editor)return false;
+  var range=restoreLetterEditorSelection(editor);if(!range)return false;
+  var parsed=new DOMParser().parseFromString(sanitizeOfficeRichHtml(html),"text/html");
+  var fragment=document.createDocumentFragment();while(parsed.body.firstChild)fragment.appendChild(parsed.body.firstChild);
+  if(!fragment.childNodes.length)return false;
+  range.deleteContents();var lastNode=fragment.lastChild;range.insertNode(fragment);
+  range.setStartAfter(lastNode);range.collapse(true);
+  var selection=window.getSelection();selection.removeAllRanges();selection.addRange(range);
+  letterEditorSavedRange=range.cloneRange();syncRichEditorToTextarea();editor.focus();return true;
+}
+window.execLetterFormat=function(cmd,val){
+  var editor=document.getElementById("l-body-rich");if(!editor||!restoreLetterEditorSelection(editor))return;
+  document.execCommand(cmd,false,val||null);syncRichEditorToTextarea();rememberLetterEditorSelection();
+};
+window.applyLetterFontSize=function(size){
+  var editor=document.getElementById("l-body-rich");
+  if(!editor||!/^(16pt|13pt|11pt|9\.5pt)$/.test(String(size)))return;
+  var range=restoreLetterEditorSelection(editor);if(!range)return;
+  if(!range.collapsed){
+    var span=document.createElement("span");span.style.fontSize=size;span.appendChild(range.extractContents());range.insertNode(span);
+    range.setStartAfter(span);range.collapse(true);
+    var selection=window.getSelection();selection.removeAllRanges();selection.addRange(range);letterEditorSavedRange=range.cloneRange();
+  }else document.execCommand("fontSize",false,size==="16pt"?"5":(size==="13pt"?"4":"3"));
   syncRichEditorToTextarea();
 };
-
-window.insertTagIntoLetterBody = function(tag) {
-  var editor = document.getElementById("l-body-rich");
-  if (!editor) return;
-  editor.focus();
-  document.execCommand("insertText", false, tag);
-  syncRichEditorToTextarea();
+window.insertTagIntoLetterBody=function(tag){
+  if(!/^\{[^{}]+\}$/.test(String(tag||"")))return false;return insertTextAtLetterSelection(tag);
 };
-
-window.insertPhraseIntoLetterBody = function(phrase) {
-  var editor = document.getElementById("l-body-rich");
-  if (!editor) return;
-  editor.focus();
-  document.execCommand("insertText", false, phrase);
-  syncRichEditorToTextarea();
-};
-
-window.insertLetterTable = function() {
-  var editor = document.getElementById("l-body-rich");
-  if (!editor) return;
-  var tblHtml = '<table class="table table-bordered my-2" style="width:100%;font-size:9.5pt;border:1px solid #333;">' +
-    '<thead><tr style="background:#f1f5f9;"><th>ردیف</th><th>شرح مشخصات</th><th>مقدار یا وضعیت</th></tr></thead>' +
-    '<tbody><tr><td>۱</td><td>موضوع طرح</td><td>مطابق پرونده</td></tr><tr><td>۲</td><td>مساحت زمین</td><td>مترمربع</td></tr></tbody>' +
-  '</table><p></p>';
-  editor.focus();
-  document.execCommand("insertHTML", false, tblHtml);
-  syncRichEditorToTextarea();
+window.insertPhraseIntoLetterBody=function(phrase){return insertTextAtLetterSelection(phrase);};
+window.insertLetterTable=function(){
+  var tblHtml='<table class="table table-bordered my-2" style="width:100%;font-size:9.5pt;border:1px solid #333;">'+
+    '<thead><tr style="background:#f1f5f9;"><th>ردیف</th><th>شرح مشخصات</th><th>مقدار یا وضعیت</th></tr></thead>'+
+    '<tbody><tr><td>۱</td><td>موضوع طرح</td><td>{طرح}</td></tr><tr><td>۲</td><td>مساحت زمین</td><td>{مساحت} مترمربع</td></tr></tbody>'+
+  '</table><p></p>';return insertHtmlAtLetterSelection(tblHtml);
 };
 
 function issueDeficiencyLetterForActiveCase() {
@@ -4775,6 +4878,7 @@ function exportStageToWordDoc() {
     showToastMsg("فرم نامه بعد از آخرین پیش‌نمایش تغییر کرده است؛ ابتدا دوباره پیش‌نمایش بگیرید.", true);
     return false;
   }
+  if (!ensureLetterVariablesResolvedForOutput()) return false;
   var fitResult = autoFitPaperContent(stage);
   if (fitResult.pendingCount || fitResult.overflowCount) {
     showToastMsg("خروجی Word ساخته نشد؛ صفحه هنوز کامل قابل اندازه‌گیری نیست یا محتوا از محدوده بیرون می‌زند.", true);
