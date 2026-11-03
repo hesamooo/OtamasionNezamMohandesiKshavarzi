@@ -2484,17 +2484,37 @@ function downloadWindowsBatFolderCreator() {
 /* =========================================================================
    ۹. دبیرخانه، امور مالی، کارها، پشتیبان‌گیری و خروجی تک‌فایلی ویندوز
    ========================================================================= */
+function normalizeSecretariatSearchText(value) {
+  var text = String(value == null ? "" : value);
+  try {
+    if (typeof DOMParser !== "undefined" && /<\/?[a-z][\s\S]*?>/i.test(text)) {
+      text = new DOMParser().parseFromString(text, "text/html").body.textContent || "";
+    } else {
+      text = text.replace(/<[^>]*>/g, " ");
+    }
+  } catch (parseError) {
+    text = text.replace(/<[^>]*>/g, " ");
+  }
+  return toEn(text).replace(/[يى]/g, "ی").replace(/ك/g, "ک")
+    .replace(/[\u200c\u200f\u0640]/g, "")
+    .replace(/[\s\u00a0]+/g, " ").trim().toLowerCase();
+}
+
 function renderSecretariatTable() {
   var tbody = document.getElementById("secretariat-tbody");
   if (!tbody) return;
-  var q = toFa((document.getElementById("sec-search-q") || {}).value || "").trim().toLowerCase();
+  var q = normalizeSecretariatSearchText((document.getElementById("sec-search-q") || {}).value || "");
   var dir = (document.getElementById("sec-filter-dir") || {}).value || "ALL";
   var html = "";
 
   for (var i = 0; i < lettersDB.length; i++) {
     var l = lettersDB[i] || {};
     if (dir !== "ALL" && l.type !== dir) continue;
-    var hay = [l.number, l.recipient, l.appName, l.appNid, l.body].join(" ").toLowerCase();
+    var hay = normalizeSecretariatSearchText([
+      l.number, l.date, l.type === "OUT" ? "صادره" : "وارده",
+      l.recipient, l.appName, l.appNid, l.project, l.cap, l.land,
+      l.landParcel, l.loc, l.body, l.officeLetter === true ? "نامه مستقل دفتر" : "نامه پرونده"
+    ].join(" "));
     if (q && hay.indexOf(q) === -1) continue;
 
     var pSize = l.paperSize === "A5" ? "A5" : "A4";
