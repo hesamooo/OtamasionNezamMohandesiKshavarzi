@@ -502,7 +502,7 @@ test('local IndexedDB failures cannot indefinitely block Google Drive document l
   assert.match(core, /setTimeout\(function\(\) \{ finish\(null\); \}, 4500\)/);
   assert.match(core, /Local document lookup timed out; continuing with Google Drive inventory/);
   assert.match(core, /var driveListPromise = window\.NezamDriveDocuments/);
-  assert.match(core, /Drive file library independently of browser IndexedDB/);
+  assert.match(core, /نمایش کتابخانه ابری مستقل از IndexedDB/);
   assert.match(core, /setTimeout\(function\(\) \{\s*if \(completed\) return;\s*completed = true;/);
   assert.match(vault, /function withTimeout\(promise, timeoutMs, message\)/);
   assert.match(vault, /15000, 'پاسخ Google Apps Script برای بررسی اتصال در ۱۵ ثانیه دریافت نشد/);
