@@ -2569,6 +2569,23 @@
               <textarea id="l-body" class="form-control form-control-sm" rows="6" style="display:none;" oninput="syncTextareaToRichEditor()"></textarea>
             </div>
 
+            <!-- پیوست‌های چندگانه نامه: انتخاب از رایانه یا بایگانی Google Drive متقاضی -->
+            <section id="letter-attachments-panel" class="mb-3 p-3 rounded border bg-white">
+              <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                <div>
+                  <strong class="text-success">📎 پیوست‌های نامه</strong>
+                  <div class="small text-muted">می‌توانید چند فایل از رایانه یا مدارک ثبت‌شده متقاضی در Google Drive انتخاب کنید.</div>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                  <button type="button" class="btn btn-sm btn-outline-primary" onclick="document.getElementById('l-attachment-files').click()">＋ افزودن از رایانه</button>
+                  <button type="button" class="btn btn-sm btn-outline-success" onclick="openLetterAttachmentPicker()">▤ انتخاب از مدارک متقاضی</button>
+                </div>
+              </div>
+              <input id="l-attachment-files" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.gif,.tif,.tiff,.bmp,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.rtf,.odt,.ods,.odp" style="display:none" onchange="handleLetterAttachmentUpload(this)">
+              <div id="letter-attachments-list" class="small">هنوز پیوستی برای این نامه انتخاب نشده است.</div>
+              <div class="small text-muted mt-2">فایل‌های انتخاب‌شده به پرونده متقاضی در Drive بارگذاری یا از همان‌جا ارجاع می‌شوند؛ حذف از فهرست نامه، فایل اصلی را حذف نمی‌کند.</div>
+            </section>
+
             <!-- ۳. سوییچ جدول UTM در انتهای نامه (صفحه ۸ راهنمای PDF) -->
             <div class="form-check form-switch mb-3 p-2 rounded bg-light border">
               <input class="form-check-input ms-2" type="checkbox" id="l-include-utm" checked onchange="onToggleLetterIncludeUtm(this.checked)" style="cursor:pointer;" />
@@ -3097,8 +3114,9 @@
 
   <!-- ماژول‌های اصلی اتوماسیون مرکز خدمات ۶۳۶ خفر -->
   <script src="./nezam-core.js?v=20261103-secretariat-r9"></script>
-  <script src="./nezam-drive-documents.js?v=20261103-drive-docs-r6"></script>
-  <script src="./nezam-customizer.js?v=20261103-secretariat-r17"></script>
+  <script src="./nezam-drive-documents.js?v=20261103-drive-docs-r7"></script>
+  <script src="./nezam-letter-attachments.js?v=20261103-letter-attachments-r1"></script>
+  <script src="./nezam-customizer.js?v=20261103-secretariat-r19"></script>
   <script src="./nezam-ai-assistant.js?v=20261101-security-r3"></script>
 
   <!-- ماژول اصلاح‌شده و دوطرفه اتصال سامانه ۶۳۶ خفر به گوگل درایو (ذخیره و بازخوانی ۱۰۰٪ اطلاعات) -->
@@ -3296,7 +3314,7 @@
         // ارسال همزمان در فرمت db (برای اسکریپت sync) و فرمت driveForm (برای اسکریپت پوشه‌ساز)
         const payload = {
           action: 'sync',
-          accessKey: window.NezamDriveDocuments.getAccessKey(),
+          sessionToken: window.NezamDriveDocuments.getAccessKey(),
           updatedAt: ts,
           fullDatabase: syncRecord,
           db: [syncRecord],
@@ -3429,7 +3447,7 @@
 
       const applicantPayload = {
         action: 'saveApplicant',
-        accessKey: window.NezamDriveDocuments.getAccessKey(),
+        sessionToken: window.NezamDriveDocuments.getAccessKey(),
         caseId: activeCase ? String(activeCase.id) : '',
         fullName: fullName || 'متقاضی',
         nationalCode: nationalCode || String(Date.now()),
@@ -3489,7 +3507,7 @@
       }
       const payload = {
         action: 'saveApplicant',
-        accessKey: window.NezamDriveDocuments.getAccessKey(),
+        sessionToken: window.NezamDriveDocuments.getAccessKey(),
         fullName: 'کتابخانه دانش مرکز ۶۳۶ خفر',
         nationalCode: 'NEZAM636_KNOWLEDGE_VAULT',
         phone: 'NEZAM636-KNOWLEDGE',

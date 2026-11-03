@@ -2,21 +2,57 @@
 (function () {
   'use strict';
   var DRIVE_API_URL = 'https://script.google.com/macros/s/AKfycbyd7lrIZfKVUm09OzBQewj8_XRWJfMpd8vCm6DV-tAUXEkA33LgqL10UKe8Yz17TwM2/exec';
-  var ACCESS_KEY_STORAGE = '__nezam636_docs_access_key';
+  var SESSION_STORAGE = '__nezam636_docs_session_v2';
+  var LEGACY_KEY_STORAGE = '__nezam636_docs_access_key';
   var MAX_FILE_BYTES = 10 * 1024 * 1024;
   var lastFailedFiles = [];
   var ALLOWED = new Set(['pdf','jpg','jpeg','png','webp','gif','tif','tiff','bmp','doc','docx','xls','xlsx','ppt','pptx','txt','csv','rtf','odt','ods','odp']);
 
-  function getAccessKey(forcePrompt) {
-    var key = '';
-    try { key = localStorage.getItem(ACCESS_KEY_STORAGE) || ''; } catch (e) {}
-    if (forcePrompt || !key) {
-      key = window.prompt('کلید دسترسی اختصاصی بایگانی Google Drive را وارد کنید:') || '';
-      key = key.trim();
-      if (!key) throw new Error('کلید دسترسی بایگانی وارد نشد.');
-      try { localStorage.setItem(ACCESS_KEY_STORAGE, key); } catch (e) {}
-    }
-    return key;
+  function getAccessKey() {
+    try {
+      localStorage.removeItem(LEGACY_KEY_STORAGE);
+      return sessionStorage.getItem(SESSION_STORAGE) || '';
+    } catch (e) { return ''; }
+  }
+
+  function clearSession() {
+    try { sessionStorage.removeItem(SESSION_STORAGE); } catch (e) {}
+    try { localStorage.removeItem(LEGACY_KEY_STORAGE); } catch (e) {}
+    readyPromise = null;
+  }
+
+  async function postPublic(payload, timeoutMs) {
+    return withTimeout((async function() {
+      var response = await fetch(DRIVE_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload || {}),
+        redirect: 'follow',
+        cache: 'no-store'
+      });
+      var raw = await response.text();
+      var data;
+      try { data = JSON.parse(raw); }
+      catch (e) { throw new Error('پاسخ Apps Script قابل‌خواندن نیست؛ Web App را بررسی کنید.'); }
+      if (!response.ok) throw new Error('خطای ارتباط با Google Drive (' + response.status + ').');
+      if (!data || data.status !== 'success') throw new Error(data && data.message ? data.message : 'درخواست ورود تأیید نشد.');
+      return data;
+    })(), timeoutMs || 15000, 'پاسخ Apps Script برای ورود دریافت نشد.');
+  }
+
+  async function loginByEmailOtp() {
+    var email = window.prompt('ایمیل مجاز ورود به اتوماسیون را وارد کنید:', 'khajehpourhesam@gmail.com');
+    email = String(email || '').trim().toLowerCase();
+    if (!email) throw new Error('ورود لغو شد؛ ایمیل وارد نشد.');
+    var sent = await postPublic({ action: 'requestLoginCode', email: email }, 15000);
+    var code = window.prompt((sent.message || 'کد ورود ارسال شد.') + '\\nکد ۶ رقمی ارسال‌شده به ایمیل را وارد کنید:');
+    code = String(code || '').replace(/\\D/g, '');
+    if (!/^\\d{6}$/.test(code)) throw new Error('کد ورود باید دقیقاً ۶ رقم باشد.');
+    var verified = await postPublic({ action: 'verifyLoginCode', email: email, code: code }, 15000);
+    if (Number(verified.apiVersion) !== 2 || !verified.sessionToken) throw new Error('پاسخ احراز هویت معتبر نیست؛ Code.gs نسخه ۲ را منتشر کنید.');
+    try { sessionStorage.setItem(SESSION_STORAGE, verified.sessionToken); }
+    catch (e) { throw new Error('مرورگر اجازه ذخیره نشست موقت را نمی‌دهد.'); }
+    return verified.sessionToken;
   }
 
   function withTimeout(promise, timeoutMs, message) {
@@ -34,7 +70,7 @@
       var response = await fetch(DRIVE_API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(Object.assign({}, payload, { accessKey: getAccessKey(false) })),
+        body: JSON.stringify(Object.assign({}, payload, { sessionToken: getAccessKey() })),
         redirect: 'follow',
         cache: 'no-store'
       });
@@ -48,74 +84,58 @@
   }
 
   var readyPromise = null;
-  async function ensureReady() {
-    if (readyPromise) return readyPromise;
+  async function ensureReady(forceLogin) {
+    if (readyPromise && !forceLogin) return readyPromise;
     readyPromise = (async function() {
-      async function sendHealthCheck(key) {
-        var data = await withTimeout((async function() {
-          var response = await fetch(DRIVE_API_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({
-              action: 'sync',
-              healthCheck: true,
-              fullDatabase: { storage: {} },
-              accessKey: key
-            }),
-            redirect: 'follow',
-            cache: 'no-store'
-          });
-          var raw = await response.text();
-          var parsed;
-          try { parsed = JSON.parse(raw); }
-          catch (e) { throw new Error('پاسخ سرور قابل‌خواندن نیست؛ نسخه جدید Code.gs را نصب کنید.'); }
-          if (!response.ok) throw new Error('خطای ارتباط با Google Drive (' + response.status + ').');
-          return parsed;
-        })(), 15000, 'پاسخ Google Apps Script برای بررسی اتصال در ۱۵ ثانیه دریافت نشد.');
-        if (!data || Number(data.apiVersion) !== 1) {
-          throw new Error('نسخه جدید Google Apps Script هنوز منتشر نشده است. ابتدا Code.gs جدید را جایگزین و Web App را به‌روزرسانی کنید.');
+      var token = forceLogin ? '' : getAccessKey();
+      if (token) {
+        try {
+          var check = await fetchJsonWithTimeout(
+            { action: 'sync', healthCheck: true, fullDatabase: { storage: {} } },
+            15000,
+            'پاسخ Google Apps Script برای بررسی نشست دریافت نشد.'
+          );
+          if (Number(check.apiVersion) !== 2) throw new Error('نسخه Google Apps Script قدیمی است؛ Code.gs نسخه ۲ را منتشر کنید.');
+          if (check.status === 'success') return true;
+          throw new Error(check.message || 'نشست ورود تأیید نشد.');
+        } catch (error) {
+          if (!/نشست|نامعتبر|منقضی|AUTH_REQUIRED/i.test(String(error && error.message || error))) throw error;
+          clearSession();
         }
-        return data;
       }
-
-      var key = getAccessKey(false);
-      for (var attempt = 0; attempt < 2; attempt++) {
-        var result = await sendHealthCheck(key);
-        if (result.status === 'success') return true;
-        if (attempt === 0 && /کلید دسترسی/.test(String(result.message || ''))) {
-          try { localStorage.removeItem(ACCESS_KEY_STORAGE); } catch (e) {}
-          key = getAccessKey(true);
-          continue;
-        }
-        throw new Error(result.message || 'دسترسی به بایگانی Google Drive تأیید نشد.');
+      token = await loginByEmailOtp();
+      var result = await fetchJsonWithTimeout(
+        { action: 'sync', healthCheck: true, fullDatabase: { storage: {} } },
+        15000,
+        'پاسخ Google Apps Script برای بررسی نشست دریافت نشد.'
+      );
+      if (Number(result.apiVersion) !== 2 || result.status !== 'success') {
+        clearSession();
+        throw new Error(result.message || 'احراز هویت Google Drive ناموفق بود.');
       }
-      throw new Error('احراز هویت بایگانی Google Drive ناموفق بود.');
+      return true;
     })();
-    try {
-      return await readyPromise;
-    } catch (error) {
-      readyPromise = null;
-      throw error;
-    }
+    try { return await readyPromise; }
+    catch (error) { readyPromise = null; throw error; }
   }
 
   async function request(payload, allowKeyRetry) {
     await ensureReady();
-    getAccessKey(false);
+    getAccessKey();
     var data = await fetchJsonWithTimeout(
       payload,
       18000,
-      'پاسخ Google Apps Script در ۱۸ ثانیه دریافت نشد؛ احتمالاً نسخه Web App قدیمی است یا اجرای سرور متوقف مانده است.'
+      'پاسخ Google Apps Script در ۱۸ ثانیه دریافت نشد؛ نسخه Web App یا اتصال اینترنت را بررسی کنید.'
     );
     var documentActions = ['readDatabase','listCaseDocuments','uploadCaseDocument','replaceCaseDocument','deleteCaseDocument'];
-    if (documentActions.indexOf(String(payload.action || '')) !== -1 && Number(data && data.apiVersion) !== 1) {
-      throw new Error('Google Apps Script هنوز به نسخه جدید بایگانی مدارک ارتقا نیافته است. فایل Code.gs جدید را جایگزین و Web App را به‌روزرسانی کنید.');
+    if (documentActions.indexOf(String(payload.action || '')) !== -1 && Number(data && data.apiVersion) !== 2) {
+      throw new Error('Google Apps Script هنوز نسخه ۲ بایگانی مدارک را اجرا نمی‌کند؛ Code.gs را جایگزین و Web App را به‌روزرسانی کنید.');
     }
     if (!data || data.status !== 'success') {
       var message = data && data.message ? String(data.message) : 'عملیات در Google Drive تأیید نشد.';
-      if (allowKeyRetry !== false && /کلید دسترسی/.test(message)) {
-        try { localStorage.removeItem(ACCESS_KEY_STORAGE); } catch (e) {}
-        getAccessKey(true);
+      if (allowKeyRetry !== false && /نشست|نامعتبر|منقضی|AUTH_REQUIRED/i.test(message)) {
+        clearSession();
+        await ensureReady(true);
         return request(payload, false);
       }
       throw new Error(message);
@@ -287,7 +307,7 @@
   window.NezamDriveDocuments={
     list:list,readDatabase:readDatabase,uploadFiles:uploadFiles,retryFailed:retryFailed,remove:remove,migrateLegacyDocs:migrateLegacyDocs,
     getCaseContext:getCaseContext,getAccessKey:function(){return getAccessKey(false);},ensureReady:ensureReady,
-    clearAccessKey:function(){try{localStorage.removeItem(ACCESS_KEY_STORAGE);}catch(e){}},
+    clearAccessKey:clearSession,
     maxFileBytes:MAX_FILE_BYTES
   };
 })();

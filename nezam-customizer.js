@@ -285,6 +285,7 @@ function clearUnsavedLetterStateAfterConfirmation() {
   editingLetterId = null;
   currentPreviewLetterId = null;
   currentPreviewDraft = null;
+  if (window.NezamLetterAttachments) window.NezamLetterAttachments.clear();
   letterDraftDirty = false;
   paperPreviewDirty = false;
   var alertEl = document.getElementById("letter-edit-alert");
@@ -373,6 +374,34 @@ function isSecretariatNumberAvailable(number, ignoreId) {
   });
 }
 
+function ensureApplicantIdentityInLetterBody_(bodyHtml, applicant) {
+  var source = applicant || {};
+  var name = String(source.name || source.appName || "").trim();
+  var parcel = String(source.landParcel || source.parcel || "").trim();
+  var missing = [];
+  if (!name) missing.push("نام متقاضی");
+  if (!parcel) missing.push("پلاک ثبتی زمین");
+  if (missing.length) return { ok: false, missing: missing, html: String(bodyHtml || "") };
+  var parsed = new DOMParser().parseFromString(String(bodyHtml || ""), "text/html");
+  var normalize = function(value) {
+    return String(value || "").replace(/[يى]/g, "ی").replace(/ك/g, "ک").replace(/[\s\u200c\u200f\u0640]/g, "").toLowerCase();
+  };
+  var rawText = parsed.body.textContent || "";
+  var plain = normalize(rawText);
+  var hasNamePlaceholder = /\{\{?\s*(?:نام|نام\s*متقاضی|نام\s*و\s*نام\s*خانوادگی)\s*\}\}?/.test(rawText);
+  var hasParcelPlaceholder = /\{\{?\s*(?:پلاک\s*ثبتی|پلاک)\s*\}\}?/.test(rawText);
+  var additions = [];
+  if (plain.indexOf(normalize(name)) === -1 && !hasNamePlaceholder) additions.push("نام متقاضی: " + name);
+  if (plain.indexOf(normalize(parcel)) === -1 && !hasParcelPlaceholder) additions.push("پلاک ثبتی زمین: " + parcel);
+  if (additions.length) {
+    var p = parsed.createElement("p");
+    p.setAttribute("data-nezam-required-identity", "true");
+    p.textContent = additions.join(" | ");
+    parsed.body.appendChild(p);
+  }
+  return { ok: true, html: parsed.body.innerHTML, added: additions.length > 0 };
+}
+
 function getLetterDraftFromEditor() {
   var officeMode = window.__nezamOfficeLetterDraftMode === true;
   var c = officeMode ? null : getActiveCase();
@@ -403,6 +432,22 @@ function getLetterDraftFromEditor() {
     if (editor) editor.focus();
     return null;
   }
+  if (!officeMode) {
+    var identity = ensureApplicantIdentityInLetterBody_(body, c);
+    if (!identity.ok) {
+      showToastMsg("برای صدور نامه، این اطلاعات پرونده الزامی است: " + identity.missing.join(" و ") + "؛ ابتدا پرونده متقاضی را تکمیل کنید.", true);
+      var parcelInput = document.getElementById("c-land-parcel");
+      if (parcelInput && identity.missing.indexOf("پلاک ثبتی زمین") !== -1) parcelInput.focus();
+      else { var nameInput = document.getElementById("c-name"); if (nameInput) nameInput.focus(); }
+      return null;
+    }
+    body = identity.html;
+    if (identity.added) {
+      if (editor) editor.innerHTML = body;
+      if (bodyField) bodyField.value = editor ? (editor.innerText || editor.textContent || "") : body;
+      letterDraftDirty = true;
+    }
+  }
   var rec = String(recipientEl.value || "").trim();
   if (!rec) {
     showToastMsg("عنوان گیرنده نامه را وارد کنید.", true);
@@ -428,14 +473,16 @@ function getLetterDraftFromEditor() {
   var snapshotMapId = hasFreshUtmSnapshot && map && map.id
     ? map.id
     : (existingLetter && existingLetter.croquisMapId ? existingLetter.croquisMapId : (map && map.id ? map.id : activeCroquisMapId));
+  var letterAttachments = window.NezamLetterAttachments ? window.NezamLetterAttachments.getDraft() : [];
   return {
     id: editingLetterId || null,
     caseId: officeMode ? "" : c.id,
+    attachments: letterAttachments,
     officeLetter: officeMode,
     number: number,
     date: date,
     type: officeMode ? "OUT" : (directionEl && directionEl.value === "IN" ? "IN" : "OUT"),
-    attach: getLetterAttachmentLabel(String(attachEl && attachEl.value || "ندارد"), hasUtm),
+    attach: getLetterAttachmentLabel(String(attachEl && attachEl.value || "ندارد"), hasUtm, letterAttachments.length),
     recipient: rec,
     appName: officeMode ? "" : (c.name || ""),
     appNid: officeMode ? "" : (c.nid || ""),
@@ -664,8 +711,19 @@ function renderLetterPreviewObject(letter, forcedPaperSize, mode) {
       ? letter.utmAttachmentHtml
       : (includeUtm && linkedCase ? buildAllSelectedFeaturesUtmTableHTML(linkedCase, letter.utm || linkedCase.utm || "", isNat) : ""));
   var hasUtm = includeUtm && !!(coordinateHtml && coordinateHtml.trim());
-  var attachmentLabel = getLetterAttachmentLabel(letter.attach, hasUtm);
+  var fileAttachments = Array.isArray(letter.attachments) ? letter.attachments : [];
+  var attachmentLabel = getLetterAttachmentLabel(letter.attach, hasUtm, fileAttachments.length);
   var bodyResolution = resolveOfficeLetterVariables(sanitizeOfficeRichHtml(letter.body), letter, linkedCase);
+  if (letter.officeLetter !== true) {
+    var identitySource = Object.assign({}, letter);
+    identitySource.name = (linkedCase && linkedCase.name) || letter.appName || letter.name || "";
+    identitySource.landParcel = (linkedCase && linkedCase.landParcel) || letter.landParcel || letter.parcel || "";
+    var identityCheck = ensureApplicantIdentityInLetterBody_(bodyResolution.html, identitySource);
+    if (identityCheck.ok) bodyResolution.html = identityCheck.html;
+    else identityCheck.missing.forEach(function(item) {
+      if (bodyResolution.unresolved.indexOf(item) === -1) bodyResolution.unresolved.push(item);
+    });
+  }
   window.__nezam636UnresolvedLetterVars = bodyResolution.unresolved.slice();
 
   stage.innerHTML = buildSingleA4HTML(letter.recipient, bodyResolution.html, letter.number, letter.date, attachmentLabel, letter.utm, isNat, true, pSize, false, "");
@@ -686,6 +744,27 @@ function renderLetterPreviewObject(letter, forcedPaperSize, mode) {
       var title = "پیوست مختصات - صفحه " + toFa(si + 1) + " از " + toFa(sheets.length);
       stage.innerHTML += buildSingleA4HTML("پیوست: جدول مختصات UTM", intro, letter.number, letter.date,
         "جدول مختصات UTM", letter.utm, isNat, true, pSize, true, title, sheets[si]);
+    }
+  }
+  if (fileAttachments.length) {
+    var perPage = 14;
+    var totalAttachmentPages = Math.ceil(fileAttachments.length / perPage);
+    var applicantTitle = safeHtmlText(letter.appName || (linkedCase && linkedCase.name) || "متقاضی");
+    for (var ai = 0; ai < totalAttachmentPages; ai++) {
+      var pageItems = fileAttachments.slice(ai * perPage, (ai + 1) * perPage);
+      var rows = pageItems.map(function(item, rowIndex) {
+        var url = /^https:\/\/(drive\.google\.com|docs\.google\.com)\//i.test(String(item.webViewLink || "")) ? item.webViewLink : "";
+        var name = safeHtmlText(item.name || item.fileName || "فایل پیوست");
+        var link = url ? '<a href="' + safeHtmlText(url) + '" target="_blank" rel="noopener noreferrer">مشاهده در Google Drive</a>' : "لینک در دسترس نیست";
+        var size = Number(item.size || 0);
+        var sizeText = size ? (size < 1024 * 1024 ? Math.ceil(size / 1024) + " KB" : (size / (1024 * 1024)).toFixed(2) + " MB") : "—";
+        return '<tr><td>' + safeHtmlText(toFa(ai * perPage + rowIndex + 1)) + '</td><td>' + name + '</td><td>' + safeHtmlText(sizeText) + '</td><td>' + link + '</td></tr>';
+      }).join("");
+      var attachmentBody = '<p>مدارک زیر به نامه شماره ' + safeHtmlText(toFa(letter.number || "")) + ' مربوط به «' + applicantTitle + '» پیوست شده‌اند. فایل‌های اصلی در Google Drive باقی می‌مانند و این صفحه فقط فهرست و پیوند دسترسی آن‌هاست.</p>' +
+        '<table style="width:96%;border-collapse:collapse;"><thead><tr><th>ردیف</th><th>نام فایل</th><th>حجم</th><th>پیوند فایل</th></tr></thead><tbody>' + rows + '</tbody></table>';
+      var attachmentTitle = "پیوست مدارک - صفحه " + toFa(ai + 1) + " از " + toFa(totalAttachmentPages);
+      stage.innerHTML += buildSingleA4HTML("فهرست پیوست‌های دیجیتال نامه", attachmentBody, letter.number, letter.date,
+        toFa(fileAttachments.length) + " فایل", letter.utm, isNat, true, pSize, true, attachmentTitle, "");
     }
   }
   var letterPages = stage.querySelectorAll(".a4-page");
@@ -1297,6 +1376,7 @@ function syncLetterEditorWithActiveCase(force) {
   if (includeEl) includeEl.checked = true;
 
   letterDraftCaseId = c.id;
+  if (window.NezamLetterAttachments) window.NezamLetterAttachments.clear();
   letterDraftDirty = false;
   currentPreviewDraft = null;
   currentPreviewLetterId = null;
@@ -1332,16 +1412,20 @@ function onToggleLetterIncludeUtm(checked) {
 }
 window.onToggleLetterIncludeUtm = onToggleLetterIncludeUtm;
 
-function getLetterAttachmentLabel(baseValue, hasUtmAttachment) {
+function getLetterAttachmentLabel(baseValue, hasUtmAttachment, fileCount) {
   var base = String(baseValue || "").trim();
-  var label = "جدول مختصات UTM";
-  if (!hasUtmAttachment) {
-    base = base.replace(/،?\s*جدول مختصات UTM/g, "").replace(/^[،,\s]+|[،,\s]+$/g, "").trim();
-    return base || "ندارد";
-  }
-  if (!base || /^ندارد$/i.test(base)) return label;
-  if (base.indexOf(label) !== -1) return base;
-  return base + "، " + label;
+  base = base.replace(/،?\s*جدول مختصات UTM/g, "").replace(/،?\s*\d+\s*(?:فایل|سند)\s*پیوست/g, "");
+  base = base.replace(/^[،,\s]+|[،,\s]+$/g, "").trim();
+  var parts = [];
+  if (base && !/^ندارد$/i.test(base)) parts.push(base);
+  if (hasUtmAttachment) parts.push("جدول مختصات UTM");
+  if (Number(fileCount) > 0) parts.push(toFa(Number(fileCount)) + " فایل پیوست");
+  return parts.join("، ") || "ندارد";
+}
+
+function getLetterAttachmentBaseLabel(value) {
+  return String(value || "").replace(/،?\s*جدول مختصات UTM/g, "")
+    .replace(/،?\s*\d+\s*(?:فایل|سند)\s*پیوست/g, "").replace(/^[،,\s]+|[،,\s]+$/g, "").trim() || "ندارد";
 }
 
 function saveLetterToSecretariat(goToPrint, forcedPaperSize) {
@@ -1705,6 +1789,7 @@ function cancelLetterEditing() {
   editingLetterId = null;
   currentPreviewLetterId = null;
   currentPreviewDraft = null;
+  if (window.NezamLetterAttachments) window.NezamLetterAttachments.clear();
   var alertEl = document.getElementById("letter-edit-alert");
   if (alertEl) alertEl.style.display = "none";
   letterDraftDirty = false;
@@ -1775,11 +1860,12 @@ function editLetterFromSecretariat(letterId) {
   letterDraftCaseId = isOfficeLetter ? "__OFFICE__" : linkedCase.id;
   letterDraftDirty = false;
   paperPreviewDirty = false;
+  if (window.NezamLetterAttachments) window.NezamLetterAttachments.setDraft(letter.attachments || []);
   var fields = {
     "l-direction": isOfficeLetter ? "OUT" : (letter.type || "OUT"),
     "l-number": letter.number || "",
     "l-date": letter.date || "",
-    "l-attach": letter.attach || "ندارد",
+    "l-attach": getLetterAttachmentBaseLabel(letter.attach || "ندارد"),
     "l-recipient": letter.recipient || "",
     "l-body": letter.body || ""
   };
