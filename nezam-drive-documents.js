@@ -31,7 +31,7 @@
     try { data = JSON.parse(raw); }
     catch (e) { throw new Error('پاسخ Google Apps Script قابل‌خواندن نیست؛ انتشار نسخه جدید Code.gs را بررسی کنید.'); }
     if (!response.ok) throw new Error('خطای ارتباط با Google Drive (' + response.status + ').');
-    var documentActions = ['listCaseDocuments','uploadCaseDocument','replaceCaseDocument','deleteCaseDocument'];
+    var documentActions = ['readDatabase','listCaseDocuments','uploadCaseDocument','replaceCaseDocument','deleteCaseDocument'];
     if (documentActions.indexOf(String(payload.action || '')) !== -1 && Number(data && data.apiVersion) !== 1) {
       throw new Error('Google Apps Script هنوز به نسخه جدید بایگانی مدارک ارتقا نیافته است. فایل Code.gs جدید را جایگزین و Web App را به‌روزرسانی کنید.');
     }
