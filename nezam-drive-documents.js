@@ -44,7 +44,7 @@
     return String(value || '')
       .replace(/[۰-۹]/g, function (d) { return String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)); })
       .replace(/[٠-٩]/g, function (d) { return String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)); })
-      .replace(/\\D/g, '');
+      .replace(/\D/g, '');
   }
 
   async function loginByEmailOtp() {
@@ -138,7 +138,7 @@
 
       async function sendCode(isResend) {
         var enteredEmail = String(emailInput.value || '').trim().toLowerCase();
-        if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(enteredEmail)) {
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(enteredEmail)) {
           setStatus('نشانی ایمیل معتبر وارد کنید.', true);
           emailInput.focus();
           return;
@@ -165,7 +165,7 @@
 
       async function verifyCode() {
         var code = normalizeOtpDigits(codeInput.value);
-        if (!/^\\d{6}$/.test(code)) {
+        if (!/^\d{6}$/.test(code)) {
           setStatus('کد باید دقیقاً ۶ رقم باشد.', true);
           codeInput.focus();
           return;
