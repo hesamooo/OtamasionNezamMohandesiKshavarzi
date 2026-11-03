@@ -698,14 +698,23 @@ window.applyNezamDeletionManifestToState = applyNezamDeletionManifestToState;
 /* بارگذاری و مهاجرت یک‌باره داده‌های قدیمی؛ پس از ایجاد کلید اصلی، کلید v6 دیگر منبع جایگزین نیست. */
 function readCanonicalOrMigrateLegacy(primaryKey, legacyKey) {
   var raw = localStorage.getItem(primaryKey);
-  if (raw === null) {
-    raw = localStorage.getItem(legacyKey);
-    if (raw !== null) {
-      localStorage.setItem(primaryKey, raw);
-    }
+  if (raw !== null) {
+    try { localStorage.removeItem(legacyKey); } catch (e) {}
+    return raw;
   }
-  try { localStorage.removeItem(legacyKey); } catch (e) {}
-  return raw;
+  var legacyRaw = localStorage.getItem(legacyKey);
+  if (legacyRaw === null) return null;
+  // کلید قدیمی فقط پس از اطمینان از ثبت نسخه اصلی حذف می‌شود.
+  try {
+    localStorage.setItem(primaryKey, legacyRaw);
+    if (localStorage.getItem(primaryKey) === legacyRaw) {
+      localStorage.removeItem(legacyKey);
+      return legacyRaw;
+    }
+  } catch (migrationError) {
+    console.error("Legacy storage migration failed:", primaryKey, migrationError);
+  }
+  return null;
 }
 
 /* بارگذاری و مهاجرت هوشمند داده‌های قبلی از LocalStorage */
@@ -2209,7 +2218,8 @@ window.downloadStandaloneWindowsHTML = async function() {
       brandCfg: typeof brandCfg !== "undefined" ? brandCfg : null,
       tplCfg: typeof tplCfg !== "undefined" ? tplCfg : null,
       paperSize: typeof currentPaperSize !== "undefined" ? currentPaperSize : "A4",
-      activeCaseId: typeof activeCaseId !== "undefined" ? activeCaseId : ""
+      activeCaseId: typeof activeCaseId !== "undefined" ? activeCaseId : "",
+      deletionManifest: readNezamDeletionManifest()
     };
     var safeSnapshotJson = JSON.stringify(snapshotPayload)
       .replace(/</g, "\\u003c")
@@ -2221,6 +2231,7 @@ window.downloadStandaloneWindowsHTML = async function() {
     snapScript.textContent =
       "(function(){try{var snap=" + safeSnapshotJson + ";" +
       "if(!localStorage.getItem('nezam636_unified_cases')&&snap.casesDB)localStorage.setItem('nezam636_unified_cases',JSON.stringify(snap.casesDB));" +
+      "if(!localStorage.getItem('nezam636_deletion_manifest_v1')&&snap.deletionManifest)localStorage.setItem('nezam636_deletion_manifest_v1',JSON.stringify(snap.deletionManifest));" +
       "if(!localStorage.getItem('nezam636_letters')&&snap.lettersDB)localStorage.setItem('nezam636_letters',JSON.stringify(snap.lettersDB));" +
       "if(!localStorage.getItem('nezam636_tasks')&&snap.tasksDB)localStorage.setItem('nezam636_tasks',JSON.stringify(snap.tasksDB));" +
       "if(!localStorage.getItem('nezam636_act_specs_v3')&&snap.actSpecs)localStorage.setItem('nezam636_act_specs_v3',JSON.stringify(snap.actSpecs));" +
@@ -2329,6 +2340,7 @@ window.flushInMemoryStateToLocalStorage = function() {
     window.__gdriveInternalFlush = true;
     localStorage.setItem("nezam636_unified_cases", JSON.stringify(casesDB));
     localStorage.setItem("nezam636_letters", JSON.stringify(lettersDB));
+    localStorage.setItem(NEZAM_DELETION_MANIFEST_KEY, JSON.stringify(readNezamDeletionManifest()));
     localStorage.setItem("nezam636_tasks", JSON.stringify(tasksDB));
     localStorage.setItem("nezam636_doc_checklists_v2", JSON.stringify(DOC_CHECKLISTS));
     localStorage.setItem("nezam636_act_specs_v3", JSON.stringify(ACT_SPECS));
