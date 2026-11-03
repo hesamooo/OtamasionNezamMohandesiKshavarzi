@@ -2510,8 +2510,7 @@ function renderSecretariatTable() {
       "</td>" +
       "<td><div class='d-flex gap-1 justify-content-center flex-wrap'>" +
         "<button type='button' class='btn btn-sm btn-warning py-0 px-2 fw-bold' data-letter-action='edit' data-letter-id='" + safeLetterId + "' data-tip='ویرایش متن، شماره یا مشخصات این نامه'>✏️</button>" +
-        "<button type='button' class='btn btn-sm btn-success py-0 px-2 fw-bold' data-letter-action='a4' data-letter-id='" + safeLetterId + "' data-tip='مشاهده و چاپ روی کاغذ A4'>🖨️ A4</button>" +
-        "<button type='button' class='btn btn-sm btn-primary py-0 px-2 fw-bold' data-letter-action='a5' data-letter-id='" + safeLetterId + "' data-tip='مشاهده و چاپ روی کاغذ A5'>🖨️ A5</button>" +
+        "<button type='button' class='btn btn-sm btn-success py-0 px-2 fw-bold' data-letter-action='preview' data-letter-id='" + safeLetterId + "' data-tip='پیش‌نمایش و چاپ؛ اندازه کاغذ در صفحه چاپ انتخاب می‌شود'>🖨️ پیش‌نمایش / چاپ</button>" +
         "<button type='button' class='btn btn-sm btn-outline-danger py-0 px-2' data-letter-action='delete' data-letter-id='" + safeLetterId + "'>🗑️</button>" +
       "</div></td></tr>";
   }
@@ -2534,13 +2533,12 @@ function renderSecretariatTable() {
         if (typeof window.editLetterFromSecretariat === "function") window.editLetterFromSecretariat(id);
         else if (typeof editLetterFromSecretariat === "function") editLetterFromSecretariat(id);
         else showToastMsg("ماژول ویرایش نامه بارگذاری نشده است.", true);
-      } else if (action === "a4" || action === "a5") {
-        var size = action === "a5" ? "A5" : "A4";
+      } else if (action === "preview") {
         if (typeof window.previewSavedLetter === "function") {
-          // خود تابع پیش‌نمایش در صورت شکست یا لغو، پیام مناسب را نمایش می‌دهد.
-          window.previewSavedLetter(id, size);
+          // نامه با اندازه ذخیره‌شده باز می‌شود؛ A4/A5 فقط در یک محل انتخاب می‌شود.
+          window.previewSavedLetter(id);
         } else if (typeof window.printArchivedLetter === "function") {
-          window.printArchivedLetter(id, size);
+          window.printArchivedLetter(id);
         } else showToastMsg("موتور چاپ نامه بارگذاری نشده است.", true);
       } else if (action === "delete") {
         if (window.__nezamDriveReady === false) {
@@ -2564,7 +2562,8 @@ function renderSecretariatTable() {
       window.__nezam636LastSecretariatError = error;
       console.error("Secretariat action failed:", error && error.stack ? error.stack : error);
       var reason = error && error.message ? error.message : String(error || "خطای نامشخص");
-      showToastMsg("عملیات «" + (action === "edit" ? "ویرایش" : (action === "a4" ? "چاپ A4" : "چاپ A5")) + "» ناموفق بود: " + reason, true);
+      var actionLabel = action === "edit" ? "ویرایش" : (action === "preview" ? "پیش‌نمایش و چاپ" : "حذف");
+      showToastMsg("عملیات «" + actionLabel + "» ناموفق بود: " + reason, true);
     }
   };
 }
