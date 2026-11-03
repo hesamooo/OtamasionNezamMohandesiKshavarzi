@@ -712,6 +712,35 @@ function renderLetterPreviewObject(letter, forcedPaperSize, mode) {
       : (includeUtm && linkedCase ? buildAllSelectedFeaturesUtmTableHTML(linkedCase, letter.utm || linkedCase.utm || "", isNat) : ""));
   var hasUtm = includeUtm && !!(coordinateHtml && coordinateHtml.trim());
   var fileAttachments = Array.isArray(letter.attachments) ? letter.attachments : [];
+  var preparedAttachmentPages = fileAttachments.length && window.NezamLetterAttachments
+    ? window.NezamLetterAttachments.getPreparedPages(fileAttachments)
+    : [];
+  if (fileAttachments.length && window.NezamLetterAttachments && !preparedAttachmentPages) {
+    var attachmentRequestKey = fileAttachments.map(function(item) {
+      return String(item.id || item.fileId || "") + ":" + String(item.pageSelection || "all");
+    }).join("|");
+    stage.innerHTML = '<div class="alert alert-info m-3">در حال دریافت محتوای واقعی پیوست‌ها از Google Drive و آماده‌سازی صفحات چاپ هستیم...</div>';
+    var pending = window.__nezam636AttachmentPrepareJob;
+    if (!pending || pending.key !== attachmentRequestKey) {
+      var prepareJob = { key: attachmentRequestKey };
+      window.__nezam636AttachmentPrepareJob = prepareJob;
+      prepareJob.promise = window.NezamLetterAttachments.prepareForPreview(fileAttachments, linkedCase)
+        .then(function() {
+          if (window.__nezam636AttachmentPrepareJob !== prepareJob) return;
+          window.__nezam636AttachmentPrepareJob = null;
+          renderLetterPreviewObject(letter, forcedPaperSize, mode);
+        })
+        .catch(function(error) {
+          if (window.__nezam636AttachmentPrepareJob === prepareJob) window.__nezam636AttachmentPrepareJob = null;
+          console.error("Letter attachment preparation failed:", error);
+          stage.innerHTML = '<div class="alert alert-danger m-3"><strong>آماده‌سازی پیوست برای چاپ ناموفق بود.</strong><div class="mt-2">' +
+            safeHtmlText(error && error.message ? error.message : String(error)) +
+            '</div><div class="small mt-2">فایل اصلی در بایگانی حذف یا تغییر داده نشده است. پس از رفع خطا، پیش‌نمایش را دوباره باز کنید.</div></div>';
+          if (typeof window.showToastMsg === "function") window.showToastMsg("آماده‌سازی پیوست ناموفق بود؛ جزئیات در پیش‌نمایش نمایش داده شد.", true);
+        });
+    }
+    return true;
+  }
   var attachmentLabel = getLetterAttachmentLabel(letter.attach, hasUtm, fileAttachments.length);
   var bodyResolution = resolveOfficeLetterVariables(sanitizeOfficeRichHtml(letter.body), letter, linkedCase);
   if (letter.officeLetter !== true) {
@@ -747,24 +776,20 @@ function renderLetterPreviewObject(letter, forcedPaperSize, mode) {
     }
   }
   if (fileAttachments.length) {
-    var perPage = 14;
-    var totalAttachmentPages = Math.ceil(fileAttachments.length / perPage);
-    var applicantTitle = safeHtmlText(letter.appName || (linkedCase && linkedCase.name) || "متقاضی");
-    for (var ai = 0; ai < totalAttachmentPages; ai++) {
-      var pageItems = fileAttachments.slice(ai * perPage, (ai + 1) * perPage);
-      var rows = pageItems.map(function(item, rowIndex) {
-        var url = /^https:\/\/(drive\.google\.com|docs\.google\.com)\//i.test(String(item.webViewLink || "")) ? item.webViewLink : "";
-        var name = safeHtmlText(item.name || item.fileName || "فایل پیوست");
-        var link = url ? '<a href="' + safeHtmlText(url) + '" target="_blank" rel="noopener noreferrer">مشاهده در Google Drive</a>' : "لینک در دسترس نیست";
-        var size = Number(item.size || 0);
-        var sizeText = size ? (size < 1024 * 1024 ? Math.ceil(size / 1024) + " KB" : (size / (1024 * 1024)).toFixed(2) + " MB") : "—";
-        return '<tr><td>' + safeHtmlText(toFa(ai * perPage + rowIndex + 1)) + '</td><td>' + name + '</td><td>' + safeHtmlText(sizeText) + '</td><td>' + link + '</td></tr>';
-      }).join("");
-      var attachmentBody = '<p>مدارک زیر به نامه شماره ' + safeHtmlText(toFa(letter.number || "")) + ' مربوط به «' + applicantTitle + '» پیوست شده‌اند. فایل‌های اصلی در Google Drive باقی می‌مانند و این صفحه فقط فهرست و پیوند دسترسی آن‌هاست.</p>' +
-        '<table style="width:96%;border-collapse:collapse;"><thead><tr><th>ردیف</th><th>نام فایل</th><th>حجم</th><th>پیوند فایل</th></tr></thead><tbody>' + rows + '</tbody></table>';
-      var attachmentTitle = "پیوست مدارک - صفحه " + toFa(ai + 1) + " از " + toFa(totalAttachmentPages);
-      stage.innerHTML += buildSingleA4HTML("فهرست پیوست‌های دیجیتال نامه", attachmentBody, letter.number, letter.date,
-        toFa(fileAttachments.length) + " فایل", letter.utm, isNat, true, pSize, true, attachmentTitle, "");
+    if (!preparedAttachmentPages) throw new Error("محتوای پیوست‌ها برای چاپ هنوز آماده نشده است.");
+    for (var attachmentPageIndex = 0; attachmentPageIndex < preparedAttachmentPages.length; attachmentPageIndex++) {
+      var preparedPage = preparedAttachmentPages[attachmentPageIndex];
+      var pageName = safeHtmlText(preparedPage.name || "فایل پیوست");
+      var pageLabel = "پیوست نامه " + toFa(letter.number || "") + " | " + pageName +
+        " | صفحه " + toFa(preparedPage.pageNumber || (attachmentPageIndex + 1)) +
+        " از " + toFa(preparedPage.pageCount || 1);
+      var pageClass = "a4-page attachment-print-page" + (pSize === "A5" ? " paper-a5" : "");
+      var pageImage = safeHtmlText(preparedPage.dataUrl || "");
+      stage.innerHTML += '<div class="' + pageClass + '" data-paper-size="' + pSize + '" style="padding:4mm 5mm;display:flex;flex-direction:column;justify-content:flex-start;align-items:stretch;gap:2mm;">' +
+        '<div style="flex:0 0 auto;text-align:center;font-size:7.5pt;color:#475569;border-bottom:1px solid #cbd5e1;padding-bottom:1.5mm;">' + pageLabel + '</div>' +
+        '<div style="flex:1 1 auto;min-height:0;width:100%;display:flex;align-items:center;justify-content:center;overflow:hidden;">' +
+        '<img src="' + pageImage + '" alt="' + pageName + '" style="display:block;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;">' +
+        '</div></div>';
     }
   }
   var letterPages = stage.querySelectorAll(".a4-page");
