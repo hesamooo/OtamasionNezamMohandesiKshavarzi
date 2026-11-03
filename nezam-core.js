@@ -1956,6 +1956,25 @@ function renderActiveCaseDocsChecklist() {
   }
 
   bindToolbar();
+  var legacyBoxHandler = document.getElementById("case-docs-legacy-files");
+  if (legacyBoxHandler && legacyBoxHandler.dataset.bound !== "1") {
+    legacyBoxHandler.dataset.bound = "1";
+    legacyBoxHandler.addEventListener("click", function(event) {
+      var btn = event.target && event.target.closest ? event.target.closest("button[data-legacy-delete]") : null;
+      if (!btn) return;
+      var fileId = btn.getAttribute("data-legacy-delete");
+      var current = getActiveCase();
+      if (!fileId || !current || !window.NezamDriveDocuments) return;
+      if (!confirm("این فایل قدیمی از پوشه Google Drive متقاضی حذف شود؟")) return;
+      btn.disabled = true;
+      window.NezamDriveDocuments.remove(fileId, {
+        caseId: String(current.id), fullName: String(current.name || ""),
+        nationalCode: String(current.nid || current.code || "")
+      }).catch(function(error) {
+        showToastMsg(error.message || "حذف فایل قدیمی ناموفق بود.", true);
+      }).finally(function() { renderActiveCaseDocsChecklist(); });
+    });
+  }
   var bulkSelect = document.getElementById("case-doc-bulk-code");
   if (bulkSelect) {
     var selectedBulk = bulkSelect.value;
@@ -2088,9 +2107,12 @@ function renderActiveCaseDocsChecklist() {
           ? '<div class="small fw-bold mb-1">فایل‌های قدیمی موجود در پوشه Drive (بدون دسته‌بندی):</div>' +
             legacyFiles.map(function(file) {
               var url = /^https:\/\/drive\.google\.com\//.test(String(file.webViewLink || "")) ? String(file.webViewLink) : "";
-              return '<div class="small mb-1">' + (url ? '<a href="' + escapeHtmlCore(url) + '" target="_blank" rel="noopener noreferrer">' : '') +
+              return '<div class="d-flex flex-wrap align-items-center gap-2 small mb-1">' +
+                (url ? '<a href="' + escapeHtmlCore(url) + '" target="_blank" rel="noopener noreferrer">' : '') +
                 '📎 ' + escapeHtmlCore(file.fileName || file.name || "فایل قدیمی") +
-                (url ? '</a>' : '') + ' — برای دسته‌بندی، فایل را از مسیر «افزودن فایل» به مدرک مربوط متصل کنید.</div>';
+                (url ? '</a>' : '') +
+                '<button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" data-legacy-delete="' + escapeHtmlCore(file.fileId || file.id || "") + '">حذف</button>' +
+                '<span class="text-muted">برای تکمیل چک‌لیست، فایل را از مسیر افزودن فایل به مدرک مربوط متصل کنید.</span></div>';
             }).join("")
           : "";
       }
