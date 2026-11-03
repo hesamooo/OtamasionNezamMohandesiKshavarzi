@@ -494,3 +494,15 @@ test('applicant section displays a complete Google Drive file inventory and meta
   assert.match(core, /data-library-action="replace"/);
   assert.match(core, /دریافت فهرست فایل‌ها ناموفق بود/);
 });
+
+
+test('local IndexedDB failures cannot indefinitely block Google Drive document listing', () => {
+  const core = read('nezam-core.js');
+  const vault = read('nezam-drive-documents.js');
+  assert.match(core, /setTimeout\(function\(\) \{ finish\(null\); \}, 4500\)/);
+  assert.match(core, /Local document lookup timed out; continuing with Google Drive inventory/);
+  assert.match(core, /setTimeout\(function\(\) \{\s*if \(completed\) return;\s*completed = true;/);
+  assert.match(vault, /function withTimeout\(promise, timeoutMs, message\)/);
+  assert.match(vault, /15000, 'پاسخ Google Apps Script برای بررسی اتصال در ۱۵ ثانیه دریافت نشد/);
+  assert.match(vault, /18000,\s*'پاسخ Google Apps Script در ۱۸ ثانیه دریافت نشد/);
+});
