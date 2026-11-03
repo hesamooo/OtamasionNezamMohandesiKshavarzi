@@ -441,7 +441,7 @@ function getLetterDraftFromEditor() {
     appNid: officeMode ? "" : (c.nid || ""),
     caseCode: officeMode ? "" : (c.code || ""),
     customFields: officeMode ? [] : (Array.isArray(c.customFields) ? c.customFields.map(function(field) {
-      return { label: String(field && field.label || ""), value: String(field && field.value == null ? "" : field.value) };
+      return { label: String(field && field.label || ""), value: String(field && field.value !== null && field.value !== undefined ? field.value : "") };
     }) : []),
     project: officeMode ? "" : (c.project || ""),
     cap: officeMode ? "" : (c.cap || ""),
