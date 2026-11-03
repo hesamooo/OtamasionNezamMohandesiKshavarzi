@@ -431,4 +431,17 @@ test('print pipeline isolates the printable document and waits for map image til
   assert.ok(customizer.includes('@media print{.no-print,[data-no-print=\\'true\\']{display:none!important;}'));
   assert.ok(customizer.includes('if (fitResult.overflowCount)'));
   assert.ok(!customizer.includes('crossorigin="anonymous"'));
+  assert.ok(!customizer.includes('currentPreviewMode !== "CROQUIS" && (fitResult.pendingCount || fitResult.overflowCount)'));
+
+  const cssStart = customizer.indexOf('function buildPaperExportCss(');
+  const cssEnd = customizer.indexOf('\nfunction safePaperFileBase', cssStart);
+  assert.ok(cssStart >= 0 && cssEnd > cssStart, 'shared paper CSS builder must exist');
+  const buildCss = new Function(customizer.slice(cssStart, cssEnd) + '\nreturn buildPaperExportCss;')();
+  const a4Css = buildCss('A4', false);
+  const a5Css = buildCss('A5', false);
+  assert.ok(a4Css.includes('@page{size:210mm 297mm;margin:0;}'));
+  assert.ok(a5Css.includes('@page{size:148mm 210mm;margin:0;}'));
+  assert.ok(a4Css.includes(".a4-page,.a4-page.paper-a5{width:210mm!important"));
+  assert.ok(a5Css.includes(".a4-page,.a4-page.paper-a5{width:148mm!important"));
+  assert.ok(a4Css.includes(".no-print,[data-no-print='true']{display:none!important;}"));
 });
