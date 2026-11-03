@@ -285,6 +285,7 @@ function clearUnsavedLetterStateAfterConfirmation() {
   editingLetterId = null;
   currentPreviewLetterId = null;
   currentPreviewDraft = null;
+  if (window.NezamLetterAttachments) window.NezamLetterAttachments.clear();
   letterDraftDirty = false;
   paperPreviewDirty = false;
   var alertEl = document.getElementById("letter-edit-alert");
@@ -707,8 +708,19 @@ function renderLetterPreviewObject(letter, forcedPaperSize, mode) {
       ? letter.utmAttachmentHtml
       : (includeUtm && linkedCase ? buildAllSelectedFeaturesUtmTableHTML(linkedCase, letter.utm || linkedCase.utm || "", isNat) : ""));
   var hasUtm = includeUtm && !!(coordinateHtml && coordinateHtml.trim());
-  var attachmentLabel = getLetterAttachmentLabel(letter.attach, hasUtm);
+  var fileAttachments = Array.isArray(letter.attachments) ? letter.attachments : [];
+  var attachmentLabel = getLetterAttachmentLabel(letter.attach, hasUtm, fileAttachments.length);
   var bodyResolution = resolveOfficeLetterVariables(sanitizeOfficeRichHtml(letter.body), letter, linkedCase);
+  if (letter.officeLetter !== true) {
+    var identitySource = Object.assign({}, letter);
+    identitySource.name = (linkedCase && linkedCase.name) || letter.appName || letter.name || "";
+    identitySource.landParcel = (linkedCase && linkedCase.landParcel) || letter.landParcel || letter.parcel || "";
+    var identityCheck = ensureApplicantIdentityInLetterBody_(bodyResolution.html, identitySource);
+    if (identityCheck.ok) bodyResolution.html = identityCheck.html;
+    else identityCheck.missing.forEach(function(item) {
+      if (bodyResolution.unresolved.indexOf(item) === -1) bodyResolution.unresolved.push(item);
+    });
+  }
   window.__nezam636UnresolvedLetterVars = bodyResolution.unresolved.slice();
 
   stage.innerHTML = buildSingleA4HTML(letter.recipient, bodyResolution.html, letter.number, letter.date, attachmentLabel, letter.utm, isNat, true, pSize, false, "");
@@ -729,6 +741,27 @@ function renderLetterPreviewObject(letter, forcedPaperSize, mode) {
       var title = "پیوست مختصات - صفحه " + toFa(si + 1) + " از " + toFa(sheets.length);
       stage.innerHTML += buildSingleA4HTML("پیوست: جدول مختصات UTM", intro, letter.number, letter.date,
         "جدول مختصات UTM", letter.utm, isNat, true, pSize, true, title, sheets[si]);
+    }
+  }
+  if (fileAttachments.length) {
+    var perPage = 14;
+    var totalAttachmentPages = Math.ceil(fileAttachments.length / perPage);
+    var applicantTitle = safeHtmlText(letter.appName || (linkedCase && linkedCase.name) || "متقاضی");
+    for (var ai = 0; ai < totalAttachmentPages; ai++) {
+      var pageItems = fileAttachments.slice(ai * perPage, (ai + 1) * perPage);
+      var rows = pageItems.map(function(item, rowIndex) {
+        var url = /^https:\/\/(drive\.google\.com|docs\.google\.com)\//i.test(String(item.webViewLink || "")) ? item.webViewLink : "";
+        var name = safeHtmlText(item.name || item.fileName || "فایل پیوست");
+        var link = url ? '<a href="' + safeHtmlText(url) + '" target="_blank" rel="noopener noreferrer">مشاهده در Google Drive</a>' : "لینک در دسترس نیست";
+        var size = Number(item.size || 0);
+        var sizeText = size ? (size < 1024 * 1024 ? Math.ceil(size / 1024) + " KB" : (size / (1024 * 1024)).toFixed(2) + " MB") : "—";
+        return '<tr><td>' + safeHtmlText(toFa(ai * perPage + rowIndex + 1)) + '</td><td>' + name + '</td><td>' + safeHtmlText(sizeText) + '</td><td>' + link + '</td></tr>';
+      }).join("");
+      var attachmentBody = '<p>مدارک زیر به نامه شماره ' + safeHtmlText(toFa(letter.number || "")) + ' مربوط به «' + applicantTitle + '» پیوست شده‌اند. فایل‌های اصلی در Google Drive باقی می‌مانند و این صفحه فقط فهرست و پیوند دسترسی آن‌هاست.</p>' +
+        '<table style="width:96%;border-collapse:collapse;"><thead><tr><th>ردیف</th><th>نام فایل</th><th>حجم</th><th>پیوند فایل</th></tr></thead><tbody>' + rows + '</tbody></table>';
+      var attachmentTitle = "پیوست مدارک - صفحه " + toFa(ai + 1) + " از " + toFa(totalAttachmentPages);
+      stage.innerHTML += buildSingleA4HTML("فهرست پیوست‌های دیجیتال نامه", attachmentBody, letter.number, letter.date,
+        toFa(fileAttachments.length) + " فایل", letter.utm, isNat, true, pSize, true, attachmentTitle, "");
     }
   }
   var letterPages = stage.querySelectorAll(".a4-page");
@@ -1753,6 +1786,7 @@ function cancelLetterEditing() {
   editingLetterId = null;
   currentPreviewLetterId = null;
   currentPreviewDraft = null;
+  if (window.NezamLetterAttachments) window.NezamLetterAttachments.clear();
   var alertEl = document.getElementById("letter-edit-alert");
   if (alertEl) alertEl.style.display = "none";
   letterDraftDirty = false;
