@@ -14,6 +14,23 @@
 
 <script>
 const DRIVE_API_URL = 'https://script.google.com/macros/s/AKfycbyd7lrIZfKVUm09OzBQewj8_XRWJfMpd8vCm6DV-tAUXEkA33LgqL10UKe8Yz17TwM2/exec';
+const ACCESS_KEY_STORAGE = '__nezam636_docs_access_key';
+function getAccessKey() {
+  let key = localStorage.getItem(ACCESS_KEY_STORAGE) || '';
+  if (!key) {
+    key = (prompt('کلید دسترسی بایگانی Google Drive را وارد کنید:') || '').trim();
+    if (!key) throw new Error('کلید دسترسی وارد نشد.');
+    localStorage.setItem(ACCESS_KEY_STORAGE, key);
+  }
+  return key;
+}
+async function ensureDriveApi() {
+  const response = await fetch(DRIVE_API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ action: 'sync', healthCheck: true, fullDatabase: { storage: {} }, accessKey: getAccessKey() }), redirect: 'follow' });
+  const data = await response.json();
+  if (!response.ok || !data || data.status !== 'success' || Number(data.apiVersion) !== 1) throw new Error('نسخه جدید Code.gs منتشر نشده یا کلید دسترسی معتبر نیست.');
+  return true;
+}
 
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
@@ -43,8 +60,10 @@ document.getElementById('driveForm').addEventListener('submit', async function(e
     fileData = await fileToBase64(file);
   }
 
+  try { await ensureDriveApi(); } catch (error) { status.innerText = error.message; btn.disabled = false; return; }
   const payload = {
     action: 'saveApplicant',
+    accessKey: getAccessKey(),
     fullName: document.getElementById('fullName').value.trim(),
     nationalCode: document.getElementById('nationalCode').value.trim(),
     phone: document.getElementById('phone').value.trim(),
@@ -84,11 +103,14 @@ async function loadApplicantsFromDrive() {
   const listBox = document.getElementById('driveApplicantsList');
   try {
     if (status) status.innerText = '🔄 در حال بازخوانی اطلاعات از گوگل درایو...';
-    const url = DRIVE_API_URL + (DRIVE_API_URL.includes('?') ? '&' : '?') + 't=' + Date.now();
-    const response = await fetch(url, { method: 'GET', redirect: 'follow' });
+    await ensureDriveApi();
+    const response = await fetch(DRIVE_API_URL, {
+      method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'readDatabase', accessKey: getAccessKey() }), redirect: 'follow'
+    });
     const data = await response.json();
-
-    const items = Array.isArray(data) ? data : (data && data.data ? data.data : []);
+    if (!response.ok || !data || data.status !== 'success' || Number(data.apiVersion) !== 1) throw new Error((data && data.message) || 'بازخوانی Drive ناموفق بود.');
+    const items = Array.isArray(data.data) ? data.data : [];
     if (status) status.innerText = '✅ اطلاعات از گوگل درایو بازخوانی شد (' + items.length + ' رکورد).';
 
     if (listBox && Array.isArray(items)) {
