@@ -564,7 +564,16 @@ test('rich letter editor preserves selection and caret during token insertion', 
   assert.match(customizer, /function restoreLetterEditorSelection\(editor\)/);
   assert.match(customizer, /function insertTextAtLetterSelection\(text\)/);
   assert.match(customizer, /function insertHtmlAtLetterSelection\(html\)/);
-  assert.match(customizer, /editor\.innerHTML = safeHtml/);
+  assert.match(customizer, /editor\\.dataset\\.letterKeyboardBound/);
+  assert.match(customizer, /editor\\.addEventListener\\("paste"/);
+  assert.match(customizer, /insertHtmlAtLetterSelection\\(pastedHtml\\)/);
+  const syncStart = customizer.indexOf('function syncRichEditorToTextarea()');
+  const syncEnd = customizer.indexOf('window.syncRichEditorToTextarea', syncStart);
+  assert.notEqual(syncStart, -1);
+  assert.notEqual(syncEnd, -1);
+  const liveSync = customizer.slice(syncStart, syncEnd);
+  assert.doesNotMatch(liveSync, /editor\\.innerHTML\\s*=/);
+  assert.match(liveSync, /editor\\.innerText \\|\\| editor\\.textContent/);
   assert.match(customizer, /editor\.dataset\.letterKeyboardBound/);
 });
 
