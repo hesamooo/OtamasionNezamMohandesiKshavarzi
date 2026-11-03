@@ -2444,22 +2444,15 @@
                   <option value="IN">وارده</option>
                 </select>
               </div>
-              <div class="col-md-3 mb-2">
-                <label class="small fw-bold text-primary" for="l-paper-size">اندازه کاغذ ذخیره و چاپ:</label>
-                <select id="l-paper-size" class="form-select form-select-sm fw-bold border-success" onchange="setPaperSize(this.value)">
-                  <option value="A4">📄 کاغذ A4 (۲۱۰×۲۹۷)</option>
-                  <option value="A5">📄 کاغذ A5 (۱۴۸×۲۱۰)</option>
-                </select>
-              </div>
-              <div class="col-md-3 mb-2">
+              <div class="col-md-4 mb-2">
                 <label class="small fw-bold" for="l-number">شماره نامه:</label>
                 <input type="text" id="l-number" class="form-control form-control-sm fw-bold" />
               </div>
-              <div class="col-md-2 mb-2">
+              <div class="col-md-3 mb-2">
                 <label class="small fw-bold" for="l-date">تاریخ:</label>
                 <input type="text" id="l-date" class="form-control form-control-sm" />
               </div>
-              <div class="col-md-2 mb-2">
+              <div class="col-md-3 mb-2">
                 <label class="small fw-bold" for="l-attach">پیوست:</label>
                 <input type="text" id="l-attach" class="form-control form-control-sm" value="ندارد" />
               </div>
@@ -2550,8 +2543,7 @@
             </div>
 
             <div class="d-flex flex-wrap gap-2">
-              <button type="button" class="btn btn-success" onclick="printCurrentLetterDraft('A4')">چاپ A4</button>
-              <button type="button" class="btn btn-primary" onclick="printCurrentLetterDraft('A5')">چاپ A5</button>
+              <button type="button" class="btn btn-success" onclick="previewCurrentLetterDraft()">پیش‌نمایش و ادامه به چاپ</button>
               <button type="button" class="btn btn-outline-success" onclick="saveLetterToSecretariat(false)">ثبت در دبیرخانه</button>
             </div>
           </div>
@@ -2601,10 +2593,6 @@
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2 pb-2 border-bottom">
           <div class="d-flex flex-wrap align-items-center gap-2">
             <span id="active-paper-size-badge" class="badge bg-dark fs-6">📄 قالب فعال: کاغذ A4 (۲۱۰×۲۹۷ میلی‌متر)</span>
-            <div class="d-flex gap-1">
-              <button type="button" id="btn-paper-a4" class="btn btn-sm btn-success fw-bold" onclick="setPaperSize('A4')">📄 کاغذ A4</button>
-              <button type="button" id="btn-paper-a5" class="btn btn-sm btn-outline-success fw-bold" onclick="setPaperSize('A5')">📄 کاغذ A5</button>
-            </div>
             <select id="print-paper-size-select" class="form-select form-select-sm fw-bold" style="width:145px;" onchange="setPaperSize(this.value)" aria-label="انتخاب سایز کاغذ">
               <option value="A4">کاغذ A4</option>
               <option value="A5">کاغذ A5</option>
@@ -2634,7 +2622,6 @@
 
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
           <div class="d-flex flex-wrap gap-1">
-            <button type="button" id="btn-preview-letter-draft" class="btn btn-sm btn-outline-success" onclick="previewCurrentLetterDraft()">پیش‌نمایش پیش‌نویس نامه</button>
             <button type="button" class="btn btn-sm btn-outline-primary" onclick="printUtmSketchSheet()">🗺️ شیت کروکی چندلایه UTM (۲ برگه مجزا: نقشه + جداول الف و ب)</button>
             <button type="button" class="btn btn-sm btn-outline-dark" onclick="printOfficialForm('FOLDER_COVER')">📋 روکش تکمیل پرونده</button>
             <button type="button" class="btn btn-sm btn-outline-dark" onclick="printOfficialForm('GREENHOUSE_CHECKLIST')">🌱 فرم پایش فنی گلخانه/قارچ</button>
@@ -4041,8 +4028,6 @@
 
 <script id="nezam-layout-and-map-fix-engine">
 (function () {
-  var currentPane = 'pane-dashboard';
-
   /* ========================================================================
      بخش اول: تعمیر قطعی نقشه ماهواره‌ای (حل مشکل زوم بالای ۱۸ و تحریم تایل‌ها)
      ======================================================================== */
@@ -4187,109 +4172,6 @@
   /* ========================================================================
      بخش دوم: چیدمان استاندارد Flexbox (زیر هدر) و نوار تب زیرمجموعه‌ها در بالا
      ======================================================================== */
-  var SUB_TABS_MAP = {
-    'pane-dashboard': {
-      title: '📊 پیشخوان فرماندهی',
-      items: [
-        { label: 'نمای کلی', fn: function () { window.scrollTo({ top: 0, behavior: 'smooth' }); } },
-        { label: 'گلخانه و قارچ', fn: function () { if (window.filterDirectoryByMainGroupCard) filterDirectoryByMainGroupCard('GREENHOUSE_MUSHROOM'); } },
-        { label: 'دام و طیور', fn: function () { if (window.filterDirectoryByMainGroupCard) filterDirectoryByMainGroupCard('LIVESTOCK_POULTRY_FISHERIES'); } },
-        { label: 'کلینیک و داروخانه', fn: function () { if (window.filterDirectoryByMainGroupCard) filterDirectoryByMainGroupCard('CLINIC_PHARMACY'); } },
-        { label: 'متقاضی جدید', fn: function () { if (window.startNewCaseWizard) startNewCaseWizard('GREENHOUSE_MUSHROOM'); } }
-      ]
-    },
-    'pane-cases': {
-      title: '📁 پرونده متقاضیان',
-      items: [
-        { id: 'sub-list', label: 'فهرست و جستجو', fn: function () { if (window.switchCaseSubTab) switchCaseSubTab('sub-list'); } },
-        { id: 'sub-info', label: 'مشخصات و UTM', fn: function () { if (window.switchCaseSubTab) switchCaseSubTab('sub-info'); } },
-        { id: 'sub-matrix', label: 'استعلام‌ها', fn: function () { if (window.switchCaseSubTab) switchCaseSubTab('sub-matrix'); } },
-        { id: 'sub-docs', label: 'مدارک پرونده', fn: function () { if (window.switchCaseSubTab) switchCaseSubTab('sub-docs'); } },
-        { id: 'sub-history', label: 'سوابق اقدامات', fn: function () { if (window.switchCaseSubTab) switchCaseSubTab('sub-history'); } },
-        { label: 'پرونده جدید', fn: function () { if (window.startNewCaseWizard) startNewCaseWizard('GREENHOUSE_MUSHROOM'); } }
-      ]
-    },
-    'pane-croquis': {
-      title: '🗺️ استودیو کروکی UTM',
-      items: [
-        { label: 'نمای CAD', fn: function () { if (window.switchCroquisViewMode) switchCroquisViewMode('CAD'); } },
-        {
-          label: 'نقشه ماهواره‌ای',
-          fn: function () {
-            if (window.switchCroquisViewMode) switchCroquisViewMode('MAP');
-            setTimeout(window.forceRefreshCroquisMap, 100);
-            setTimeout(window.forceRefreshCroquisMap, 400);
-          }
-        },
-        { label: 'نقشه Esri', fn: function () { if (window.switchCroquisViewMode) switchCroquisViewMode('MAP'); setTimeout(window.switchToEsriSatellite, 120); } },
-        { label: 'الگوی نمونه', fn: function () { if (window.loadSample10HectareGreenhouseMap) loadSample10HectareGreenhouseMap(); } },
-        { label: 'دریافت KML', fn: function () { if (window.downloadCaseKML) downloadCaseKML(); } },
-        { label: 'چاپ کروکی', fn: function () { if (window.printUtmSketchSheet) printUtmSketchSheet(); } }
-      ]
-    },
-    'pane-letters': {
-      title: '✉️ مکاتبات و دبیرخانه',
-      items: [
-        { label: 'چاپ A4', fn: function () { if (window.saveLetterToSecretariat) saveLetterToSecretariat(true, 'A4'); } },
-        { label: 'چاپ A5', fn: function () { if (window.saveLetterToSecretariat) saveLetterToSecretariat(true, 'A5'); } },
-        { label: 'ثبت در دبیرخانه', fn: function () { if (window.saveLetterToSecretariat) saveLetterToSecretariat(false); } }
-      ]
-    },
-    'pane-print': {
-      title: '🖨️ سربرگ و فرم‌های نظارتی',
-      items: [
-        { label: 'پیش‌نمایش نامه', fn: function () { if (window.renderSinglePreviewSheet) renderSinglePreviewSheet(); } },
-        { label: 'شیت کروکی UTM', fn: function () { if (window.printUtmSketchSheet) printUtmSketchSheet(); } },
-        { label: 'روکش پرونده', fn: function () { if (window.printOfficialForm) printOfficialForm('FOLDER_COVER'); } },
-        { label: 'پایش گلخانه و قارچ', fn: function () { if (window.printOfficialForm) printOfficialForm('GREENHOUSE_CHECKLIST'); } },
-        { label: 'فرم بازرسی داروخانه', fn: function () { if (window.printOfficialForm) printOfficialForm('PHARMACY_INSPECTION'); } },
-        { label: 'اخطاریه نقص مدارک', fn: function () { if (window.issueDeficiencyLetterForActiveCase) issueDeficiencyLetterForActiveCase(); } }
-      ]
-    },
-    'pane-office': {
-      title: '💼 کارتابل و تنظیمات',
-      items: [
-        { label: 'نسخه ویندوز', fn: function () { if (window.downloadStandaloneWindowsHTML) downloadStandaloneWindowsHTML(); } },
-        { label: 'پشتیبان JSON', fn: function () { if (window.exportFullSystemBackup) exportFullSystemBackup(); } }
-      ]
-    },
-    'pane-ai': {
-      title: '🤖 دستیار هوشمند و OCR',
-      items: [
-        { label: 'خوانش سند', fn: function () { if (window.aiReadDocumentImagePro) aiReadDocumentImagePro(); } },
-        { label: 'استخراج اطلاعات', fn: function () { if (window.aiExtractFromRawText) aiExtractFromRawText(); } },
-        { label: 'خلبان خودکار', fn: function () { if (window.aiRunFullAutopilotPipeline) aiRunFullAutopilotPipeline(); } }
-      ]
-    },
-    'pane-guide': {
-      title: '📘 راهنمای جامع تصویری',
-      items: [
-        { label: 'راهنمای سامانه', fn: function () { window.scrollTo({ top: 0, behavior: 'smooth' }); } }
-      ]
-    }
-  };
-
-  function renderSubBar(paneId, activeSubId) {
-    var bar = document.getElementById('nezam-top-subbar');
-    if (!bar) return;
-    var cfg = SUB_TABS_MAP[paneId] || SUB_TABS_MAP['pane-dashboard'];
-
-    bar.innerHTML = '<div class="subbar-breadcrumb">' + cfg.title + ' ⬅️</div>';
-    cfg.items.forEach(function (item, idx) {
-      var btn = document.createElement('button');
-      btn.type = 'button';
-      var isAct = activeSubId ? (item.id === activeSubId) : (idx === 0);
-      btn.className = 'subbar-tab-item' + (isAct ? ' active' : '');
-      btn.innerHTML = item.label;
-      btn.onclick = function () {
-        bar.querySelectorAll('.subbar-tab-item').forEach(function (b) { b.classList.remove('active'); });
-        btn.classList.add('active');
-        if (item.fn) item.fn();
-      };
-      bar.appendChild(btn);
-    });
-  }
-
   function setupBalancedGridLayout() {
     var nav = document.querySelector('nav.app-navbar');
     var main = document.querySelector('main');
@@ -4305,13 +4187,8 @@
       contentCol.id = 'nezam-content-column';
       contentCol.className = 'nezam-content-column';
 
-      var subBar = document.createElement('div');
-      subBar.id = 'nezam-top-subbar';
-      subBar.className = 'nezam-top-subbar no-print';
-
       nav.parentNode.insertBefore(grid, nav);
       grid.appendChild(nav);
-      contentCol.appendChild(subBar);
       contentCol.appendChild(main);
       grid.appendChild(contentCol);
     }
@@ -4332,7 +4209,6 @@
       };
     }
 
-    renderSubBar(currentPane);
     addEsriButtonToMapToolbar();
     hookLeafletPrototype();
   }
@@ -4342,8 +4218,6 @@
       var origMain = window.switchMainPane;
       window.switchMainPane = function (paneId) {
         var r = origMain.apply(this, arguments);
-        currentPane = paneId;
-        renderSubBar(paneId);
         if (paneId === 'pane-croquis') {
           setTimeout(window.forceRefreshCroquisMap, 100);
           setTimeout(window.forceRefreshCroquisMap, 400);
@@ -4351,16 +4225,6 @@
         return r;
       };
       window.__nezamMainHooked = true;
-    }
-
-    if (typeof window.switchCaseSubTab === 'function' && !window.__nezamSubHooked) {
-      var origSub = window.switchCaseSubTab;
-      window.switchCaseSubTab = function (subId) {
-        var r = origSub.apply(this, arguments);
-        if (currentPane === 'pane-cases') renderSubBar('pane-cases', subId);
-        return r;
-      };
-      window.__nezamSubHooked = true;
     }
 
     if (typeof window.switchCroquisViewMode === 'function' && !window.__nezamCrqHooked) {
@@ -5107,11 +4971,11 @@
 }
 </style>
 
-  <script src="./nezam-operations.js?v=20261103-tombstone-r2"></script>
-  <script src="./nezam-agent-engine.js?v=20261102-agent-v2-r6"></script>
-  <script src="./nezam-agent-knowledge.js?v=20261101-agent-knowledge-r4"></script>
-  <script src="./nezam-rule-advisor.js?v=20261101-rule-advisor-r2"></script>
-  <script src="./nezam-agent-field-guide.js?v=20261102-field-guide-r3"></script>
+  <script defer src="./nezam-operations.js?v=20261103-tombstone-r2"></script>
+  <script defer src="./nezam-agent-engine.js?v=20261102-agent-v2-r6"></script>
+  <script defer src="./nezam-agent-knowledge.js?v=20261101-agent-knowledge-r4"></script>
+  <script defer src="./nezam-rule-advisor.js?v=20261101-rule-advisor-r2"></script>
+  <script defer src="./nezam-agent-field-guide.js?v=20261102-field-guide-r3"></script>
 <style id="nezam-ui-modern-2026-r1">
 /* Modern office workspace — visual-only layer. Print and application logic remain unchanged. */
 @media screen {
