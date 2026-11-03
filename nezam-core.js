@@ -1726,9 +1726,9 @@ function uploadCaseDocFile(event, docCode, docTitle, replaceFileId) {
     return true;
   }
 
-  // مسیر سازگاری برای اجرای نسخه‌های قدیمی/آفلاین؛ فایل در این حالت فقط در IndexedDB می‌ماند.
-  var legacyEvent = { target: input };
-  if (typeof uploadCaseDocFileLegacy === "function") return uploadCaseDocFileLegacy(legacyEvent, docCode, docTitle);
+  // برای جلوگیری از ثبت اشتباه مدرک به‌عنوان «تحویل‌شده»، در نبود ماژول Drive فایل جدید فقط محلی ذخیره نمی‌شود.
+  if (typeof showToastMsg === "function") showToastMsg("اتصال بایگانی Google Drive آماده نیست؛ فایل بارگذاری نشد. صفحه را تازه‌سازی کنید و وضعیت اتصال را بررسی کنید.", true);
+  if (input) input.value = "";
   return false;
 }
 
