@@ -302,3 +302,17 @@ test('standalone office correspondence is available without an applicant', () =>
   assert.match(html, /nezam-core\.js\?v=20261102-parcel-r4/);
   assert.match(html, /nezam-customizer\.js\?v=20261102-print-engine-r11/);
 });
+
+
+test('authoritative Google Drive snapshots prevent deleted applicants and letters from legacy backups being restored', () => {
+  const html = read('index.html');
+  const start = html.indexOf('async function loadFromDriveOnStartup');
+  const end = html.indexOf('// ۳. اعمال فوری اطلاعات بازخوانی‌شده', start);
+  assert.notEqual(start, -1, 'Drive restore routine must exist');
+  assert.notEqual(end, -1, 'Drive restore UI refresh section must exist');
+  const restore = html.slice(start, end);
+
+  assert.match(restore, /const hasAuthoritativeFullSnapshot = Boolean\\(bestSyncRecord && bestSyncRecord\\.storage/);
+  assert.match(restore, /if \\(!hasAuthoritativeFullSnapshot && recoveredCases\\.length > 0\\)/);
+  assert.match(restore, /if \\(!hasAuthoritativeFullSnapshot && recoveredLetters\\.length > 0\\)/);
+});
