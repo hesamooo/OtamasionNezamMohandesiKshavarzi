@@ -799,6 +799,7 @@ window.doPrintPaperSheet = function() {
     var raf = window.requestAnimationFrame || function(callback) { return setTimeout(callback, 40); };
     raf(function() {
       raf(function() {
+        window.addEventListener("afterprint", releasePrintLock, { once: true });
         try { window.print(); }
         catch (printError) {
           console.error("Fallback print failed:", printError);
@@ -814,7 +815,8 @@ window.doPrintPaperSheet = function() {
     }
     applyDynamicPrintPageSizeCSS(paperSize);
     var nextFrame = window.requestAnimationFrame || function(callback) { return setTimeout(callback, 40); };
-    nextFrame(function() { nextFrame(function() { try { window.print(); } catch (printError) { abortPrint("چاپ ناموفق بود: " + (printError.message || printError), false); } }); });
+    nextFrame(function() { nextFrame(function() { window.addEventListener("afterprint", releasePrintLock, { once: true });
+        try { window.print(); } catch (printError) { abortPrint("چاپ ناموفق بود: " + (printError.message || printError), false); } }); });
   });
   return true;
 };
