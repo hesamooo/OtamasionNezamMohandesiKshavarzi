@@ -733,6 +733,10 @@ try {
     activeCaseId = localStorage.getItem("nezam636_active_case_id");
   }
 } catch (e) {}
+// کلید حتی در نصب تازه ایجاد می‌شود تا صحت ذخیره ابری همیشه قابل راستی‌آزمایی باشد.
+if (localStorage.getItem(NEZAM_DELETION_MANIFEST_KEY) === null) {
+  persistNezamDeletionManifest({ version: 1, cases: [], letters: [], updatedAt: Date.now() });
+}
 applyNezamDeletionManifestToState();
 
 /* ارتقای ساختاری پرونده‌های قدیمی بدون حذف هیچ اطلاعاتی */
