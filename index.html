@@ -3542,6 +3542,7 @@
       isRestoring = true;
       window.__nezamDriveReady = false;
       let syncAfterRestore = false;
+      let cloudReadSucceeded = false;
       try {
         setCloudStatus('🔄 دریافت اطلاعات از درایو...', '#0284c7');
         const fetchUrl = DRIVE_API_URL + (DRIVE_API_URL.includes('?') ? '&' : '?') + 't=' + Date.now();
@@ -3550,6 +3551,7 @@
         const rawData = await res.json();
 
         const { bestSyncRecord, recoveredCases, recoveredLetters } = parseCloudResponse(rawData);
+        cloudReadSucceeded = true;
 
         // ادغام حذف‌های محلی و ابری حتی وقتی نسخه محلی جدیدتر است و بدنه کامل ابر اعمال نمی‌شود.
         const localDeletionManifest = typeof window.readNezamDeletionManifest === 'function'
@@ -3666,7 +3668,7 @@
         isRestoring = false;
         isInitialLoadDone = true;
         window.__nezamDriveReady = true;
-        if (syncAfterRestore) {
+        if (syncAfterRestore && cloudReadSucceeded) {
           clearTimeout(syncTimer);
           setTimeout(() => syncAllDataToDrive(false), 300);
         }
