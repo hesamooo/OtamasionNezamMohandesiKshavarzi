@@ -186,6 +186,12 @@ function sanitizeOfficeRichHtml(input) {
       return;
     }
     var clean = document.createElement(tag.toLowerCase());
+    if (tag === "SPAN") {
+      var variableKey = normalizeLetterVariableKey(node.getAttribute("data-nezam-variable") || "");
+      if (variableKey && /^[a-z0-9_\\u0600-\\u06FF-]{1,64}$/i.test(variableKey)) {
+        clean.setAttribute("data-nezam-variable", variableKey);
+      }
+    }
     if (tag === "TD" || tag === "TH") {
       ["colspan","rowspan"].forEach(function (attr) {
         var n = parseInt(node.getAttribute(attr), 10);
@@ -433,6 +439,10 @@ function getLetterDraftFromEditor() {
     recipient: rec,
     appName: officeMode ? "" : (c.name || ""),
     appNid: officeMode ? "" : (c.nid || ""),
+    caseCode: officeMode ? "" : (c.code || ""),
+    customFields: officeMode ? [] : (Array.isArray(c.customFields) ? c.customFields.map(function(field) {
+      return { label: String(field && field.label || ""), value: String(field && field.value == null ? "" : field.value) };
+    }) : []),
     project: officeMode ? "" : (c.project || ""),
     cap: officeMode ? "" : (c.cap || ""),
     land: officeMode ? "" : (c.land || ""),
@@ -451,57 +461,182 @@ function getLetterDraftFromEditor() {
 
 
 function normalizeLetterVariableKey(value) {
-  return String(value == null ? "" : value).replace(/[يى]/g, "ی").replace(/ك/g, "ک").replace(/[\s\u200c\u200f\u0640]/g, "").toLowerCase();
+  return String(value == null ? "" : value)
+    .replace(/[يى]/g, "ی")
+    .replace(/ك/g, "ک")
+    .replace(/ة/g, "ه")
+    .replace(/[\\s\\u200c\\u200f\\u0640]/g, "")
+    .toLowerCase();
 }
+
+/* نام‌های قابل قبول متغیرها در قالب‌های اداری */
+var LETTER_VARIABLE_ALIASES = {
+  "نام": "name",
+  "ناممتقاضی": "name",
+  "نامبهرهبردار": "name",
+  "نامو": "name",
+  "ناموخانوادگی": "name",
+  "ناموخانودگی": "name",
+  "مشخصاتمتقاضی": "name",
+  "کدملی": "nid",
+  "کدملیشناسه": "nid",
+  "شناسهملی": "nid",
+  "کدملی/شناسه": "nid",
+  "کدملییاشناسه": "nid",
+  "طرح": "project",
+  "موضوع": "project",
+  "موضوعطرح": "project",
+  "فعالیت": "project",
+  "عنوانطرح": "project",
+  "ظرفیت": "cap",
+  "ظرفیتطرح": "cap",
+  "ظرفیتتولید": "cap",
+  "مساحت": "land",
+  "مساحتزمین": "land",
+  "مساحتعرصه": "land",
+  "پلاک": "landParcel",
+  "پلاکثبتی": "landParcel",
+  "آب": "water",
+  "منبعآب": "water",
+  "مبنعآب": "water",
+  "موقعیت": "loc",
+  "موقعیتاراضی": "loc",
+  "محلاراضی": "loc",
+  "نشانی": "loc",
+  "مختصات": "utm",
+  "مختصاتutm": "utm",
+  "utm": "utm",
+  "کلاسه": "code",
+  "کلاسهپرونده": "code",
+  "شمارهپرونده": "code",
+  "کدپرونده": "code",
+  "شماره": "number",
+  "شمارهنامه": "number",
+  "تاریخ": "date",
+  "تاریخنامه": "date",
+  "پیوست": "attach",
+  "پیوستنامه": "attach",
+  "گیرنده": "recipient",
+  "نامگیرنده": "recipient"
+};
+
 function resolveOfficeLetterVariables(bodyHtml, letter, linkedCase) {
-  var record=letter||{}, caseData=linkedCase||{};
-  function pick(recordKeys,caseKeys){
-    var keys=Array.isArray(recordKeys)?recordKeys:[recordKeys];
-    for(var i=0;i<keys.length;i++){var v=record[keys[i]];if(v!==null&&v!==undefined&&String(v).trim()!=="")return String(v).trim();}
-    keys=Array.isArray(caseKeys)?caseKeys:[caseKeys||recordKeys];
-    for(var j=0;j<keys.length;j++){var cv=caseData[keys[j]];if(cv!==null&&cv!==undefined&&String(cv).trim()!=="")return String(cv).trim();}
+  var record = letter || {};
+  var caseData = linkedCase || {};
+  var unresolved = [];
+  var customValues = Object.create(null);
+
+  function addCustomFields(fields) {
+    if (!Array.isArray(fields)) return;
+    fields.forEach(function(field) {
+      if (!field || !field.label || field.value === null || field.value === undefined) return;
+      var key = normalizeLetterVariableKey(field.label);
+      var value = String(field.value).trim();
+      if (key && value && !Object.prototype.hasOwnProperty.call(customValues, key)) {
+        customValues[key] = value;
+      }
+    });
+  }
+
+  // ابتدا snapshot ذخیره‌شده در خود نامه، سپس فیلدهای فعلی پرونده.
+  addCustomFields(record.customFields);
+  addCustomFields(caseData.customFields);
+
+  function firstValue(source, keys) {
+    var list = Array.isArray(keys) ? keys : [keys];
+    for (var i = 0; i < list.length; i++) {
+      var value = source && source[list[i]];
+      if (value !== null && value !== undefined && String(value).trim() !== "") return String(value).trim();
+    }
     return "";
   }
-  function fa(v){return typeof toFa==="function"?toFa(String(v==null?"":v)):String(v==null?"":v);}
-  var values={
-    name:pick(["appName","name"],["name"]), nid:fa(pick(["appNid","nid","nationalId"],["nid","nationalId"])),
-    project:pick(["project","activity"],["project","activity"]), cap:fa(pick(["cap","capacity"],["cap","capacity"])),
-    land:fa(pick(["land","landArea"],["land","landArea"])), landParcel:pick(["landParcel","parcel"],["landParcel","parcel"]),
-    water:pick(["water","waterSource"],["water","waterSource"]), loc:pick(["loc","location"],["loc","location"]),
-    utm:fa(pick(["utm","coordinates"],["utm","coordinates"])), code:fa(pick(["caseCode","code"],["code","caseCode"])),
-    number:fa(pick(["number","num"],["number","num"])), date:fa(pick(["date"],["date"])),
-    attach:pick(["attach","attachment"],["attach","attachment"]), recipient:pick(["recipient","rec"],["recipient","rec"])
+
+  function pick(recordKeys, caseKeys, customKeys) {
+    var value = firstValue(record, recordKeys);
+    if (value) return value;
+    value = firstValue(caseData, caseKeys || recordKeys);
+    if (value) return value;
+    var candidates = customKeys || [];
+    for (var i = 0; i < candidates.length; i++) {
+      value = customValues[normalizeLetterVariableKey(candidates[i])];
+      if (value) return value;
+    }
+    return "";
+  }
+
+  function fa(value) {
+    return typeof toFa === "function" ? toFa(String(value == null ? "" : value)) : String(value == null ? "" : value);
+  }
+
+  var values = {
+    name: pick(["appName", "name"], ["name"], ["نام متقاضی", "نام"]),
+    nid: fa(pick(["appNid", "nid", "nationalId"], ["nid", "nationalId"], ["کد ملی", "شناسه ملی"])),
+    project: pick(["project", "activity"], ["project", "activity"], ["موضوع طرح", "عنوان طرح", "فعالیت"]),
+    cap: fa(pick(["cap", "capacity"], ["cap", "capacity"], ["ظرفیت طرح", "ظرفیت تولید"])),
+    land: fa(pick(["land", "landArea", "area"], ["land", "landArea", "area"], ["مساحت زمین", "مساحت عرصه"])),
+    landParcel: pick(["landParcel", "parcel"], ["landParcel", "parcel"], ["پلاک ثبتی", "پلاک"]),
+    water: pick(["water", "waterSource"], ["water", "waterSource"], ["منبع آب", "آب"]),
+    loc: pick(["loc", "location", "address"], ["loc", "location", "address"], ["موقعیت اراضی", "نشانی"]),
+    utm: fa(pick(["utm", "coordinates"], ["utm", "coordinates"], ["مختصات UTM", "مختصات"])),
+    code: fa(pick(["caseCode", "caseNumber", "caseNo", "code"], ["caseCode", "caseNumber", "caseNo", "code"], ["کلاسه پرونده", "کد پرونده"])),
+    number: fa(pick(["number", "num"], ["number", "num"])),
+    date: fa(pick(["date"], ["date"])),
+    attach: pick(["attach", "attachment"], ["attach", "attachment"], ["پیوست"]),
+    recipient: pick(["recipient", "rec"], ["recipient", "rec"], ["گیرنده", "عنوان گیرنده"])
   };
-  var aliases={
-    "نام":"name","ناممتقاضی":"name","ناموخانوادگی":"name","ناموخانودگی":"name",
-    "کدملی":"nid","کدملیشناسه":"nid","شناسهملی":"nid","کدملی/شناسه":"nid",
-    "طرح":"project","موضوعطرح":"project","فعالیت":"project","ظرفیت":"cap","ظرفیتطرح":"cap",
-    "مساحت":"land","مساحتزمین":"land","مساحتعرصه":"land","پلاک":"landParcel","پلاکثبتی":"landParcel",
-    "آب":"water","منبعآب":"water","موقعیت":"loc","موقعیتاراضی":"loc","محلاراضی":"loc",
-    "مختصات":"utm","مختصاتutm":"utm","utm":"utm","کلاسه":"code","کلاسهپرونده":"code","شمارهپرونده":"code",
-    "شماره":"number","شمارهنامه":"number","تاریخ":"date","تاریخنامه":"date","پیوست":"attach",
-    "گیرنده":"recipient","نامگیرنده":"recipient"
-  };
-  var customFields=Array.isArray(caseData.customFields)?caseData.customFields:[];
-  customFields.forEach(function(field){
-    if(!field||!field.label)return;
-    var key=normalizeLetterVariableKey(field.label);
-    if(key&&!Object.prototype.hasOwnProperty.call(aliases,key)&&field.value!=null)values["custom:"+key]=String(field.value);
+
+  Object.keys(customValues).forEach(function(key) {
+    values["custom:" + key] = customValues[key];
   });
-  var parsed=new DOMParser().parseFromString(String(bodyHtml||""),"text/html");
-  var walker=parsed.createTreeWalker(parsed.body,4,null), nodes=[], node;
-  while((node=walker.nextNode()))nodes.push(node);
-  var unresolved=[];
-  nodes.forEach(function(textNode){
-    if(!/\{[^{}]+\}/.test(textNode.nodeValue||""))return;
-    textNode.nodeValue=textNode.nodeValue.replace(/\{([^{}]+)\}/g,function(full,rawKey){
-      var key=normalizeLetterVariableKey(rawKey), valueKey=aliases[key];
-      var value=valueKey?values[valueKey]:values["custom:"+key];
-      if(value===null||value===undefined||String(value).trim()===""){if(unresolved.indexOf(full)===-1)unresolved.push(full);return "ــــــــ";}
-      return String(value);
+
+  function resolveValue(rawKey) {
+    var key = normalizeLetterVariableKey(rawKey);
+    var valueKey = LETTER_VARIABLE_ALIASES[key];
+    var value = valueKey ? values[valueKey] : values[key];
+    if (value !== null && value !== undefined && String(value).trim() !== "") return String(value);
+    if (customValues[key]) return customValues[key];
+    if (values["custom:" + key]) return values["custom:" + key];
+    return "";
+  }
+
+  function markUnresolved(label) {
+    if (unresolved.indexOf(label) === -1) unresolved.push(label);
+  }
+
+  var parsed = new DOMParser().parseFromString(String(bodyHtml || ""), "text/html");
+
+  // متغیرهایی که از منوی تزریق درج شده‌اند، شناسه مستقل دارند و با شکستن متن توسط قالب‌بندی از بین نمی‌روند.
+  var markedVariables = parsed.querySelectorAll("span[data-nezam-variable]");
+  Array.prototype.forEach.call(markedVariables, function(element) {
+    var rawKey = element.getAttribute("data-nezam-variable") || "";
+    var value = resolveValue(rawKey);
+    var visibleLabel = element.textContent || ("{" + rawKey + "}");
+    if (!value) {
+      markUnresolved(visibleLabel);
+      value = "ــــــــ";
+    }
+    element.parentNode.replaceChild(parsed.createTextNode(value), element);
+  });
+
+  // سازگاری با نامه‌های قدیمی و متغیرهایی که کاربر دستی داخل متن نوشته است.
+  var walker = parsed.createTreeWalker(parsed.body, 4, null);
+  var nodes = [];
+  var node;
+  while ((node = walker.nextNode())) nodes.push(node);
+  nodes.forEach(function(textNode) {
+    if (!/\\{\\{?[^{}]+\\}\\}?/.test(textNode.nodeValue || "")) return;
+    textNode.nodeValue = textNode.nodeValue.replace(/\\{\\{([^{}]+)\\}\\}|\\{([^{}]+)\\}/g, function(full, doubleKey, singleKey) {
+      var rawKey = doubleKey || singleKey || "";
+      var value = resolveValue(rawKey);
+      if (!value) {
+        markUnresolved(full);
+        return "ــــــــ";
+      }
+      return value;
     });
   });
-  return {html:parsed.body.innerHTML,unresolved:unresolved};
+
+  return { html: parsed.body.innerHTML, unresolved: unresolved };
 }
 
 function renderLetterPreviewObject(letter, forcedPaperSize, mode) {
@@ -2255,7 +2390,28 @@ window.applyLetterFontSize=function(size){
   syncRichEditorToTextarea();
 };
 window.insertTagIntoLetterBody=function(tag){
-  if(!/^\{[^{}]+\}$/.test(String(tag||"")))return false;return insertTextAtLetterSelection(tag);
+  var match = String(tag || "").match(/^\\{([^{}]+)\\}$/);
+  var editor = document.getElementById("l-body-rich");
+  if (!match || !editor) return false;
+  var rawKey = normalizeLetterVariableKey(match[1]);
+  if (!rawKey) return false;
+  var range = restoreLetterEditorSelection(editor);
+  if (!range) return false;
+  var token = document.createElement("span");
+  token.setAttribute("data-nezam-variable", rawKey);
+  token.textContent = String(tag);
+  token.setAttribute("title", "متغیر نامه؛ هنگام پیش‌نمایش با اطلاعات پرونده جایگزین می‌شود");
+  range.deleteContents();
+  range.insertNode(token);
+  range.setStartAfter(token);
+  range.collapse(true);
+  var selection = window.getSelection();
+  selection.removeAllRanges();
+  selection.addRange(range);
+  letterEditorSavedRange = range.cloneRange();
+  syncRichEditorToTextarea();
+  editor.focus();
+  return true;
 };
 window.insertPhraseIntoLetterBody=function(phrase){return insertTextAtLetterSelection(phrase);};
 window.insertLetterTable=function(){
