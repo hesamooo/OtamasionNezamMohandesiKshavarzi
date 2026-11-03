@@ -2166,6 +2166,87 @@ function renderActiveCaseDocsChecklist() {
     });
   }
 
+  function renderDriveLibrary(cloudFiles, cloudError, folderUrl) {
+    if (!getActiveCase() || String(getActiveCase().id) !== String(c.id)) return;
+    if (libraryBody) {
+      if (cloudError) {
+        libraryBody.innerHTML = '<tr><td colspan="6" class="text-center text-danger py-4">دریافت فهرست فایل‌ها ناموفق بود: ' +
+          escapeHtmlCore(cloudError) + '<br><small>اتصال و دسترسی Google Drive را بررسی کنید.</small></td></tr>';
+      } else if (!cloudFiles || !cloudFiles.length) {
+        libraryBody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">هنوز فایلی در پوشه Google Drive این متقاضی پیدا نشد.</td></tr>';
+      } else {
+        var ordered = cloudFiles.slice().sort(function(a,b) {
+          return Number(b.updatedAt || b.uploadedAt || 0) - Number(a.updatedAt || a.uploadedAt || 0);
+        });
+        libraryBody.innerHTML = ordered.map(function(file) {
+          var fileId = String(file.fileId || file.id || "");
+          var safeId = escapeHtmlCore(fileId);
+          var rawName = String(file.fileName || file.name || "بدون نام");
+          var fileName = escapeHtmlCore(rawName);
+          var docTitle = escapeHtmlCore(file.docTitle || "فایل قدیمی / پیوست");
+          var docCode = escapeHtmlCore(file.docCode || "LEGACY");
+          var ext = rawName.match(/\.([^.]+)$/);
+          var typeLabel = escapeHtmlCore((ext ? ext[1].toUpperCase() + " · " : "") + String(file.mimeType || "نوع نامشخص"));
+          var size = Math.max(0, Number(file.size || 0));
+          var sizeLabel = size >= 1073741824 ? (size/1073741824).toFixed(2)+" GB" :
+            (size >= 1048576 ? (size/1048576).toFixed(2)+" MB" : (size ? Math.max(1,Math.round(size/1024))+" KB" : "—"));
+          var stamp = Number(file.uploadedAt || file.updatedAt || 0);
+          var dateLabel = stamp ? new Date(stamp).toLocaleString("fa-IR") : "—";
+          var version = Math.max(1,Number(file.version || 1));
+          var viewUrl = /^https:\/\/drive\.google\.com\//.test(String(file.webViewLink || "")) ? String(file.webViewLink) : "";
+          var downloadUrl = /^https:\/\/drive\.google\.com\//.test(String(file.downloadUrl || "")) ? String(file.downloadUrl) : "";
+          var links = (viewUrl ? '<a class="btn btn-sm btn-outline-primary py-0 px-2" target="_blank" rel="noopener noreferrer" href="' + escapeHtmlCore(viewUrl) + '">👁️ مشاهده</a>' : '') +
+            (downloadUrl ? '<a class="btn btn-sm btn-outline-secondary py-0 px-2" target="_blank" rel="noopener noreferrer" href="' + escapeHtmlCore(downloadUrl) + '">⬇️ دانلود</a>' : '');
+          var replace = (!file.legacy && docCode !== "LEGACY")
+            ? '<label class="btn btn-sm btn-outline-warning py-0 px-2 m-0">جایگزینی<input type="file" hidden data-library-action="replace" data-file-id="' + safeId + '" data-doc-code="' + docCode + '" data-doc-title="' + docTitle + '" accept=".pdf,.jpg,.jpeg,.png,.webp,.gif,.tif,.tiff,.bmp,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.rtf,.odt,.ods,.odp"></label>' : '';
+          return '<tr class="case-drive-file-row">' +
+            '<td><div class="fw-bold">' + fileName + '</div><small class="text-muted">' + docTitle + '</small></td>' +
+            '<td><span class="badge bg-light text-dark border">' + typeLabel + '</span></td>' +
+            '<td class="text-nowrap">' + escapeHtmlCore(sizeLabel) + '</td>' +
+            '<td class="text-nowrap small">' + escapeHtmlCore(dateLabel) + '</td>' +
+            '<td class="text-center">' + escapeHtmlCore(toFa(version)) + '</td>' +
+            '<td><div class="d-flex flex-wrap gap-1">' + links + replace +
+              '<button type="button" class="btn btn-sm btn-outline-danger py-0 px-2" data-library-action="delete" data-file-id="' + safeId + '">🗑️ حذف</button>' +
+            '</div></td></tr>';
+        }).join("");
+        var search = document.getElementById("case-doc-search");
+        if (search && search.value) {
+          var q = String(search.value).trim().toLocaleLowerCase();
+          Array.prototype.forEach.call(libraryBody.querySelectorAll(".case-drive-file-row"),function(row) {
+            row.style.display = String(row.textContent || "").toLocaleLowerCase().indexOf(q) !== -1 ? "" : "none";
+          });
+        }
+      }
+    }
+    if (librarySummary) {
+      var total = (cloudFiles || []).reduce(function(sum,file) { return sum + Math.max(0,Number(file.size || 0)); },0);
+      var sizeText = total >= 1073741824 ? (total/1073741824).toFixed(2)+" GB" :
+        (total >= 1048576 ? (total/1048576).toFixed(2)+" MB" : (total ? Math.max(1,Math.round(total/1024))+" KB" : "۰ بایت"));
+      librarySummary.textContent = cloudError
+        ? "خطا در دریافت فهرست فایل‌ها"
+        : toFa((cloudFiles || []).length)+" فایل · مجموع حجم "+sizeText+" · تازه‌سازی "+new Date().toLocaleTimeString("fa-IR");
+    }
+    if (folderLbl && folderUrl && /^https:\/\/drive\.google\.com\//.test(folderUrl)) {
+      folderLbl.innerHTML = '<a href="' + escapeHtmlCore(folderUrl) + '" target="_blank" rel="noopener noreferrer">📁 بازکردن پوشه اختصاصی در Google Drive</a>';
+    }
+  }
+
+  var driveListContext = {
+    caseId: String(c.id),
+    fullName: String(c.name || ""),
+    nationalCode: String(c.nid || c.code || "")
+  };
+  var driveListPromise = window.NezamDriveDocuments && typeof window.NezamDriveDocuments.list === "function"
+    ? window.NezamDriveDocuments.list(driveListContext)
+    : Promise.reject(new Error("ماژول اتصال بایگانی ابری بارگذاری نشده است."));
+
+  // دریافت و نمایش کتابخانه ابری مستقل از IndexedDB؛ خرابی حافظه محلی نباید دیدن فایل‌های Drive را متوقف کند.
+  driveListPromise.then(function(result) {
+    renderDriveLibrary(result.documents || [], "", result.folderUrl || "");
+  }).catch(function(error) {
+    renderDriveLibrary([], error && error.message ? error.message : String(error), "");
+  });
+
   getUploadedDocsForCase(c.id, function(localMap) {
     if (!getActiveCase() || String(getActiveCase().id) !== String(c.id)) return;
 
@@ -2337,19 +2418,11 @@ function renderActiveCaseDocsChecklist() {
       }
     }
 
-    if (window.NezamDriveDocuments && typeof window.NezamDriveDocuments.list === "function") {
-      window.NezamDriveDocuments.list({
-        caseId: String(c.id),
-        fullName: String(c.name || ""),
-        nationalCode: String(c.nid || c.code || "")
-      }).then(function(result) {
-        renderRows(result.documents || [], "", result.folderUrl || "");
-      }).catch(function(error) {
-        renderRows([], error && error.message ? error.message : String(error), "");
-      });
-    } else {
-      renderRows([], "ماژول اتصال بایگانی ابری بارگذاری نشده است.", "");
-    }
+    driveListPromise.then(function(result) {
+      renderRows(result.documents || [], "", result.folderUrl || "");
+    }).catch(function(error) {
+      renderRows([], error && error.message ? error.message : String(error), "");
+    });
   });
 }
 async function syncActiveCaseFolderToDrive() {
