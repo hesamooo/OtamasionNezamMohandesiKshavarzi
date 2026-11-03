@@ -542,7 +542,7 @@ test('local IndexedDB failures cannot indefinitely block Google Drive document l
 test('secretariat variable injection resolves in preview using the letter snapshot and linked case', () => {
   const customizer = read('nezam-customizer.js');
   assert.match(customizer, /function resolveOfficeLetterVariables\(bodyHtml, letter, linkedCase\)/);
-  assert.match(customizer, /pick\(\["appName", "name"\], \["name"\]\)/);
+  assert.match(customizer, /pick\(\["appName", "name"\], \["name"\], \["نام متقاضی", "نام"\]\)/);
   assert.match(customizer, /"نام": "name"/);
   assert.match(customizer, /"پلاکثبتی": "landParcel"/);
   assert.match(customizer, /window\.__nezam636UnresolvedLetterVars = bodyResolution\.unresolved\.slice\(\)/);
@@ -566,4 +566,28 @@ test('rich letter editor preserves selection and caret during token insertion', 
   assert.match(customizer, /function insertHtmlAtLetterSelection\(html\)/);
   assert.match(customizer, /editor\.innerHTML = safeHtml/);
   assert.match(customizer, /editor\.dataset\.letterKeyboardBound/);
+});
+
+test('secretariat variable tokens survive sanitization and resolve from standard and custom case fields', () => {
+  const customizer = read('nezam-customizer.js');
+  const html = read('index.html');
+
+  assert.match(customizer, /setAttribute\("data-nezam-variable", rawKey\)/);
+  assert.match(customizer, /clean\.setAttribute\("data-nezam-variable", variableKey\)/);
+  assert.match(customizer, /querySelectorAll\("span\[data-nezam-variable\]"\)/);
+  assert.match(customizer, /addCustomFields\(record\.customFields\)/);
+  assert.match(customizer, /addCustomFields\(caseData\.customFields\)/);
+  assert.match(customizer, /caseCode: officeMode \? "" : \(c\.code \|\| ""\)/);
+  assert.match(customizer, /customFields: officeMode \? \[\] : \(Array\.isArray\(c\.customFields\)/);
+  assert.match(customizer, /pick\(\["landParcel", "parcel"\], \["landParcel", "parcel"\], \["پلاک ثبتی", "پلاک"\]\)/);
+  assert.match(customizer, /pick\(\["water", "waterSource"\], \["water", "waterSource"\], \["منبع آب", "آب"\]\)/);
+  assert.match(html, /onmousedown="rememberLetterEditorSelection\(\)"/);
+  assert.match(html, /\.rich-editor-paper \[data-nezam-variable\]/);
+});
+
+test('secretariat variable syntax supports old plain-text tags and double-brace tags', () => {
+  const customizer = read('nezam-customizer.js');
+  assert.ok(customizer.includes('String(tag || "").match(/^\\{([^{}]+)\\}$/)'));
+  assert.ok(customizer.includes('textNode.nodeValue.replace(/\\{\\{([^{}]+)\\}\\}|\\{([^{}]+)\\}/g'));
+  assert.ok(customizer.includes('replace(/[\\s\\u200c\\u200f\\u0640]/g, "")'));
 });
