@@ -3019,6 +3019,7 @@
     let isRestoring = false;
     let isInitialLoadDone = false;
     let isSyncInProgress = false;
+    let syncRequestedWhileBusy = false;
 
     // کلیدهای سیستمی که به تنهایی نباید باعث بازنویسی خودکار دیتابیس ابری در زمان لود صفحه شوند
     const IGNORED_STARTUP_KEYS = new Set([
@@ -3145,7 +3146,12 @@
     }
 
     async function syncAllDataToDrive(showAlert) {
-      if (isRestoring || isSyncInProgress) return false;
+      if (isRestoring) return false;
+      if (isSyncInProgress) {
+        // اگر هنگام ارسال نسخه قبلی تغییری مثل حذف رخ دهد، درخواست جدید را دور نمی‌اندازیم.
+        syncRequestedWhileBusy = true;
+        return false;
+      }
       if (!isInitialLoadDone && !showAlert) return false;
 
       isSyncInProgress = true;
@@ -3218,6 +3224,11 @@
         return false;
       } finally {
         isSyncInProgress = false;
+        if (syncRequestedWhileBusy && isInitialLoadDone && !isRestoring) {
+          syncRequestedWhileBusy = false;
+          clearTimeout(syncTimer);
+          syncTimer = setTimeout(() => syncAllDataToDrive(false), 350);
+        }
       }
     }
 
