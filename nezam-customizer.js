@@ -386,10 +386,13 @@ function ensureApplicantIdentityInLetterBody_(bodyHtml, applicant) {
   var normalize = function(value) {
     return String(value || "").replace(/[يى]/g, "ی").replace(/ك/g, "ک").replace(/[\s\u200c\u200f\u0640]/g, "").toLowerCase();
   };
-  var plain = normalize(parsed.body.textContent || "");
+  var rawText = parsed.body.textContent || "";
+  var plain = normalize(rawText);
+  var hasNamePlaceholder = /\{\{?\s*(?:نام|نام\s*متقاضی|نام\s*و\s*نام\s*خانوادگی)\s*\}\}?/.test(rawText);
+  var hasParcelPlaceholder = /\{\{?\s*(?:پلاک\s*ثبتی|پلاک)\s*\}\}?/.test(rawText);
   var additions = [];
-  if (plain.indexOf(normalize(name)) === -1) additions.push("نام متقاضی: " + name);
-  if (plain.indexOf(normalize(parcel)) === -1) additions.push("پلاک ثبتی زمین: " + parcel);
+  if (plain.indexOf(normalize(name)) === -1 && !hasNamePlaceholder) additions.push("نام متقاضی: " + name);
+  if (plain.indexOf(normalize(parcel)) === -1 && !hasParcelPlaceholder) additions.push("پلاک ثبتی زمین: " + parcel);
   if (additions.length) {
     var p = parsed.createElement("p");
     p.setAttribute("data-nezam-required-identity", "true");
