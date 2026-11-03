@@ -1352,6 +1352,10 @@ function saveActiveCaseChanges(goToLetters) {
 }
 
 function deleteActiveCase() {
+  if (window.__nezamDriveReady === false) {
+    showToastMsg("در حال تکمیل بازیابی اطلاعات؛ پس از آماده‌شدن سامانه حذف را انجام دهید.", true);
+    return;
+  }
   var c = getActiveCase();
   if (!c) return;
   if (casesDB.length <= 1) {
@@ -1389,9 +1393,12 @@ function deleteActiveCase() {
     }
   }
   activeCaseId = casesDB[0].id;
-  saveAllDB();
+  var caseDeleteSaved = saveAllDB();
   loadActiveCaseIntoForm();
-  showToastMsg("پرونده با رعایت کنترل دسترسی حذف گردید.");
+  if (typeof window.syncDeletionToDrive === "function") window.syncDeletionToDrive();
+  showToastMsg(caseDeleteSaved
+    ? "پرونده حذف و در فهرست حذف دائمی ثبت شد."
+    : "حذف در فهرست حذف دائمی ثبت شد، اما ذخیره یکی از بخش‌های مرورگر خطا داد؛ وضعیت ذخیره‌سازی را بررسی کنید.", !caseDeleteSaved);
 }
 
 /* جدول فهرست جامع و جستجوی پیشرفته متقاضیان در ۳ گروه تخصصی */
@@ -2024,6 +2031,10 @@ function renderSecretariatTable() {
           window.printArchivedLetter(id, size);
         } else showToastMsg("موتور چاپ نامه بارگذاری نشده است.", true);
       } else if (action === "delete") {
+        if (window.__nezamDriveReady === false) {
+          showToastMsg("در حال تکمیل بازیابی اطلاعات؛ پس از آماده‌شدن سامانه حذف را انجام دهید.", true);
+          return;
+        }
         if (!confirm("آیا از حذف این نامه از دفتر اندیکاتور اطمینان دارید؟")) return;
         var deletedLetterRecord = lettersDB[idx];
         if (!recordNezamDeletions([], [deletedLetterRecord])) {
@@ -2032,6 +2043,7 @@ function renderSecretariatTable() {
         }
         lettersDB.splice(idx, 1);
         var letterDeleteSaved = saveAllDB();
+        if (typeof window.syncDeletionToDrive === "function") window.syncDeletionToDrive();
         showToastMsg(letterDeleteSaved
           ? "نامه حذف و در فهرست حذف دائمی ثبت شد."
           : "حذف در فهرست حذف دائمی ثبت شد، اما ذخیره یکی از بخش‌های مرورگر خطا داد؛ وضعیت ذخیره‌سازی را بررسی کنید.", !letterDeleteSaved);
