@@ -3220,6 +3220,7 @@
 
       isSyncInProgress = true;
       try {
+        await window.NezamDriveDocuments.ensureReady();
         setCloudStatus('⏳ در حال ذخیره در درایو...', '#d97706');
         const snapshot = await collectCompleteSystemSnapshot();
 
@@ -3407,6 +3408,7 @@
       };
 
       try {
+        await window.NezamDriveDocuments.ensureReady();
         setCloudStatus('⏳ ساخت پوشه متقاضی در درایو...', '#1d4ed8');
         const folderResponse = await fetch(DRIVE_API_URL, {
           method: 'POST',
@@ -3430,6 +3432,7 @@
     // بارگذاری فایل‌های کتابخانه دانش در پوشه اختصاصی Google Drive.
     // این عملیات از قرارداد شناخته‌شده driveForm (action=saveApplicant) استفاده می‌کند.
     async function saveNezaam636KnowledgeFileToDrive(fileInfo) {
+      await window.NezamDriveDocuments.ensureReady();
       if (!fileInfo || typeof fileInfo.fileName !== 'string' || !fileInfo.fileName ||
           typeof fileInfo.fileData !== 'string' || !fileInfo.fileData) {
         throw new Error('اطلاعات فایل برای ذخیره در Google Drive ناقص است.');
