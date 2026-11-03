@@ -419,3 +419,16 @@ test('manual browser backup restore merges permanent deletion markers', () => {
   assert.ok(apply.includes('filterNezamRecordsByDeletionManifest'));
   assert.ok(apply.includes('persistNezamDeletionManifest(mergedDeletionManifest)'));
 });
+
+test('print pipeline isolates the printable document and waits for map image tiles', () => {
+  const customizer = read('nezam-customizer.js');
+  assert.ok(customizer.includes('function waitForPrintAssets(root, timeoutMs)'));
+  assert.ok(customizer.includes('root.querySelectorAll("svg image")'));
+  assert.ok(customizer.includes('function buildIsolatedPrintDocument(stage, paperSize, title)'));
+  assert.ok(customizer.includes('window.open("", "_blank")'));
+  assert.ok(customizer.includes('waitForPrintAssets(printWindow.document, 12000)'));
+  assert.ok(customizer.includes('.printed-croquis-satellite-box>svg{display:block!important;width:100%!important;'));
+  assert.ok(customizer.includes('@media print{.no-print,[data-no-print=\\'true\\']{display:none!important;}'));
+  assert.ok(customizer.includes('if (fitResult.overflowCount)'));
+  assert.ok(!customizer.includes('crossorigin="anonymous"'));
+});
