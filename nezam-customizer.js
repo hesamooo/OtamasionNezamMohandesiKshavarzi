@@ -669,7 +669,7 @@ function waitForPrintAssets(root, timeoutMs) {
 
 function buildIsolatedPrintDocument(stage, paperSize, title) {
   var css = buildPaperExportCss(paperSize, false) +
-    "\n@media print{.no-print,[data-no-print='true']{display:none!important;}html,body{overflow:visible!important;} .a4-page{break-inside:avoid!important;page-break-inside:avoid!important;} .a4-page:last-child{break-after:auto!important;page-break-after:auto!important;}}";
+    "\n@media print{.no-print,[data-no-print='true']{display:none!important;}html,body{overflow:visible!important;} .a4-page{break-inside:avoid!important;page-break-inside:avoid!important;} .a4-page:last-child{break-after:auto!important;page-break-after:auto!important;}.no-print,[data-no-print='true']{display:none!important;}}";
   var baseHref = String(document.baseURI || location.href).replace(/&/g, "&amp;").replace(/"/g, "&quot;");
   return '<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="UTF-8">' +
     '<meta name="viewport" content="width=device-width,initial-scale=1">' +
@@ -1441,7 +1441,7 @@ window.downloadPaperSheetFile = function(forcedSize) {
     return false;
   }
   var fitResult = autoFitPaperContent(stage);
-  if (currentPreviewMode !== "CROQUIS" && (fitResult.pendingCount || fitResult.overflowCount)) {
+  if (fitResult.pendingCount || fitResult.overflowCount) {
     showToastMsg("خروجی HTML ساخته نشد؛ صفحه هنوز کامل قابل اندازه‌گیری نیست یا محتوا از محدوده بیرون می‌زند.", true);
     return false;
   }
@@ -4787,7 +4787,7 @@ function exportStageToWordDoc() {
     return false;
   }
   var fitResult = autoFitPaperContent(stage);
-  if (currentPreviewMode !== "CROQUIS" && (fitResult.pendingCount || fitResult.overflowCount)) {
+  if (fitResult.pendingCount || fitResult.overflowCount) {
     showToastMsg("خروجی Word ساخته نشد؛ صفحه هنوز کامل قابل اندازه‌گیری نیست یا محتوا از محدوده بیرون می‌زند.", true);
     return false;
   }
