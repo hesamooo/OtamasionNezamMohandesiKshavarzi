@@ -3133,16 +3133,42 @@
           return { ok: false, message: (data && (data.message || data.error)) || 'اسکریپت گوگل خطای ذخیره گزارش کرد.' };
         }
         const status = data && typeof data === 'object' ? String(data.status || data.result || '').toLowerCase() : '';
-        if (/error|fail|denied|unauthorized|invalid/.test(status)) {
-          return { ok: false, message: (data && data.message) || 'اسکریپت گوگل ذخیره را نپذیرفت.' };
+        if (data && typeof data === 'object' &&
+            (data.success === true || data.ok === true || /^(success|saved|created|done|ok)$/.test(status))) {
+          return { ok: true, message: data.message || 'اسکریپت گوگل ذخیره را تأیید کرد.' };
         }
-        return { ok: true, message: (data && data.message) || 'پاسخ JSON دریافت شد.' };
+        return { ok: false, message: 'پاسخ گوگل صریحاً موفقیت ذخیره را تأیید نکرد؛ از اعلام ذخیره موفق خودداری شد.' };
       } catch (parseError) {
         if (/^(ok|success|saved|created|done)\b/i.test(raw) || /با موفقیت|ذخیره شد|ثبت شد/i.test(raw)) {
           return { ok: true, message: raw.slice(0, 180) };
         }
         return { ok: false, message: 'پاسخ سرور قابل تأیید نیست؛ ذخیره موفق اعلام نشد.' };
       }
+    }
+
+    // پاسخ POST به‌تنهایی کافی نیست؛ آخرین نسخه باید با همان محتوای پرونده/نامه در GET نیز دیده شود.
+    async function verifyDriveSnapshot(snapshot, expectedTs) {
+      const verifyKeys = ['nezam636_unified_cases', 'nezam636_letters', 'nezam636_deletion_manifest_v1'];
+      const delays = [250, 700, 1400];
+      for (let attempt = 0; attempt < delays.length; attempt++) {
+        if (delays[attempt]) await new Promise(resolve => setTimeout(resolve, delays[attempt]));
+        try {
+          const verifyUrl = DRIVE_API_URL + (DRIVE_API_URL.includes('?') ? '&' : '?') +
+            'verify=' + encodeURIComponent(String(expectedTs)) + '&t=' + Date.now();
+          const response = await fetch(verifyUrl, { method: 'GET', redirect: 'follow', cache: 'no-store' });
+          if (!response.ok) continue;
+          const remote = parseCloudResponse(await response.json()).bestSyncRecord;
+          if (!remote || !remote.storage || Number(remote.updatedAt || 0) < expectedTs) continue;
+          const matches = verifyKeys.every(key =>
+            typeof snapshot.storage[key] === 'string' &&
+            remote.storage[key] === snapshot.storage[key]
+          );
+          if (matches) return true;
+        } catch (error) {
+          console.warn('Google Drive read-back verification attempt failed:', error);
+        }
+      }
+      return false;
     }
 
     async function syncAllDataToDrive(showAlert) {
@@ -3203,6 +3229,10 @@
         const responseText = await res.text();
         const responseCheck = validateDriveWriteResponse(res, responseText);
         if (!responseCheck.ok) throw new Error(responseCheck.message);
+        const readBackConfirmed = await verifyDriveSnapshot(snapshot, ts);
+        if (!readBackConfirmed) {
+          throw new Error('گوگل پاسخ اولیه را پذیرفت، اما نسخه جدید شامل پرونده‌ها، نامه‌ها و فهرست حذف دائمی در بازخوانی تأیید نشد.');
+        }
         localStorage.setItem('__gdrive_sync_ts', String(ts));
         localStorage.setItem('__gdrive_has_local_data', '1');
 
@@ -3529,10 +3559,41 @@
           const cloudTs = Number(bestSyncRecord.updatedAt || Date.now());
           if (manualForce || !hasLocalData || localTs === 0 || cloudTs >= localTs) {
             window.__gdriveInternalFlush = true;
+            const localDeletionManifest = typeof window.readNezamDeletionManifest === 'function'
+              ? window.readNezamDeletionManifest() : { version: 1, cases: [], letters: [] };
+            let cloudDeletionManifest = { version: 1, cases: [], letters: [] };
+            try {
+              const rawManifest = bestSyncRecord.storage['nezam636_deletion_manifest_v1'];
+              if (typeof rawManifest === 'string') cloudDeletionManifest = JSON.parse(rawManifest);
+            } catch (manifestError) {}
+            const mergedDeletionManifest = typeof window.mergeNezamDeletionManifests === 'function'
+              ? window.mergeNezamDeletionManifests(localDeletionManifest, cloudDeletionManifest)
+              : localDeletionManifest;
+
             const entries = Object.entries(bestSyncRecord.storage);
-            for (const [k, v] of entries) {
-              if (isAllowedCloudStorageKey(k) && typeof v === 'string') {
-                localStorage.setItem(k, v);
+            for (const [k, originalValue] of entries) {
+              if (!isAllowedCloudStorageKey(k) || typeof originalValue !== 'string' ||
+                  k === 'nezam636_deletion_manifest_v1') continue;
+              let v = originalValue;
+              if (typeof window.filterNezamRecordsByDeletionManifest === 'function' &&
+                  (k === 'nezam636_unified_cases' || k === 'nezam636_letters')) {
+                try {
+                  const decoded = JSON.parse(v);
+                  const filtered = window.filterNezamRecordsByDeletionManifest(
+                    k === 'nezam636_unified_cases' ? decoded : [],
+                    k === 'nezam636_letters' ? decoded : [],
+                    mergedDeletionManifest
+                  );
+                  v = JSON.stringify(k === 'nezam636_unified_cases' ? filtered.cases : filtered.letters);
+                } catch (dataError) {
+                  throw new Error('ساختار اطلاعات پرونده یا نامه در نسخه ابری معتبر نیست؛ از بازنویسی داده جلوگیری شد.');
+                }
+              }
+              localStorage.setItem(k, v);
+            }
+            if (typeof window.persistNezamDeletionManifest === 'function') {
+              if (!window.persistNezamDeletionManifest(mergedDeletionManifest)) {
+                throw new Error('فهرست حذف دائمی در حافظه مرورگر قابل ذخیره نبود.');
               }
             }
             localStorage.setItem('__gdrive_sync_ts', String(cloudTs));
@@ -3546,65 +3607,18 @@
           }
         }
 
-        // ۲. بازیابی از پوشه‌های قدیمی فقط زمانی مجاز است که هنوز هیچ نسخه کامل دیتابیسی در درایو وجود نداشته باشد.
-        // در غیر این صورت، ادغام این فایل‌های قدیمی باعث بازگشت متقاضیان حذف‌شده می‌شود.
-        if (!hasAuthoritativeFullSnapshot && recoveredCases.length > 0) {
-          let currentCases = [];
-          try {
-            currentCases = JSON.parse(localStorage.getItem('nezam636_unified_cases') || '[]');
-          } catch (e) {}
-          if (!Array.isArray(currentCases) || currentCases.length === 0) {
-            currentCases = (typeof casesDB !== 'undefined' && Array.isArray(casesDB)) ? JSON.parse(JSON.stringify(casesDB)) : [];
-          }
-
-          let addedAnyCase = false;
-          for (const rc of recoveredCases) {
-            const existsIdx = currentCases.findIndex(
-              c => (c.id && rc.id && c.id === rc.id) || (c.nid && rc.nid && String(c.nid) === String(rc.nid) && c.name === rc.name)
-            );
-            if (existsIdx === -1) {
-              currentCases.unshift(rc);
-              addedAnyCase = true;
-            } else if (manualForce) {
-              currentCases[existsIdx] = rc;
-              addedAnyCase = true;
-            }
-          }
-
-          if (addedAnyCase) {
-            window.__gdriveInternalFlush = true;
-            localStorage.setItem('nezam636_unified_cases', JSON.stringify(currentCases));
-            localStorage.setItem('__gdrive_has_local_data', '1');
-            window.__gdriveInternalFlush = false;
-            didRestore = true;
-          }
-        }
-
-        // نامه‌های موجود در پشتیبان‌های قدیمی پرونده نیز نباید حذف از دفتر اندیکاتور را خنثی کنند.
-        if (!hasAuthoritativeFullSnapshot && recoveredLetters.length > 0) {
-          let currentLetters = [];
-          try {
-            currentLetters = JSON.parse(localStorage.getItem('nezam636_letters') || '[]');
-          } catch (e) {}
-          if (Array.isArray(currentLetters)) {
-            let addedLetter = false;
-            for (const rl of recoveredLetters) {
-              if (rl && rl.id && !currentLetters.some(l => l.id === rl.id)) {
-                currentLetters.unshift(rl);
-                addedLetter = true;
-              }
-            }
-            if (addedLetter) {
-              window.__gdriveInternalFlush = true;
-              localStorage.setItem('nezam636_letters', JSON.stringify(currentLetters));
-              window.__gdriveInternalFlush = false;
-              didRestore = true;
-            }
-          }
+        // نسخه‌های تکی پرونده که قبلاً در پوشه‌های Drive ساخته شده‌اند، فقط بایگانی‌اند.
+        // واردکردن خودکار آن‌ها ممنوع است؛ چون حذف از دفتر اصلی، فایل قدیمی Drive را پاک نمی‌کند
+        // و ادغام آن فایل‌ها باعث زنده‌شدن دوباره پرونده یا نامه حذف‌شده می‌شود.
+        if (recoveredCases.length || recoveredLetters.length) {
+          console.info('Legacy applicant-folder backups were detected and intentionally not merged into the live database.');
         }
 
         // ۳. اعمال فوری اطلاعات بازخوانی‌شده روی تمام جداول، فرم‌ها و نقشه‌ها بدون نیاز به رفرش
         if (didRestore) {
+          if (typeof window.applyNezamDeletionManifestToState === 'function') {
+            window.applyNezamDeletionManifestToState();
+          }
           if (typeof window.reloadAllStateFromLocalStorage === 'function') {
             window.reloadAllStateFromLocalStorage();
           }
