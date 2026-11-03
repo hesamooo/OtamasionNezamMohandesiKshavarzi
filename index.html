@@ -3541,6 +3541,7 @@
     async function loadFromDriveOnStartup(manualForce = false) {
       isRestoring = true;
       window.__nezamDriveReady = false;
+      let syncAfterRestore = false;
       try {
         setCloudStatus('🔄 دریافت اطلاعات از درایو...', '#0284c7');
         const fetchUrl = DRIVE_API_URL + (DRIVE_API_URL.includes('?') ? '&' : '?') + 't=' + Date.now();
@@ -3549,6 +3550,34 @@
         const rawData = await res.json();
 
         const { bestSyncRecord, recoveredCases, recoveredLetters } = parseCloudResponse(rawData);
+
+        // ادغام حذف‌های محلی و ابری حتی وقتی نسخه محلی جدیدتر است و بدنه کامل ابر اعمال نمی‌شود.
+        const localDeletionManifest = typeof window.readNezamDeletionManifest === 'function'
+          ? window.readNezamDeletionManifest() : { version: 1, cases: [], letters: [] };
+        let cloudDeletionManifest = { version: 1, cases: [], letters: [] };
+        try {
+          const rawManifest = bestSyncRecord && bestSyncRecord.storage
+            ? bestSyncRecord.storage['nezam636_deletion_manifest_v1'] : null;
+          if (typeof rawManifest === 'string') cloudDeletionManifest = JSON.parse(rawManifest);
+        } catch (manifestError) {}
+        const mergedDeletionManifest = typeof window.mergeNezamDeletionManifests === 'function'
+          ? window.mergeNezamDeletionManifests(localDeletionManifest, cloudDeletionManifest)
+          : localDeletionManifest;
+        const cloudCaseDeleteIds = new Set((cloudDeletionManifest.cases || []).map(item => String(item && item.id || '')));
+        const cloudLetterDeleteIds = new Set((cloudDeletionManifest.letters || []).map(item => String(item && item.id || '')));
+        const hasLocalOnlyDeletion =
+          (localDeletionManifest.cases || []).some(item => item && !cloudCaseDeleteIds.has(String(item.id))) ||
+          (localDeletionManifest.letters || []).some(item => item && !cloudLetterDeleteIds.has(String(item.id)));
+        if (hasLocalOnlyDeletion) syncAfterRestore = true;
+        if (JSON.stringify(mergedDeletionManifest) !== JSON.stringify(localDeletionManifest)) {
+          if (typeof window.persistNezamDeletionManifest === 'function' &&
+              !window.persistNezamDeletionManifest(mergedDeletionManifest)) {
+            throw new Error('ادغام فهرست حذف دائمی در حافظه مرورگر ناموفق بود.');
+          }
+          if (typeof window.applyNezamDeletionManifestToState === 'function') {
+            window.applyNezamDeletionManifestToState();
+          }
+        }
 
         const localTs = Number(localStorage.getItem('__gdrive_sync_ts') || 0);
         const hasLocalData = Boolean(localStorage.getItem('__gdrive_has_local_data') && localStorage.getItem('nezam636_unified_cases'));
@@ -3562,17 +3591,6 @@
           if (manualForce || !hasLocalData || localTs === 0 || cloudTs >= localTs) {
             window.__gdriveInternalFlush = true;
             try {
-              const localDeletionManifest = typeof window.readNezamDeletionManifest === 'function'
-                ? window.readNezamDeletionManifest() : { version: 1, cases: [], letters: [] };
-              let cloudDeletionManifest = { version: 1, cases: [], letters: [] };
-              try {
-                const rawManifest = bestSyncRecord.storage['nezam636_deletion_manifest_v1'];
-                if (typeof rawManifest === 'string') cloudDeletionManifest = JSON.parse(rawManifest);
-              } catch (manifestError) {}
-              const mergedDeletionManifest = typeof window.mergeNezamDeletionManifests === 'function'
-                ? window.mergeNezamDeletionManifests(localDeletionManifest, cloudDeletionManifest)
-                : localDeletionManifest;
-
               const entries = Object.entries(bestSyncRecord.storage);
               for (const [k, originalValue] of entries) {
                 if (!isAllowedCloudStorageKey(k) || typeof originalValue !== 'string' ||
@@ -3648,6 +3666,10 @@
         isRestoring = false;
         isInitialLoadDone = true;
         window.__nezamDriveReady = true;
+        if (syncAfterRestore) {
+          clearTimeout(syncTimer);
+          setTimeout(() => syncAllDataToDrive(false), 300);
+        }
       }
     }
 
