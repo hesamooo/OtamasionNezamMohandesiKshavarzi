@@ -598,19 +598,132 @@ var editingLetterId = null;
 var rootDriveHandle = null;
 var pendingGuardedCallback = null;
 
+// فهرست حذف دائمی؛ جلوی بازگشت داده از نسخه‌های قدیمی مرورگر و Google Drive را می‌گیرد.
+var NEZAM_DELETION_MANIFEST_KEY = "nezam636_deletion_manifest_v1";
+function readNezamDeletionManifest() {
+  try {
+    var raw = localStorage.getItem(NEZAM_DELETION_MANIFEST_KEY);
+    var data = raw ? JSON.parse(raw) : {};
+    return {
+      version: 1,
+      updatedAt: Number(data.updatedAt || 0),
+      cases: Array.isArray(data.cases) ? data.cases : [],
+      letters: Array.isArray(data.letters) ? data.letters : []
+    };
+  } catch (e) {
+    return { version: 1, updatedAt: 0, cases: [], letters: [] };
+  }
+}
+function mergeNezamDeletionManifests(a, b) {
+  var left = a && typeof a === "object" ? a : {};
+  var right = b && typeof b === "object" ? b : {};
+  var merged = { version: 1, updatedAt: Math.max(Number(left.updatedAt || 0), Number(right.updatedAt || 0)), cases: [], letters: [] };
+  ["cases", "letters"].forEach(function (type) {
+    var byId = {};
+    [left[type], right[type]].forEach(function (list) {
+      (Array.isArray(list) ? list : []).forEach(function (item) {
+        if (!item || !item.id) return;
+        var id = String(item.id);
+        if (!byId[id] || Number(item.deletedAt || 0) > Number(byId[id].deletedAt || 0)) {
+          byId[id] = Object.assign({}, item, { id: id });
+        }
+      });
+    });
+    merged[type] = Object.keys(byId).map(function (id) { return byId[id]; });
+  });
+  return merged;
+}
+function persistNezamDeletionManifest(manifest) {
+  try {
+    var normalized = mergeNezamDeletionManifests(manifest, null);
+    normalized.updatedAt = Math.max(Date.now(), Number(normalized.updatedAt || 0));
+    localStorage.setItem(NEZAM_DELETION_MANIFEST_KEY, JSON.stringify(normalized));
+    return true;
+  } catch (e) {
+    console.error("Nezam636 deletion manifest could not be saved:", e);
+    return false;
+  }
+}
+function recordNezamDeletions(caseRecords, letterRecords) {
+  var manifest = readNezamDeletionManifest();
+  var now = Date.now();
+  (Array.isArray(caseRecords) ? caseRecords : []).forEach(function (item) {
+    if (!item || !item.id) return;
+    manifest.cases.push({ id: String(item.id), nid: String(item.nid || ""), name: String(item.name || ""), deletedAt: now });
+  });
+  (Array.isArray(letterRecords) ? letterRecords : []).forEach(function (item) {
+    if (!item || !item.id) return;
+    manifest.letters.push({ id: String(item.id), number: String(item.number || ""), recipient: String(item.recipient || ""), deletedAt: now });
+  });
+  return persistNezamDeletionManifest(manifest);
+}
+function isNezamCaseDeleted(item, manifest) {
+  if (!item) return false;
+  var id = String(item.id || "");
+  return (manifest.cases || []).some(function (deleted) {
+    if (!deleted) return false;
+    if (id && String(deleted.id) === id) return true;
+    // شناسه‌های ساخته‌شده از نسخه‌های بسیار قدیمی Drive بر اساس کدملی بازسازی می‌شوند.
+    return id.indexOf("CASE-DRV-") === 0 && deleted.nid && String(deleted.nid) === String(item.nid || "");
+  });
+}
+function isNezamLetterDeleted(item, manifest) {
+  if (!item) return false;
+  var id = String(item.id || "");
+  return (manifest.letters || []).some(function (deleted) {
+    if (!deleted) return false;
+    if (id && String(deleted.id) === id) return true;
+    return !!(deleted.number && String(deleted.number) === String(item.number || "") &&
+      (!deleted.recipient || String(deleted.recipient) === String(item.recipient || "")));
+  });
+}
+function filterNezamRecordsByDeletionManifest(caseRecords, letterRecords, manifest) {
+  var m = mergeNezamDeletionManifests(manifest || readNezamDeletionManifest(), null);
+  return {
+    cases: (Array.isArray(caseRecords) ? caseRecords : []).filter(function (item) { return !isNezamCaseDeleted(item, m); }),
+    letters: (Array.isArray(letterRecords) ? letterRecords : []).filter(function (item) { return !isNezamLetterDeleted(item, m); })
+  };
+}
+function applyNezamDeletionManifestToState() {
+  var filtered = filterNezamRecordsByDeletionManifest(casesDB, lettersDB, readNezamDeletionManifest());
+  casesDB = filtered.cases;
+  lettersDB = filtered.letters;
+}
+window.readNezamDeletionManifest = readNezamDeletionManifest;
+window.mergeNezamDeletionManifests = mergeNezamDeletionManifests;
+window.persistNezamDeletionManifest = persistNezamDeletionManifest;
+window.filterNezamRecordsByDeletionManifest = filterNezamRecordsByDeletionManifest;
+window.applyNezamDeletionManifestToState = applyNezamDeletionManifestToState;
+
+/* بارگذاری و مهاجرت یک‌باره داده‌های قدیمی؛ پس از ایجاد کلید اصلی، کلید v6 دیگر منبع جایگزین نیست. */
+function readCanonicalOrMigrateLegacy(primaryKey, legacyKey) {
+  var raw = localStorage.getItem(primaryKey);
+  if (raw === null) {
+    raw = localStorage.getItem(legacyKey);
+    if (raw !== null) {
+      localStorage.setItem(primaryKey, raw);
+    }
+  }
+  try { localStorage.removeItem(legacyKey); } catch (e) {}
+  return raw;
+}
+
 /* بارگذاری و مهاجرت هوشمند داده‌های قبلی از LocalStorage */
 try {
   if (localStorage.getItem("nezam636_act_specs_v3")) {
     var savedSpecs = JSON.parse(localStorage.getItem("nezam636_act_specs_v3"));
     for (var sk in savedSpecs) ACT_SPECS[sk] = savedSpecs[sk];
   }
-  if (localStorage.getItem("nezam636_unified_cases")) {
-    var loadedCases = JSON.parse(localStorage.getItem("nezam636_unified_cases"));
-    if (Array.isArray(loadedCases) && loadedCases.length) {
-      casesDB = loadedCases;
-    }
+  var initialCasesRaw = readCanonicalOrMigrateLegacy("nezam636_unified_cases", "nezam636_cases_v6");
+  if (initialCasesRaw !== null) {
+    var loadedCases = JSON.parse(initialCasesRaw);
+    if (Array.isArray(loadedCases)) casesDB = loadedCases;
   }
-  if (localStorage.getItem("nezam636_letters")) lettersDB = JSON.parse(localStorage.getItem("nezam636_letters"));
+  var initialLettersRaw = readCanonicalOrMigrateLegacy("nezam636_letters", "nezam636_letters_v6");
+  if (initialLettersRaw !== null) {
+    var loadedLetters = JSON.parse(initialLettersRaw);
+    if (Array.isArray(loadedLetters)) lettersDB = loadedLetters;
+  }
   if (localStorage.getItem("nezam636_tasks")) tasksDB = JSON.parse(localStorage.getItem("nezam636_tasks"));
   if (localStorage.getItem("nezam636_doc_checklists_v2")) {
     var loadedDocs = JSON.parse(localStorage.getItem("nezam636_doc_checklists_v2"));
@@ -620,6 +733,7 @@ try {
     activeCaseId = localStorage.getItem("nezam636_active_case_id");
   }
 } catch (e) {}
+applyNezamDeletionManifestToState();
 
 /* ارتقای ساختاری پرونده‌های قدیمی بدون حذف هیچ اطلاعاتی */
 function normalizeAllCasesSchema() {
@@ -688,9 +802,12 @@ function normalizeAllCasesSchema() {
 normalizeAllCasesSchema();
 
 function saveAllDB() {
+  // هیچ نسخه قدیمی/بازیابی‌شده‌ای نباید رکوردی را که در فهرست حذف دائمی است دوباره ذخیره کند.
+  applyNezamDeletionManifestToState();
   var storageEntries = [
     ["nezam636_unified_cases", casesDB],
     ["nezam636_letters", lettersDB],
+    [NEZAM_DELETION_MANIFEST_KEY, readNezamDeletionManifest()],
     ["nezam636_tasks", tasksDB],
     ["nezam636_doc_checklists_v2", DOC_CHECKLISTS],
     ["nezam636_act_specs_v3", ACT_SPECS],
@@ -708,6 +825,12 @@ function saveAllDB() {
     }
   }
 
+  if (!failedKeys.length) {
+    try {
+      localStorage.removeItem("nezam636_cases_v6");
+      localStorage.removeItem("nezam636_letters_v6");
+    } catch (legacyCleanupError) {}
+  }
   if (failedKeys.length) {
     var now = Date.now();
     var lastWarning = Number(window.__nezam636LastStorageWarningAt || 0);
@@ -1243,6 +1366,14 @@ function deleteActiveCase() {
   if (!confirm(msg)) return;
 
   var deleteHistoryToo = confirm("آیا نامه‌های ثبت‌شده این متقاضی در دفتر اندیکاتور نیز حذف شوند؟ (برای حفظ سوابق دبیرخانه روی Cancel کلیک کنید)");
+  var lettersToDelete = deleteHistoryToo
+    ? lettersDB.filter(function(item) { return item.caseId === c.id; })
+    : [];
+  // پیش از حذف، ثبت دائمی انجام می‌شود تا نسخه‌های قدیمی Drive یا مرورگر نتوانند پرونده را زنده کنند.
+  if (!recordNezamDeletions([c], lettersToDelete)) {
+    alert("ثبت سابقه حذف در حافظه مرورگر ناموفق بود؛ برای جلوگیری از بازگشت پرونده، حذف انجام نشد. فضای ذخیره‌سازی مرورگر را بررسی کنید.");
+    return;
+  }
   if (deleteHistoryToo) {
     lettersDB = lettersDB.filter(function(item) { return item.caseId !== c.id; });
   }
@@ -1890,9 +2021,16 @@ function renderSecretariatTable() {
         } else showToastMsg("موتور چاپ نامه بارگذاری نشده است.", true);
       } else if (action === "delete") {
         if (!confirm("آیا از حذف این نامه از دفتر اندیکاتور اطمینان دارید؟")) return;
+        var deletedLetterRecord = lettersDB[idx];
+        if (!recordNezamDeletions([], [deletedLetterRecord])) {
+          showToastMsg("ثبت سابقه حذف در حافظه مرورگر ناموفق بود؛ نامه حذف نشد. فضای ذخیره‌سازی مرورگر را بررسی کنید.", true);
+          return;
+        }
         lettersDB.splice(idx, 1);
-        saveAllDB();
-        showToastMsg("نامه از دفتر اندیکاتور حذف شد.");
+        var letterDeleteSaved = saveAllDB();
+        showToastMsg(letterDeleteSaved
+          ? "نامه حذف و در فهرست حذف دائمی ثبت شد."
+          : "حذف در فهرست حذف دائمی ثبت شد، اما ذخیره یکی از بخش‌های مرورگر خطا داد؛ وضعیت ذخیره‌سازی را بررسی کنید.", !letterDeleteSaved);
       }
     } catch (error) {
       window.__nezam636LastSecretariatError = error;
@@ -2171,6 +2309,7 @@ if (document.readyState === "loading") {
    ========================================================================= */
 window.flushInMemoryStateToLocalStorage = function() {
   try {
+    applyNezamDeletionManifestToState();
     window.__gdriveInternalFlush = true;
     localStorage.setItem("nezam636_unified_cases", JSON.stringify(casesDB));
     localStorage.setItem("nezam636_letters", JSON.stringify(lettersDB));
@@ -2201,18 +2340,21 @@ window.reloadAllStateFromLocalStorage = function() {
       var savedSpecs = JSON.parse(localStorage.getItem("nezam636_act_specs_v3"));
       for (var sk in savedSpecs) ACT_SPECS[sk] = savedSpecs[sk];
     }
-    var rawCases = localStorage.getItem("nezam636_unified_cases") || localStorage.getItem("nezam636_cases_v6");
-    if (rawCases) {
+    var rawCases = localStorage.getItem("nezam636_unified_cases");
+    if (rawCases !== null) {
       var loadedCases = JSON.parse(rawCases);
-      if (Array.isArray(loadedCases) && loadedCases.length) {
-        casesDB = loadedCases;
-      }
+      if (Array.isArray(loadedCases)) casesDB = loadedCases;
     }
-    var rawLetters = localStorage.getItem("nezam636_letters") || localStorage.getItem("nezam636_letters_v6");
-    if (rawLetters) {
+    var rawLetters = localStorage.getItem("nezam636_letters");
+    if (rawLetters !== null) {
       var loadedLetters = JSON.parse(rawLetters);
       if (Array.isArray(loadedLetters)) lettersDB = loadedLetters;
     }
+    try {
+      localStorage.removeItem("nezam636_cases_v6");
+      localStorage.removeItem("nezam636_letters_v6");
+    } catch (legacyCleanupError) {}
+    applyNezamDeletionManifestToState();
     var rawTasks = localStorage.getItem("nezam636_tasks") || localStorage.getItem("nezam636_tasks_v6");
     if (rawTasks) {
       var loadedTasks = JSON.parse(rawTasks);
