@@ -312,7 +312,7 @@ test('authoritative Google Drive snapshots prevent deleted applicants and letter
   assert.notEqual(end, -1, 'Drive restore UI refresh section must exist');
   const restore = html.slice(start, end);
 
-  assert.match(restore, /const hasAuthoritativeFullSnapshot = Boolean\\(bestSyncRecord && bestSyncRecord\\.storage/);
-  assert.match(restore, /if \\(!hasAuthoritativeFullSnapshot && recoveredCases\\.length > 0\\)/);
-  assert.match(restore, /if \\(!hasAuthoritativeFullSnapshot && recoveredLetters\\.length > 0\\)/);
+  assert.ok(restore.includes('const hasAuthoritativeFullSnapshot = Boolean(bestSyncRecord && bestSyncRecord.storage'), 'full database snapshot must be detected');
+  assert.ok(restore.includes('if (!hasAuthoritativeFullSnapshot && recoveredCases.length > 0)'), 'legacy applicant backups must only be used without a full snapshot');
+  assert.ok(restore.includes('if (!hasAuthoritativeFullSnapshot && recoveredLetters.length > 0)'), 'legacy letter backups must only be used without a full snapshot');
 });
