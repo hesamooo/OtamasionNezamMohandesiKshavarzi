@@ -1977,6 +1977,8 @@ function renderActiveCaseDocsChecklist() {
   }
 
   bindToolbar();
+  if (librarySummary) librarySummary.textContent = "در حال دریافت فهرست فایل‌های متقاضی از Google Drive...";
+  if (libraryBody) libraryBody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">⏳ در حال بارگذاری فهرست اسناد...</td></tr>';
   var legacyBoxHandler = document.getElementById("case-docs-legacy-files");
   if (legacyBoxHandler && legacyBoxHandler.dataset.bound !== "1") {
     legacyBoxHandler.dataset.bound = "1";
