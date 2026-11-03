@@ -3540,6 +3540,7 @@
     // ۵. بازخوانی کامل اطلاعات از گوگل درایو (هنگام ورود با مرورگر/دستگاه جدید یا کلیک روی دکمه بازخوانی)
     async function loadFromDriveOnStartup(manualForce = false) {
       isRestoring = true;
+      window.__nezamDriveReady = false;
       try {
         setCloudStatus('🔄 دریافت اطلاعات از درایو...', '#0284c7');
         const fetchUrl = DRIVE_API_URL + (DRIVE_API_URL.includes('?') ? '&' : '?') + 't=' + Date.now();
@@ -3560,48 +3561,53 @@
           const cloudTs = Number(bestSyncRecord.updatedAt || Date.now());
           if (manualForce || !hasLocalData || localTs === 0 || cloudTs >= localTs) {
             window.__gdriveInternalFlush = true;
-            const localDeletionManifest = typeof window.readNezamDeletionManifest === 'function'
-              ? window.readNezamDeletionManifest() : { version: 1, cases: [], letters: [] };
-            let cloudDeletionManifest = { version: 1, cases: [], letters: [] };
             try {
-              const rawManifest = bestSyncRecord.storage['nezam636_deletion_manifest_v1'];
-              if (typeof rawManifest === 'string') cloudDeletionManifest = JSON.parse(rawManifest);
-            } catch (manifestError) {}
-            const mergedDeletionManifest = typeof window.mergeNezamDeletionManifests === 'function'
-              ? window.mergeNezamDeletionManifests(localDeletionManifest, cloudDeletionManifest)
-              : localDeletionManifest;
-
-            const entries = Object.entries(bestSyncRecord.storage);
-            for (const [k, originalValue] of entries) {
-              if (!isAllowedCloudStorageKey(k) || typeof originalValue !== 'string' ||
-                  k === 'nezam636_deletion_manifest_v1') continue;
-              let v = originalValue;
-              if (typeof window.filterNezamRecordsByDeletionManifest === 'function' &&
-                  (k === 'nezam636_unified_cases' || k === 'nezam636_letters')) {
-                try {
-                  const decoded = JSON.parse(v);
-                  const filtered = window.filterNezamRecordsByDeletionManifest(
-                    k === 'nezam636_unified_cases' ? decoded : [],
-                    k === 'nezam636_letters' ? decoded : [],
-                    mergedDeletionManifest
-                  );
-                  v = JSON.stringify(k === 'nezam636_unified_cases' ? filtered.cases : filtered.letters);
-                } catch (dataError) {
-                  throw new Error('ساختار اطلاعات پرونده یا نامه در نسخه ابری معتبر نیست؛ از بازنویسی داده جلوگیری شد.');
+              const localDeletionManifest = typeof window.readNezamDeletionManifest === 'function'
+                ? window.readNezamDeletionManifest() : { version: 1, cases: [], letters: [] };
+              let cloudDeletionManifest = { version: 1, cases: [], letters: [] };
+              try {
+                const rawManifest = bestSyncRecord.storage['nezam636_deletion_manifest_v1'];
+                if (typeof rawManifest === 'string') cloudDeletionManifest = JSON.parse(rawManifest);
+              } catch (manifestError) {}
+              const mergedDeletionManifest = typeof window.mergeNezamDeletionManifests === 'function'
+                ? window.mergeNezamDeletionManifests(localDeletionManifest, cloudDeletionManifest)
+                : localDeletionManifest;
+  
+              const entries = Object.entries(bestSyncRecord.storage);
+              for (const [k, originalValue] of entries) {
+                if (!isAllowedCloudStorageKey(k) || typeof originalValue !== 'string' ||
+                    k === 'nezam636_deletion_manifest_v1') continue;
+                let v = originalValue;
+                if (typeof window.filterNezamRecordsByDeletionManifest === 'function' &&
+                    (k === 'nezam636_unified_cases' || k === 'nezam636_letters')) {
+                  try {
+                    const decoded = JSON.parse(v);
+                    const filtered = window.filterNezamRecordsByDeletionManifest(
+                      k === 'nezam636_unified_cases' ? decoded : [],
+                      k === 'nezam636_letters' ? decoded : [],
+                      mergedDeletionManifest
+                    );
+                    v = JSON.stringify(k === 'nezam636_unified_cases' ? filtered.cases : filtered.letters);
+                  } catch (dataError) {
+                    throw new Error('ساختار اطلاعات پرونده یا نامه در نسخه ابری معتبر نیست؛ از بازنویسی داده جلوگیری شد.');
+                  }
+                }
+                localStorage.setItem(k, v);
+              }
+              if (typeof window.persistNezamDeletionManifest === 'function') {
+                if (!window.persistNezamDeletionManifest(mergedDeletionManifest)) {
+                  throw new Error('فهرست حذف دائمی در حافظه مرورگر قابل ذخیره نبود.');
                 }
               }
-              localStorage.setItem(k, v);
+              localStorage.setItem('__gdrive_sync_ts', String(cloudTs));
+              localStorage.setItem('__gdrive_has_local_data', '1');
+  
+              if (Array.isArray(bestSyncRecord.indexedDBDocs)
+            } finally {
+              window.__gdriveInternalFlush = false;
             }
-            if (typeof window.persistNezamDeletionManifest === 'function') {
-              if (!window.persistNezamDeletionManifest(mergedDeletionManifest)) {
-                throw new Error('فهرست حذف دائمی در حافظه مرورگر قابل ذخیره نبود.');
-              }
-            }
-            localStorage.setItem('__gdrive_sync_ts', String(cloudTs));
-            localStorage.setItem('__gdrive_has_local_data', '1');
-            window.__gdriveInternalFlush = false;
 
-            if (Array.isArray(bestSyncRecord.indexedDBDocs) && bestSyncRecord.indexedDBDocs.length > 0 && typeof window.importIndexedDBDocs === 'function') {
+ && bestSyncRecord.indexedDBDocs.length > 0 && typeof window.importIndexedDBDocs === 'function') {
               await window.importIndexedDBDocs(bestSyncRecord.indexedDBDocs);
             }
             didRestore = true;
