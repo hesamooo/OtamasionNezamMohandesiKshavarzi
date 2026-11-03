@@ -454,23 +454,22 @@ test('navigation and printing have one clear control path', () => {
   const core = read('nezam-core.js');
   const operations = read('nezam-operations.js');
 
-  assert.doesNotMatch(html, /var SUB_TABS_MAP\\s*=|function renderSubBar\\s*\\(/);
-  assert.doesNotMatch(html, /id\\s*=\\s*'nezam-top-subbar'/);
+  assert.doesNotMatch(html, /var SUB_TABS_MAP\s*=|function renderSubBar\s*\(/);
+  assert.doesNotMatch(html, /id\s*=\s*'nezam-top-subbar'/);
   assert.match(html, /id="sub-docs"/);
   assert.equal((html.match(/id="print-paper-size-select"/g) || []).length, 1);
   assert.doesNotMatch(html, /id="l-paper-size"|id="btn-paper-a4"|id="btn-paper-a5"|id="btn-preview-letter-draft"/);
   assert.doesNotMatch(customizer, /l-paper-size|btn-paper-a4|btn-paper-a5|btn-preview-letter-draft/);
   assert.match(core, /data-letter-action='preview'/);
   assert.doesNotMatch(core, /data-letter-action='a4'|data-letter-action='a5'/);
-  assert.equal((customizer.match(/waitForPrintAssets\\(printWindow\\.document, 12000\\)/g) || []).length, 1);
-  assert.equal((customizer.match(/waitForPrintAssets\\(stage, 12000\\)/g) || []).length, 1);
+  assert.equal((customizer.match(/waitForPrintAssets\(printWindow\.document, 12000\)/g) || []).length, 1);
+  assert.equal((customizer.match(/waitForPrintAssets\(stage, 12000\)/g) || []).length, 1);
   assert.match(customizer, /askToContinueWithMissingAssets/);
-  assert.match(html, /<script defer src="\\.\\/nezam-agent-engine\\.js/);
+  assert.match(html, /<script defer src="\.\/nezam-agent-engine\.js/);
   assert.doesNotMatch(operations, /پرونده‌های ثبت‌شده|نامه‌های ثبت‌شده:/);
   assert.match(operations, /پیگیری‌های عقب‌افتاده/);
   assert.match(operations, /استعلام‌های غیرقطعی/);
 });
-
 test('Google Drive applicant document vault supports protected multi-file storage', () => {
   const html = read('index.html');
   const core = read('nezam-core.js');
