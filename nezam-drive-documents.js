@@ -23,26 +23,40 @@
   async function ensureReady() {
     if (readyPromise) return readyPromise;
     readyPromise = (async function() {
-      var key = getAccessKey(false);
-      var response = await fetch(DRIVE_API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({
-          action: 'sync',
-          healthCheck: true,
-          fullDatabase: { storage: {} },
-          accessKey: key
-        }),
-        redirect: 'follow'
-      });
-      var raw = await response.text();
-      var data;
-      try { data = JSON.parse(raw); }
-      catch (e) { throw new Error('پاسخ سرور قابل‌خواندن نیست؛ نسخه جدید Code.gs را نصب کنید.'); }
-      if (!response.ok || !data || data.status !== 'success' || Number(data.apiVersion) !== 1) {
-        throw new Error('نسخه جدید Google Apps Script هنوز منتشر نشده است. ابتدا Code.gs جدید را جایگزین و Web App را به‌روزرسانی کنید.');
+      async function sendHealthCheck(key) {
+        var response = await fetch(DRIVE_API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            action: 'sync',
+            healthCheck: true,
+            fullDatabase: { storage: {} },
+            accessKey: key
+          }),
+          redirect: 'follow'
+        });
+        var raw = await response.text();
+        var data;
+        try { data = JSON.parse(raw); }
+        catch (e) { throw new Error('پاسخ سرور قابل‌خواندن نیست؛ نسخه جدید Code.gs را نصب کنید.'); }
+        if (!response.ok || !data || Number(data.apiVersion) !== 1) {
+          throw new Error('نسخه جدید Google Apps Script هنوز منتشر نشده است. ابتدا Code.gs جدید را جایگزین و Web App را به‌روزرسانی کنید.');
+        }
+        return data;
       }
-      return true;
+
+      var key = getAccessKey(false);
+      for (var attempt = 0; attempt < 2; attempt++) {
+        var result = await sendHealthCheck(key);
+        if (result.status === 'success') return true;
+        if (attempt === 0 && /کلید دسترسی/.test(String(result.message || ''))) {
+          try { localStorage.removeItem(ACCESS_KEY_STORAGE); } catch (e) {}
+          key = getAccessKey(true);
+          continue;
+        }
+        throw new Error(result.message || 'دسترسی به بایگانی Google Drive تأیید نشد.');
+      }
+      throw new Error('احراز هویت بایگانی Google Drive ناموفق بود.');
     })();
     try {
       return await readyPromise;
