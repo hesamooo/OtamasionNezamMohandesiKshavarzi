@@ -476,3 +476,21 @@ test('Google Drive applicant document vault supports protected multi-file storag
   assert.doesNotMatch(vault, /NEZAM636_DOCS_ACCESS_KEY\s*=\s*['"][^'"]+['"]/);
 });
 
+
+
+test('applicant section displays a complete Google Drive file inventory and metadata', () => {
+  const html = read('index.html');
+  const core = read('nezam-core.js');
+  assert.match(html, /id="case-docs-file-library"/);
+  assert.match(html, /id="case-docs-library-summary"/);
+  assert.match(html, /id="case-docs-library-tbody"/);
+  assert.match(html, /id="case-docs-refresh-library"/);
+  assert.match(core, /var allFiles = \(cloudFiles \|\| \[\]\)\.slice\(\)/);
+  assert.match(core, /file\.mimeType/);
+  assert.match(core, /file\.uploadedAt/);
+  assert.match(core, /file\.webViewLink/);
+  assert.match(core, /file\.downloadUrl/);
+  assert.match(core, /data-library-action="delete"/);
+  assert.match(core, /data-library-action="replace"/);
+  assert.match(core, /دریافت فهرست فایل‌ها ناموفق بود/);
+});
