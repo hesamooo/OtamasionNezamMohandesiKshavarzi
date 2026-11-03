@@ -1657,31 +1657,95 @@ function renderUnifiedCasesMatrix() {
   }
 }
 function openFilesDB(cb) {
-  if (idbInstance) return cb(idbInstance);
-  if (!window.indexedDB) return cb(null);
-  var req = window.indexedDB.open("Nezam636_UnifiedFiles_DB", 1);
+  var settled = false;
+  var timer = setTimeout(function() { finish(null); }, 4500);
+  function finish(db) {
+    if (settled) return;
+    settled = true;
+    clearTimeout(timer);
+    try { cb(db || null); }
+    catch (callbackError) { console.error("IndexedDB callback failed:", callbackError); }
+  }
+
+  if (idbInstance) {
+    try {
+      // دسترسی به transaction هم وضعیت بسته‌شدن DB را آشکار می‌کند.
+      idbInstance.transaction(["docs"], "readonly");
+      return finish(idbInstance);
+    } catch (closedError) {
+      try { idbInstance.close(); } catch (e) {}
+      idbInstance = null;
+    }
+  }
+  if (!window.indexedDB) return finish(null);
+
+  var req;
+  try {
+    req = window.indexedDB.open("Nezam636_UnifiedFiles_DB", 1);
+  } catch (openError) {
+    console.warn("Could not open local document database:", openError);
+    return finish(null);
+  }
   req.onupgradeneeded = function(e) {
     var db = e.target.result;
     if (!db.objectStoreNames.contains("docs")) db.createObjectStore("docs", { keyPath: "key" });
   };
-  req.onsuccess = function(e) { idbInstance = e.target.result; cb(idbInstance); };
-  req.onerror = function() { cb(null); };
+  req.onsuccess = function(e) {
+    var db = e.target.result;
+    idbInstance = db;
+    db.onversionchange = function() {
+      try { db.close(); } catch (closeError) {}
+      if (idbInstance === db) idbInstance = null;
+    };
+    finish(db);
+  };
+  req.onerror = function() {
+    console.warn("IndexedDB open failed:", req.error || "unknown error");
+    finish(null);
+  };
+  req.onblocked = function() {
+    console.warn("IndexedDB open is blocked by another tab or connection.");
+    finish(null);
+  };
 }
 
 function getUploadedDocsForCase(caseId, cb) {
+  var completed = false;
+  var fallbackTimer = setTimeout(function() {
+    if (completed) return;
+    completed = true;
+    console.warn("Local document lookup timed out; continuing with Google Drive inventory.");
+    cb({});
+  }, 5000);
+
+  function finish(map) {
+    if (completed) return;
+    completed = true;
+    clearTimeout(fallbackTimer);
+    cb(map || {});
+  }
+
   openFilesDB(function(db) {
-    if (!db) return cb({});
-    var tx = db.transaction(["docs"], "readonly");
-    var req = tx.objectStore("docs").getAll();
-    req.onsuccess = function(e) {
-      var list = e.target.result || [];
-      var map = {};
-      for (var i = 0; i < list.length; i++) {
-        if (list[i].caseId === caseId) map[list[i].docCode] = list[i];
-      }
-      cb(map);
-    };
-    req.onerror = function() { cb({}); };
+    if (!db) return finish({});
+    var tx;
+    try {
+      tx = db.transaction(["docs"], "readonly");
+      var req = tx.objectStore("docs").getAll();
+      req.onsuccess = function(e) {
+        var list = e.target.result || [];
+        var map = {};
+        for (var i = 0; i < list.length; i++) {
+          if (String(list[i].caseId) === String(caseId)) map[list[i].docCode] = list[i];
+        }
+        finish(map);
+      };
+      req.onerror = function() { finish({}); };
+      tx.onerror = function() { finish({}); };
+      tx.onabort = function() { finish({}); };
+    } catch (readError) {
+      console.warn("Local document lookup failed:", readError);
+      finish({});
+    }
   });
 }
 
