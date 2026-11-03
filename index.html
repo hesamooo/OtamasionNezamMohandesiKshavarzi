@@ -3018,6 +3018,7 @@
     let syncTimer = null;
     let isRestoring = false;
     let isInitialLoadDone = false;
+    window.__nezamDriveReady = false;
     let isSyncInProgress = false;
     let syncRequestedWhileBusy = false;
 
@@ -3641,6 +3642,7 @@
       } finally {
         isRestoring = false;
         isInitialLoadDone = true;
+        window.__nezamDriveReady = true;
       }
     }
 
@@ -3663,6 +3665,12 @@
 
     // در دسترس قرار دادن توابع در سطح window
     window.syncAllDataToDrive = syncAllDataToDrive;
+    window.syncDeletionToDrive = function() {
+      // حذف باید فوراً ارسال شود، نه اینکه پشت debounce معمول ۱٫۸ ثانیه‌ای بماند.
+      if (!isInitialLoadDone || isRestoring) return Promise.resolve(false);
+      clearTimeout(syncTimer);
+      return syncAllDataToDrive(false);
+    };
     window.saveApplicantFolderToDrive = saveApplicantFolderToDrive;
     window.loadFromDriveOnStartup = loadFromDriveOnStartup;
 
