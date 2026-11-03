@@ -387,3 +387,37 @@ test('Drive sync queues a second snapshot when a write arrives during an active 
   assert.ok(sync.includes('if (syncRequestedWhileBusy && isInitialLoadDone && !isRestoring)'), 'queued changes must run after the active request finishes');
   assert.ok(sync.includes('setTimeout(() => syncAllDataToDrive(false), 350)'), 'the queued snapshot must be sent after the previous request');
 });
+
+
+test('deletions are immediately synced and cannot race with initial Drive restore', () => {
+  const core = read('nezam-core.js');
+  const html = read('index.html');
+  const deleteStart = core.indexOf('function deleteActiveCase()');
+  const deleteEnd = core.indexOf('\\n}', deleteStart);
+  const deleteFn = core.slice(deleteStart, deleteEnd);
+  assert.match(deleteFn, /window\\.__nezamDriveReady === false/);
+  assert.match(deleteFn, /window\\.syncDeletionToDrive\\(\\)/);
+  assert.match(html, /window\\.syncDeletionToDrive = function\\(\\)/);
+  assert.match(html, /if \\(!isInitialLoadDone \\|\\| isRestoring\\) return Promise\\.resolve\\(false\\)/);
+  assert.match(html, /window\\.__nezamDriveReady = true/);
+});
+
+test('offline deletion markers are pushed to Drive after the next successful cloud read', () => {
+  const html = read('index.html');
+  const start = html.indexOf('async function loadFromDriveOnStartup');
+  const end = html.indexOf('// ۶. اتصال هوشمند', start);
+  const restore = html.slice(start, end);
+  assert.match(restore, /hasLocalOnlyDeletion/);
+  assert.match(restore, /if \\(syncAfterRestore && cloudReadSucceeded\\)/);
+  assert.match(restore, /setTimeout\\(\\(\\) => syncAllDataToDrive\\(false\\), 300\\)/);
+});
+
+test('manual browser backup restore merges permanent deletion markers', () => {
+  const ops = read('nezam-operations.js');
+  const start = ops.indexOf('async function applyBackupPayload');
+  const end = ops.indexOf('\\n  async function restoreProtectedBackup', start);
+  const apply = ops.slice(start, end);
+  assert.match(apply, /mergeNezamDeletionManifests\\(localDeletionManifest, backupDeletionManifest\\)/);
+  assert.match(apply, /filterNezamRecordsByDeletionManifest/);
+  assert.match(apply, /persistNezamDeletionManifest\\(mergedDeletionManifest\\)/);
+});
