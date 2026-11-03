@@ -468,6 +468,8 @@ test('Google Drive applicant document vault supports protected multi-file storag
   assert.match(vault, /__nezam636_docs_access_key/);
   assert.match(vault, /'readDatabase','listCaseDocuments'/);
   assert.match(vault, /retryFailed:retryFailed/);
+  assert.match(vault, /healthCheck: true/);
+  assert.match(html, /await window\.NezamDriveDocuments\.ensureReady\(\)/);
   assert.match(html, /id="case-doc-retry-failed"/);
   assert.match(html, /id="case-doc-upload-errors"/);
   assert.match(html, /accessKey: window\.NezamDriveDocuments\.getAccessKey\(\)/);
