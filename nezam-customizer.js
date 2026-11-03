@@ -188,7 +188,7 @@ function sanitizeOfficeRichHtml(input) {
     var clean = document.createElement(tag.toLowerCase());
     if (tag === "SPAN") {
       var variableKey = normalizeLetterVariableKey(node.getAttribute("data-nezam-variable") || "");
-      if (variableKey && /^[a-z0-9_\\u0600-\\u06FF-]{1,64}$/i.test(variableKey)) {
+      if (variableKey && /^[a-z0-9_\u0600-\u06FF-]{1,64}$/i.test(variableKey)) {
         clean.setAttribute("data-nezam-variable", variableKey);
       }
     }
@@ -465,7 +465,7 @@ function normalizeLetterVariableKey(value) {
     .replace(/[يى]/g, "ی")
     .replace(/ك/g, "ک")
     .replace(/ة/g, "ه")
-    .replace(/[\\s\\u200c\\u200f\\u0640]/g, "")
+    .replace(/[\s\u200c\u200f\u0640]/g, "")
     .toLowerCase();
 }
 
@@ -624,8 +624,8 @@ function resolveOfficeLetterVariables(bodyHtml, letter, linkedCase) {
   var node;
   while ((node = walker.nextNode())) nodes.push(node);
   nodes.forEach(function(textNode) {
-    if (!/\\{\\{?[^{}]+\\}\\}?/.test(textNode.nodeValue || "")) return;
-    textNode.nodeValue = textNode.nodeValue.replace(/\\{\\{([^{}]+)\\}\\}|\\{([^{}]+)\\}/g, function(full, doubleKey, singleKey) {
+    if (!/\{\{?[^{}]+\}\}?/.test(textNode.nodeValue || "")) return;
+    textNode.nodeValue = textNode.nodeValue.replace(/\{\{([^{}]+)\}\}|\{([^{}]+)\}/g, function(full, doubleKey, singleKey) {
       var rawKey = doubleKey || singleKey || "";
       var value = resolveValue(rawKey);
       if (!value) {
@@ -2390,7 +2390,7 @@ window.applyLetterFontSize=function(size){
   syncRichEditorToTextarea();
 };
 window.insertTagIntoLetterBody=function(tag){
-  var match = String(tag || "").match(/^\\{([^{}]+)\\}$/);
+  var match = String(tag || "").match(/^\{([^{}]+)\}$/);
   var editor = document.getElementById("l-body-rich");
   if (!match || !editor) return false;
   var rawKey = normalizeLetterVariableKey(match[1]);
