@@ -241,7 +241,7 @@ test('form and secretariat print engine keeps paper geometry, binder padding, an
   assert.ok(customizer.includes('letterPageIndex === 0 ? "letter" : "letter-appendix"'));
   assert.ok(html.includes('main {\n        width: 100% !important;\n        max-width: none !important;\n        margin: 0 !important;\n        padding: 0 !important;'));
   assert.ok(html.includes('.a4-page[data-page-kind="binder-label"] {\n        padding: 15mm !important;'));
-  assert.ok(html.includes('nezam-customizer.js?v=20261103-secretariat-r15'));
+  assert.ok(html.includes('nezam-customizer.js?v=20261103-secretariat-r16'));
 });
 
 
@@ -590,4 +590,28 @@ test('secretariat variable syntax supports old plain-text tags and double-brace 
   assert.ok(customizer.includes('String(tag || "").match(/^\\{([^{}]+)\\}$/)'));
   assert.ok(customizer.includes('textNode.nodeValue.replace(/\\{\\{([^{}]+)\\}\\}|\\{([^{}]+)\\}/g'));
   assert.ok(customizer.includes('replace(/[\\s\\u200c\\u200f\\u0640]/g, "")'));
+});
+
+
+test('secretariat save from preview blocks unresolved variables before writing the archive record', () => {
+  const customizer = read('nezam-customizer.js');
+  const start = customizer.indexOf('window.savePaperEditsToSecretariat = function(options)');
+  const end = customizer.indexOf('\\n};', start);
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+  assert.match(customizer.slice(start, end), /ensureLetterVariablesResolvedForOutput/);
+});
+
+test('secretariat archive search normalizes digits, Arabic letters and HTML body content', () => {
+  const core = read('nezam-core.js');
+  assert.match(core, /function normalizeSecretariatSearchText\(value\)/);
+  assert.match(core, /return toEn\(text\)/);
+  assert.match(core, /replace\(\/\[يى\]\/g, "ی"\)/);
+  assert.match(core, /l\.landParcel, l\.loc, l\.body/);
+  assert.match(core, /نامه مستقل دفتر/);
+});
+
+test('common full applicant-name variable alias resolves consistently', () => {
+  const customizer = read('nezam-customizer.js');
+  assert.match(customizer, /"نامونامخانوادگی": "name"/);
 });
