@@ -1685,7 +1685,54 @@ function getUploadedDocsForCase(caseId, cb) {
   });
 }
 
-function uploadCaseDocFile(event, docCode, docTitle) {
+function uploadCaseDocFile(event, docCode, docTitle, replaceFileId) {
+  var input = event && event.target;
+  var files = input && input.files ? Array.prototype.slice.call(input.files) : [];
+  if (!files.length) return false;
+  var active = requireActiveCase("بارگذاری فایل مدرک در پرونده");
+  if (!active) { if (input) input.value = ""; return false; }
+
+  if (window.NezamDriveDocuments && typeof window.NezamDriveDocuments.uploadFiles === "function") {
+    var context = {
+      caseId: String(active.id),
+      fullName: String(active.name || ""),
+      nationalCode: String(active.nid || active.code || ""),
+      docCode: String(docCode || "OTHER"),
+      docTitle: String(docTitle || "سایر مدارک"),
+      replaceFileId: String(replaceFileId || "")
+    };
+    if (context.replaceFileId && files.length !== 1) {
+      alert("برای جایگزینی فقط یک فایل انتخاب کنید.");
+      if (input) input.value = "";
+      return false;
+    }
+    window.NezamDriveDocuments.uploadFiles(files, context).then(function(result) {
+      var successCount = result.successes ? result.successes.length : 0;
+      var failureCount = result.failures ? result.failures.length : 0;
+      if (typeof showToastMsg === "function") {
+        showToastMsg(failureCount
+          ? successCount + " فایل در Drive ذخیره شد؛ " + failureCount + " فایل ناموفق بود. جزئیات را در گزارش بارگذاری ببینید."
+          : successCount + " فایل با موفقیت در Google Drive ذخیره شد.", !!failureCount);
+      }
+      if (failureCount) console.warn("Drive document upload failures:", result.failures);
+      if (typeof renderActiveCaseDocsChecklist === "function") renderActiveCaseDocsChecklist();
+    }).catch(function(error) {
+      console.error("Drive document upload failed:", error);
+      if (typeof showToastMsg === "function") showToastMsg(error.message || "بارگذاری در Google Drive ناموفق بود.", true);
+      else alert(error.message || "بارگذاری در Google Drive ناموفق بود.");
+    }).finally(function() {
+      if (input) input.value = "";
+    });
+    return true;
+  }
+
+  // مسیر سازگاری برای اجرای نسخه‌های قدیمی/آفلاین؛ فایل در این حالت فقط در IndexedDB می‌ماند.
+  var legacyEvent = { target: input };
+  if (typeof uploadCaseDocFileLegacy === "function") return uploadCaseDocFileLegacy(legacyEvent, docCode, docTitle);
+  return false;
+}
+
+function uploadCaseDocFileLegacy(event, docCode, docTitle) {
   var input = event && event.target;
   var file = input && input.files ? input.files[0] : null;
   if (!file) return;
@@ -1834,94 +1881,238 @@ function renderActiveCaseDocsChecklist() {
   var tbody = document.getElementById("case-docs-tbody");
   var banner = document.getElementById("case-missing-docs-banner");
   var folderLbl = document.getElementById("drive-folder-label");
+  var toolbar = document.getElementById("case-docs-drive-toolbar");
   if (!tbody || !banner) return;
 
   if (!c) {
     tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger py-3 fw-bold">ابتدا یک متقاضی را انتخاب نمایید.</td></tr>';
     banner.textContent = "";
+    if (toolbar) toolbar.style.display = "none";
     return;
   }
 
+  if (toolbar) toolbar.style.display = "";
   var safeFolder = (c.name + " - " + toEn(c.nid || "000")).replace(/[\\/:*?"<>|]/g, "_");
-  if (folderLbl) folderLbl.textContent = "📁 پوشه اختصاصی این متقاضی در درایو کامپیوتر: " + safeFolder;
+  if (folderLbl) folderLbl.textContent = "📁 بایگانی ابری متقاضی: " + safeFolder;
 
   var sp = ACT_SPECS[c.actType] || ACT_SPECS.sheep_high;
   var reqDocs = DOC_CHECKLISTS[sp.docGroup || "LIVESTOCK"] || DOC_CHECKLISTS.LIVESTOCK;
 
+  function bindToolbar() {
+    if (!toolbar || toolbar.dataset.bound === "1") return;
+    toolbar.dataset.bound = "1";
+    var select = document.getElementById("case-doc-bulk-code");
+    var fileInput = document.getElementById("case-doc-bulk-files");
+    var uploadBtn = document.getElementById("case-doc-bulk-upload");
+    var migrateBtn = document.getElementById("case-doc-migrate-legacy");
+    if (uploadBtn) uploadBtn.addEventListener("click", function() {
+      var option = select && select.options[select.selectedIndex];
+      if (!option || !option.value) {
+        showToastMsg("ابتدا عنوان مدرک را انتخاب کنید.", true);
+        return;
+      }
+      if (!fileInput || !fileInput.files || !fileInput.files.length) {
+        showToastMsg("ابتدا یک یا چند فایل انتخاب کنید.", true);
+        return;
+      }
+      uploadCaseDocFile({ target: fileInput }, option.value, option.textContent || "سایر مدارک");
+    });
+    if (fileInput) fileInput.addEventListener("change", function() {
+      var label = document.getElementById("case-doc-bulk-file-label");
+      if (label) label.textContent = fileInput.files.length
+        ? toFa(fileInput.files.length) + " فایل انتخاب شده"
+        : "هنوز فایلی انتخاب نشده است";
+    });
+    if (migrateBtn) migrateBtn.addEventListener("click", async function() {
+      if (!window.NezamDriveDocuments || !window.NezamDriveDocuments.migrateLegacyDocs) {
+        showToastMsg("ابزار انتقال فایل‌های قدیمی بارگذاری نشده است.", true);
+        return;
+      }
+      var button = migrateBtn;
+      button.disabled = true;
+      try {
+        var ctx = window.NezamDriveDocuments.getCaseContext();
+        var result = await window.NezamDriveDocuments.migrateLegacyDocs(ctx);
+        var failed = result.failures ? result.failures.length : 0;
+        showToastMsg((result.successes ? result.successes.length : 0) + " فایل قدیمی منتقل شد." +
+          (failed ? " " + failed + " فایل منتقل نشد؛ جزئیات در گزارش فنی موجود است." : ""), !!failed);
+        if (failed) console.warn("Legacy document migration failures:", result.failures);
+        renderActiveCaseDocsChecklist();
+      } catch (error) {
+        showToastMsg(error.message || "انتقال مدارک قدیمی ناموفق بود.", true);
+      } finally {
+        button.disabled = false;
+      }
+    });
+  }
+
+  bindToolbar();
+  var bulkSelect = document.getElementById("case-doc-bulk-code");
+  if (bulkSelect) {
+    var selectedBulk = bulkSelect.value;
+    bulkSelect.innerHTML = reqDocs.map(function(doc) {
+      return '<option value="' + escapeHtmlCore(doc.code) + '">' + escapeHtmlCore(doc.title) + '</option>';
+    }).join("");
+    if (selectedBulk && reqDocs.some(function(doc) { return String(doc.code) === selectedBulk; })) bulkSelect.value = selectedBulk;
+  }
+
   if (!tbody.dataset.secureDocActionsBound) {
     tbody.dataset.secureDocActionsBound = "1";
-    tbody.addEventListener("change", function (event) {
-      var input = event.target.closest('input[data-doc-action="upload"]');
+    tbody.addEventListener("change", function(event) {
+      var input = event.target && event.target.closest
+        ? event.target.closest('input[data-doc-action="upload"],input[data-doc-action="replace"]') : null;
       if (!input || !tbody.contains(input)) return;
       var code = input.getAttribute("data-doc-code");
       var title = input.getAttribute("data-doc-title");
-      if (!code || !title) return;
+      var action = input.getAttribute("data-doc-action");
+      var oldFileId = action === "replace" ? input.getAttribute("data-file-id") : "";
       var current = getActiveCase();
-      if (!current) return;
+      if (!current || !code || !title) return;
       var currentSpec = ACT_SPECS[current.actType] || ACT_SPECS.sheep_high;
       var allowedDocs = DOC_CHECKLISTS[currentSpec.docGroup || "LIVESTOCK"] || DOC_CHECKLISTS.LIVESTOCK;
-      if (!allowedDocs.some(function (doc) { return doc && String(doc.code) === code; })) return;
-      uploadCaseDocFile(event, code, title);
+      if (!allowedDocs.some(function(doc) { return doc && String(doc.code) === code; })) return;
+      uploadCaseDocFile(event, code, title, oldFileId);
     });
-    tbody.addEventListener("click", function (event) {
-      var btn = event.target.closest("button[data-doc-action]");
+
+    tbody.addEventListener("click", function(event) {
+      var btn = event.target && event.target.closest
+        ? event.target.closest("button[data-doc-action]") : null;
       if (!btn || !tbody.contains(btn)) return;
       var code = btn.getAttribute("data-doc-code");
       var action = btn.getAttribute("data-doc-action");
+      var fileId = btn.getAttribute("data-file-id");
       var current = getActiveCase();
       if (!current || !code) return;
       var currentSpec = ACT_SPECS[current.actType] || ACT_SPECS.sheep_high;
       var allowedDocs = DOC_CHECKLISTS[currentSpec.docGroup || "LIVESTOCK"] || DOC_CHECKLISTS.LIVESTOCK;
-      if (!allowedDocs.some(function (doc) { return doc && String(doc.code) === code; })) return;
-      if (action === "download") downloadCaseDocFile(code);
-      else if (action === "remove" && confirm("آیا از حذف فایل این مدرک اطمینان دارید؟")) removeCaseDocFile(code);
+      if (!allowedDocs.some(function(doc) { return doc && String(doc.code) === code; })) return;
+
+      if (action === "remove-file") {
+        if (!fileId || !window.NezamDriveDocuments) return;
+        if (!confirm("این فایل به‌صورت دائمی از بایگانی Google Drive حذف شود؟ فایل به سطل زباله Drive منتقل خواهد شد.")) return;
+        var context = { caseId: String(current.id), fullName: String(current.name || ""), nationalCode: String(current.nid || current.code || "") };
+        btn.disabled = true;
+        window.NezamDriveDocuments.remove(fileId, context).catch(function(error) {
+          showToastMsg(error.message || "حذف فایل از Drive ناموفق بود.", true);
+        }).finally(function() {
+          btn.disabled = false;
+          renderActiveCaseDocsChecklist();
+        });
+      } else if (action === "download-local") {
+        downloadCaseDocFile(code);
+      }
     });
   }
 
-  getUploadedDocsForCase(c.id, function(upMap) {
-    // جلوگیری از نمایش اطلاعات پرونده قبلی در صورت تغییر متقاضی هنگام خواندن IndexedDB
+  getUploadedDocsForCase(c.id, function(localMap) {
     if (!getActiveCase() || String(getActiveCase().id) !== String(c.id)) return;
-    var missing = [];
-    var rows = "";
-    var doneCount = 0;
 
-    for (var i = 0; i < reqDocs.length; i++) {
-      var d = reqDocs[i] || {};
-      var safeCode = escapeHtmlCore(d.code);
-      var safeTitle = escapeHtmlCore(d.title);
-      var up = upMap[d.code];
-      if (up) doneCount++; else missing.push(d.title);
+    function renderRows(cloudFiles, cloudError, folderUrl) {
+      if (!getActiveCase() || String(getActiveCase().id) !== String(c.id)) return;
+      var missing = [];
+      var rows = "";
+      var doneCount = 0;
+      var legacyFiles = (cloudFiles || []).filter(function(file) { return file && (file.legacy || file.docCode === "LEGACY"); });
+      var managedFiles = (cloudFiles || []).filter(function(file) { return file && !file.legacy && file.docCode !== "LEGACY"; });
 
-      rows += '<tr class="' + (up ? 'table-success' : '') + '">' +
-        '<td class="text-center fw-bold">' + escapeHtmlCore(toFa(i + 1)) + '</td>' +
-        '<td><b>' + safeTitle + '</b>' + (d.legalRef ? '<br><small class="text-primary">⚖️ مستند قانونی: ' + escapeHtmlCore(d.legalRef) + '</small>' : '') + '</td>' +
-        '<td>' + (up ? '<span class="badge bg-success">✅ تحویل و بارگذاری شد (' + escapeHtmlCore(toFa(up.uploadDate)) + ')</span><br><small>' + escapeHtmlCore(up.fileName) + '</small>' : '<span class="badge bg-danger">❌ مدرک ناقص (تحویل نشده)</span>') + '</td>' +
-        '<td><div class="d-flex gap-1">' +
-          '<label class="btn btn-sm btn-primary fw-bold m-0" style="cursor:pointer;">📤 بارگذاری فایل<input type="file" data-doc-action="upload" data-doc-code="' + safeCode + '" data-doc-title="' + safeTitle + '" hidden></label>' +
-          (up ? '<button type="button" class="btn btn-sm btn-success fw-bold" data-doc-action="download" data-doc-code="' + safeCode + '">👁️ مشاهده</button><button type="button" class="btn btn-sm btn-outline-danger" data-doc-action="remove" data-doc-code="' + safeCode + '">🗑️</button>' : '') +
-        '</div></td></tr>';
-    }
-    tbody.innerHTML = rows || '<tr><td colspan="4" class="text-center py-3 text-muted">چک‌لیست مدرک برای این فعالیت تعریف نشده است.</td></tr>';
+      for (var i = 0; i < reqDocs.length; i++) {
+        var d = reqDocs[i] || {};
+        var safeCode = escapeHtmlCore(d.code);
+        var safeTitle = escapeHtmlCore(d.title);
+        var filesForDoc = managedFiles.filter(function(file) { return String(file.docCode) === String(d.code); });
+        var localFile = localMap[d.code];
+        if (filesForDoc.length) doneCount++;
+        else missing.push(d.title);
 
-    if (missing.length === 0) {
-      banner.className = "alert alert-success fw-bold mb-3";
-      banner.textContent = "🎉 پرونده «" + String(c.name || "") + "» کامل است و تمامی " + toFa(reqDocs.length) + " مدرک قانونی بارگذاری شده‌اند.";
-    } else {
-      var badges = "";
-      for (var m = 0; m < missing.length; m++) {
-        badges += '<span class="badge bg-danger me-1 mb-1 p-2">❗ ' + escapeHtmlCore(toFa(m + 1)) + '. ' + escapeHtmlCore(missing[m]) + '</span>';
+        var statusHtml = filesForDoc.length
+          ? '<span class="badge bg-success">✅ در Google Drive (' + escapeHtmlCore(toFa(filesForDoc.length)) + ' فایل)</span>'
+          : (localFile
+            ? '<span class="badge bg-warning text-dark">⚠️ فقط در این مرورگر؛ هنوز به Drive منتقل نشده</span><br><small>' + escapeHtmlCore(localFile.fileName || "") + '</small>'
+            : '<span class="badge bg-danger">❌ مدرک در بایگانی ابری موجود نیست</span>');
+
+        var fileActions = filesForDoc.map(function(file) {
+          var safeId = escapeHtmlCore(file.fileId || file.id || "");
+          var safeName = escapeHtmlCore(file.fileName || file.name || "فایل");
+          var size = Number(file.size || 0);
+          var sizeLabel = size ? (size >= 1048576 ? (size / 1048576).toFixed(2) + " MB" : Math.max(1, Math.round(size / 1024)) + " KB") : "";
+          var viewUrl = /^https:\/\/drive\.google\.com\//.test(String(file.webViewLink || "")) ? String(file.webViewLink) : "";
+          var downloadUrl = /^https:\/\/drive\.google\.com\//.test(String(file.downloadUrl || "")) ? String(file.downloadUrl) : "";
+          return '<div class="d-flex flex-wrap align-items-center gap-1 border rounded p-1 mb-1 bg-white">' +
+            (viewUrl ? '<a class="small fw-bold text-decoration-none" href="' + escapeHtmlCore(viewUrl) + '" target="_blank" rel="noopener noreferrer">👁️ ' + safeName + '</a>' : '<span class="small fw-bold">' + safeName + '</span>') +
+            '<small class="text-muted">' + escapeHtmlCore(sizeLabel) + '</small>' +
+            (downloadUrl ? '<a class="btn btn-sm btn-outline-secondary py-0 px-1" href="' + escapeHtmlCore(downloadUrl) + '" target="_blank" rel="noopener noreferrer">دریافت</a>' : '') +
+            (!file.legacy ? '<label class="btn btn-sm btn-outline-primary py-0 px-1 m-0" title="ابتدا نسخه جدید ذخیره می‌شود و سپس نسخه قبلی به سطل زباله می‌رود">جایگزینی<input type="file" data-doc-action="replace" data-doc-code="' + safeCode + '" data-doc-title="' + safeTitle + '" data-file-id="' + safeId + '" accept=".pdf,.jpg,.jpeg,.png,.webp,.gif,.tif,.tiff,.bmp,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.rtf,.odt,.ods,.odp" hidden></label>' : '') +
+            '<button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" data-doc-action="remove-file" data-doc-code="' + safeCode + '" data-file-id="' + safeId + '">حذف</button>' +
+            '</div>';
+        }).join("");
+
+        rows += '<tr class="' + (filesForDoc.length ? 'table-success' : '') + '">' +
+          '<td class="text-center fw-bold">' + escapeHtmlCore(toFa(i + 1)) + '</td>' +
+          '<td><b>' + safeTitle + '</b>' + (d.legalRef ? '<br><small class="text-primary">⚖️ مستند قانونی: ' + escapeHtmlCore(d.legalRef) + '</small>' : '') + '</td>' +
+          '<td>' + statusHtml + (filesForDoc.length && localFile ? '<br><small class="text-warning">یک نسخه قدیمی محلی نیز وجود دارد.</small>' : '') + '</td>' +
+          '<td><div class="d-flex flex-column gap-1">' +
+          '<label class="btn btn-sm btn-primary fw-bold m-0" style="cursor:pointer;">📤 افزودن فایل<input type="file" multiple data-doc-action="upload" data-doc-code="' + safeCode + '" data-doc-title="' + safeTitle + '" accept=".pdf,.jpg,.jpeg,.png,.webp,.gif,.tif,.tiff,.bmp,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.rtf,.odt,.ods,.odp" hidden></label>' +
+          fileActions +
+          '</div></td></tr>';
       }
-      banner.className = "p-3 rounded-3 border border-2 border-danger bg-danger-subtle mb-3";
-      banner.innerHTML =
-        '<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">' +
-          '<b class="text-danger">⚠️ اعلام هوشمند نقص مدارک پرونده «' + escapeHtmlCore(c.name) + '»: (' + escapeHtmlCore(toFa(doneCount)) + ' از ' + escapeHtmlCore(toFa(reqDocs.length)) + ' مدرک کامل — ' + escapeHtmlCore(toFa(missing.length)) + ' مدرک ناقص)</b>' +
-          '<button type="button" class="btn btn-sm btn-danger fw-bold" onclick="issueDeficiencyLetterForActiveCase()">🖨️ چاپ نامه ابلاغ نواقص روی سربرگ ۶۳۶</button>' +
-        '</div>' +
-        '<div>' + badges + '</div>';
+
+      tbody.innerHTML = rows || '<tr><td colspan="4" class="text-center py-3 text-muted">چک‌لیست مدرک برای این فعالیت تعریف نشده است.</td></tr>';
+
+      var legacyBox = document.getElementById("case-docs-legacy-files");
+      if (legacyBox) {
+        legacyBox.innerHTML = legacyFiles.length
+          ? '<div class="small fw-bold mb-1">فایل‌های قدیمی موجود در پوشه Drive (بدون دسته‌بندی):</div>' +
+            legacyFiles.map(function(file) {
+              var url = /^https:\/\/drive\.google\.com\//.test(String(file.webViewLink || "")) ? String(file.webViewLink) : "";
+              return '<div class="small mb-1">' + (url ? '<a href="' + escapeHtmlCore(url) + '" target="_blank" rel="noopener noreferrer">' : '') +
+                '📎 ' + escapeHtmlCore(file.fileName || file.name || "فایل قدیمی") +
+                (url ? '</a>' : '') + ' — برای دسته‌بندی، فایل را از مسیر «افزودن فایل» به مدرک مربوط متصل کنید.</div>';
+            }).join("")
+          : "";
+      }
+
+      if (folderLbl && folderUrl && /^https:\/\/drive\.google\.com\//.test(folderUrl)) {
+        folderLbl.innerHTML = '<a href="' + escapeHtmlCore(folderUrl) + '" target="_blank" rel="noopener noreferrer">📁 بازکردن پوشه اختصاصی در Google Drive</a>';
+      }
+
+      if (missing.length === 0) {
+        banner.className = "alert alert-success fw-bold mb-3";
+        banner.textContent = "🎉 پرونده «" + String(c.name || "") + "» کامل است و تمامی " + toFa(reqDocs.length) + " عنوان مدرک در Google Drive موجود است.";
+      } else {
+        var badges = "";
+        for (var m = 0; m < missing.length; m++) {
+          badges += '<span class="badge bg-danger me-1 mb-1 p-2">❗ ' + escapeHtmlCore(toFa(m + 1)) + '. ' + escapeHtmlCore(missing[m]) + '</span>';
+        }
+        banner.className = "p-3 rounded-3 border border-2 border-danger bg-danger-subtle mb-3";
+        banner.innerHTML =
+          '<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">' +
+            '<b class="text-danger">⚠️ نقص مدارک پرونده «' + escapeHtmlCore(c.name) + '»: (' + escapeHtmlCore(toFa(doneCount)) + ' از ' + escapeHtmlCore(toFa(reqDocs.length)) + ' عنوان مدرک در Drive — ' + escapeHtmlCore(toFa(missing.length)) + ' عنوان ناقص)</b>' +
+            '<button type="button" class="btn btn-sm btn-danger fw-bold" onclick="issueDeficiencyLetterForActiveCase()">🖨️ چاپ نامه ابلاغ نواقص روی سربرگ ۶۳۶</button>' +
+          '</div><div>' + badges + '</div>';
+      }
+
+      if (cloudError) {
+        banner.className = "alert alert-warning mb-3";
+        banner.innerHTML = '<b>ارتباط با بایگانی ابری برقرار نشد:</b> ' + escapeHtmlCore(cloudError) +
+          '<br><small>تا زمان دریافت فهرست Drive، وضعیت تحویل مدارک تأییدشده محسوب نمی‌شود.</small>';
+      }
+    }
+
+    if (window.NezamDriveDocuments && typeof window.NezamDriveDocuments.list === "function") {
+      window.NezamDriveDocuments.list({
+        caseId: String(c.id),
+        fullName: String(c.name || ""),
+        nationalCode: String(c.nid || c.code || "")
+      }).then(function(result) {
+        renderRows(result.documents || [], "", result.folderUrl || "");
+      }).catch(function(error) {
+        renderRows([], error && error.message ? error.message : String(error), "");
+      });
+    } else {
+      renderRows([], "ماژول اتصال بایگانی ابری بارگذاری نشده است.", "");
     }
   });
 }
-
 async function syncActiveCaseFolderToDrive() {
   var c = requireActiveCase("ساخت پوشه اختصاصی متقاضی در درایو");
   if (!c) return;
