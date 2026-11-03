@@ -188,7 +188,7 @@ function sanitizeOfficeRichHtml(input) {
     var clean = document.createElement(tag.toLowerCase());
     if (tag === "SPAN") {
       var variableKey = normalizeLetterVariableKey(node.getAttribute("data-nezam-variable") || "");
-      if (variableKey && /^[a-z0-9_\u0600-\u06FF-]{1,64}$/i.test(variableKey)) {
+      if (variableKey && variableKey.length <= 80 && !/[{}<>\u0000-\u001F]/.test(variableKey)) {
         clean.setAttribute("data-nezam-variable", variableKey);
       }
     }
