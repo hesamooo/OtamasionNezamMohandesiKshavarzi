@@ -241,7 +241,7 @@ test('form and secretariat print engine keeps paper geometry, binder padding, an
   assert.ok(customizer.includes('letterPageIndex === 0 ? "letter" : "letter-appendix"'));
   assert.ok(html.includes('main {\n        width: 100% !important;\n        max-width: none !important;\n        margin: 0 !important;\n        padding: 0 !important;'));
   assert.ok(html.includes('.a4-page[data-page-kind="binder-label"] {\n        padding: 15mm !important;'));
-  assert.ok(html.includes('nezam-customizer.js?v=20261103-print-engine-r13'));
+  assert.ok(html.includes('nezam-customizer.js?v=20261103-print-engine-r14'));
 });
 
 
@@ -465,6 +465,8 @@ test('navigation and printing have one clear control path', () => {
   assert.equal((customizer.match(/waitForPrintAssets\(printWindow\.document, 12000\)/g) || []).length, 1);
   assert.equal((customizer.match(/waitForPrintAssets\(stage, 12000\)/g) || []).length, 1);
   assert.match(customizer, /askToContinueWithMissingAssets/);
+  assert.match(customizer, /afterprint\", releasePrintLock/);
+  assert.match(html, /mapEnhancementRetry = setInterval/);
   assert.match(html, /<script defer src="\.\/nezam-agent-engine\.js/);
   assert.doesNotMatch(operations, /پرونده‌های ثبت‌شده|نامه‌های ثبت‌شده:/);
   assert.match(operations, /پیگیری‌های عقب‌افتاده/);
