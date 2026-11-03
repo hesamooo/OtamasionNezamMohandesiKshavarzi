@@ -19,27 +19,60 @@
     return key;
   }
 
+  function withTimeout(promise, timeoutMs, message) {
+    var timer;
+    return Promise.race([
+      promise,
+      new Promise(function(resolve, reject) {
+        timer = setTimeout(function() { reject(new Error(message)); }, timeoutMs);
+      })
+    ]).finally(function() { if (timer) clearTimeout(timer); });
+  }
+
+  async function fetchJsonWithTimeout(payload, timeoutMs, timeoutMessage) {
+    return withTimeout((async function() {
+      var response = await fetch(DRIVE_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(Object.assign({}, payload, { accessKey: getAccessKey(false) })),
+        redirect: 'follow',
+        cache: 'no-store'
+      });
+      var raw = await response.text();
+      var data;
+      try { data = JSON.parse(raw); }
+      catch (e) { throw new Error('پاسخ Google Apps Script قابل‌خواندن نیست؛ نسخه منتشرشده Code.gs را بررسی کنید.'); }
+      if (!response.ok) throw new Error('خطای ارتباط با Google Drive (' + response.status + ').');
+      return data;
+    })(), timeoutMs, timeoutMessage);
+  }
+
   var readyPromise = null;
   async function ensureReady() {
     if (readyPromise) return readyPromise;
     readyPromise = (async function() {
       async function sendHealthCheck(key) {
-        var response = await fetch(DRIVE_API_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({
-            action: 'sync',
-            healthCheck: true,
-            fullDatabase: { storage: {} },
-            accessKey: key
-          }),
-          redirect: 'follow'
-        });
-        var raw = await response.text();
-        var data;
-        try { data = JSON.parse(raw); }
-        catch (e) { throw new Error('پاسخ سرور قابل‌خواندن نیست؛ نسخه جدید Code.gs را نصب کنید.'); }
-        if (!response.ok || !data || Number(data.apiVersion) !== 1) {
+        var data = await withTimeout((async function() {
+          var response = await fetch(DRIVE_API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({
+              action: 'sync',
+              healthCheck: true,
+              fullDatabase: { storage: {} },
+              accessKey: key
+            }),
+            redirect: 'follow',
+            cache: 'no-store'
+          });
+          var raw = await response.text();
+          var parsed;
+          try { parsed = JSON.parse(raw); }
+          catch (e) { throw new Error('پاسخ سرور قابل‌خواندن نیست؛ نسخه جدید Code.gs را نصب کنید.'); }
+          if (!response.ok) throw new Error('خطای ارتباط با Google Drive (' + response.status + ').');
+          return parsed;
+        })(), 15000, 'پاسخ Google Apps Script برای بررسی اتصال در ۱۵ ثانیه دریافت نشد.');
+        if (!data || Number(data.apiVersion) !== 1) {
           throw new Error('نسخه جدید Google Apps Script هنوز منتشر نشده است. ابتدا Code.gs جدید را جایگزین و Web App را به‌روزرسانی کنید.');
         }
         return data;
@@ -68,18 +101,12 @@
 
   async function request(payload, allowKeyRetry) {
     await ensureReady();
-    var key = getAccessKey(false);
-    var response = await fetch(DRIVE_API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(Object.assign({}, payload, { accessKey: key })),
-      redirect: 'follow'
-    });
-    var raw = await response.text();
-    var data;
-    try { data = JSON.parse(raw); }
-    catch (e) { throw new Error('پاسخ Google Apps Script قابل‌خواندن نیست؛ انتشار نسخه جدید Code.gs را بررسی کنید.'); }
-    if (!response.ok) throw new Error('خطای ارتباط با Google Drive (' + response.status + ').');
+    getAccessKey(false);
+    var data = await fetchJsonWithTimeout(
+      payload,
+      18000,
+      'پاسخ Google Apps Script در ۱۸ ثانیه دریافت نشد؛ احتمالاً نسخه Web App قدیمی است یا اجرای سرور متوقف مانده است.'
+    );
     var documentActions = ['readDatabase','listCaseDocuments','uploadCaseDocument','replaceCaseDocument','deleteCaseDocument'];
     if (documentActions.indexOf(String(payload.action || '')) !== -1 && Number(data && data.apiVersion) !== 1) {
       throw new Error('Google Apps Script هنوز به نسخه جدید بایگانی مدارک ارتقا نیافته است. فایل Code.gs جدید را جایگزین و Web App را به‌روزرسانی کنید.');
