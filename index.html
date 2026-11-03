@@ -3062,7 +3062,7 @@
   <!-- ماژول‌های اصلی اتوماسیون مرکز خدمات ۶۳۶ خفر -->
   <script src="./nezam-core.js?v=20261103-drive-docs-r8"></script>
   <script src="./nezam-drive-documents.js?v=20261103-drive-docs-r6"></script>
-  <script src="./nezam-customizer.js?v=20261103-print-engine-r13"></script>
+  <script src="./nezam-customizer.js?v=20261103-print-engine-r14"></script>
   <script src="./nezam-ai-assistant.js?v=20261101-security-r3"></script>
 
   <!-- ماژول اصلاح‌شده و دوطرفه اتصال سامانه ۶۳۶ خفر به گوگل درایو (ذخیره و بازخوانی ۱۰۰٪ اطلاعات) -->
@@ -4241,10 +4241,13 @@
     }
   }
 
-  setInterval(function () {
+  var mapEnhancementRetry = setInterval(function () {
     hookLeafletPrototype();
     addEsriButtonToMapToolbar();
-  }, 1200);
+    if (window.__nezamLeafletHooked && document.getElementById('btn-esri-sat-fallback')) {
+      clearInterval(mapEnhancementRetry);
+    }
+  }, 2500);
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function () {
