@@ -291,14 +291,29 @@
     catch (error) { readyPromise = null; throw error; }
   }
 
+  function getActionTimeout_(action) {
+    // خواندن دیتابیس دیگر پشت قفل نوشتن منتظر نمی‌ماند؛ برای تأخیرهای مقطعی Drive نیز مهلت مناسب‌تری دارد.
+    var timeouts = {
+      readDatabase: 35000,
+      listCaseDocuments: 35000,
+      getCaseDocumentContent: 60000,
+      uploadCaseDocument: 90000,
+      replaceCaseDocument: 90000,
+      deleteCaseDocument: 35000
+    };
+    return timeouts[String(action || '')] || 30000;
+  }
+
   async function request(payload, allowKeyRetry) {
     await ensureReady();
     getAccessKey();
-    var data = await fetchJsonWithTimeout(
-      payload,
-      18000,
-      'پاسخ Google Apps Script در ۱۸ ثانیه دریافت نشد؛ نسخه Web App یا اتصال اینترنت را بررسی کنید.'
-    );
+    var action = String(payload && payload.action || '');
+    var timeoutMs = getActionTimeout_(action);
+    var timeoutMessage = action === 'readDatabase'
+      ? 'بازخوانی پایگاه داده از Google Drive در ۳۵ ثانیه پاسخ نداد. وضعیت اجرای Web App را بررسی کنید.'
+      : 'عملیات «' + (action || 'نامشخص') + '» در مهلت ' + Math.round(timeoutMs / 1000) +
+        ' ثانیه پاسخ نداد. ممکن است پردازش در Google Apps Script هنوز ادامه داشته باشد؛ پیش از تکرار عملیات، فهرست را بازخوانی کنید.';
+    var data = await fetchJsonWithTimeout(payload, timeoutMs, timeoutMessage);
     var documentActions = ['readDatabase','listCaseDocuments','getCaseDocumentContent','uploadCaseDocument','replaceCaseDocument','deleteCaseDocument'];
     if (documentActions.indexOf(String(payload.action || '')) !== -1 && Number(data && data.apiVersion) !== 2) {
       throw new Error('Google Apps Script هنوز نسخه ۲ بایگانی مدارک را اجرا نمی‌کند؛ Code.gs را جایگزین و Web App را به‌روزرسانی کنید.');
