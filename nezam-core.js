@@ -3165,7 +3165,13 @@ window.importIndexedDBDocs = function(docsList) {
               cloudIndexError: String(d.cloudIndexError || "")
             });
           });
-          tx.oncomplete = function() { db.close(); next(true); };
+          tx.oncomplete = function() {
+            db.close();
+            if (window.Nezaam636Knowledge && typeof window.Nezaam636Knowledge.refresh === 'function') {
+              Promise.resolve(window.Nezaam636Knowledge.refresh()).catch(function() {});
+            }
+            next(true);
+          };
           tx.onerror = function() { db.close(); next(false); };
           tx.onabort = function() { db.close(); next(false); };
         } catch (err) { db.close(); next(false); }
