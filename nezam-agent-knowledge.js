@@ -1115,6 +1115,7 @@
     buildContext: buildContext,
     stats: getStats,
     list: getAllDocuments,
-    version: '1.1.0'
+    refresh: renderList,
+    version: '1.1.1'
   };
 })();

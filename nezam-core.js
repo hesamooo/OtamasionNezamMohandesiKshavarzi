@@ -2966,86 +2966,171 @@ window.exportIndexedDBDocs = function() {
   return new Promise(function(resolve, reject) {
     openFilesDB(function(db) {
       if (!db) return reject(new Error("پایگاه فایل‌های محلی IndexedDB قابل بازشدن نیست؛ ذخیره ابری برای جلوگیری از حذف پیوست‌ها متوقف شد."));
-      var tx;
       try {
-        tx = db.transaction(["docs"], "readonly");
+        var tx = db.transaction(["docs"], "readonly");
         var req = tx.objectStore("docs").getAll();
-        req.onsuccess = function(e) {
-          var list = Array.isArray(e.target.result) ? e.target.result : [];
-          var cleanList = [];
-          var omittedLargeCount = 0;
-          for (var i = 0; i < list.length; i++) {
-            var item = list[i] || {};
-            var dUrl = item.dataUrl || "";
-            // محدودیت حجم انتقال از Apps Script؛ فایل‌های بزرگ باید از مسیر بایگانی مستقیم Drive منتقل شوند.
-            if (dUrl.length < 2200000) {
-              cleanList.push({
-                key: item.key,
-                caseId: item.caseId,
-                docCode: item.docCode,
-                docTitle: item.docTitle,
-                fileName: item.fileName,
-                uploadDate: item.uploadDate,
-                dataUrl: dUrl
-              });
-            } else {
-              omittedLargeCount++;
+        req.onsuccess = async function(e) {
+          try {
+            var list = Array.isArray(e.target.result) ? e.target.result : [];
+            var cleanList = [];
+            var omittedLargeCount = 0;
+            for (var i = 0; i < list.length; i++) {
+              var item = list[i] || {};
+              var dUrl = item.dataUrl || "";
+              if (dUrl.length < 2200000) {
+                cleanList.push({
+                  key: item.key, caseId: item.caseId, docCode: item.docCode,
+                  docTitle: item.docTitle, fileName: item.fileName,
+                  uploadDate: item.uploadDate, dataUrl: dUrl
+                });
+              } else omittedLargeCount++;
             }
-          }
-          window.__nezam636IndexedDBExportStatus = {
-            totalCount: list.length,
-            includedCount: cleanList.length,
-            omittedLargeCount: omittedLargeCount,
-            exportedAt: Date.now()
-          };
-          resolve(cleanList);
+            var knowledgeDocs = await exportNezaamKnowledgeIndex();
+            window.__nezam636IndexedDBExportStatus = {
+              totalCount: list.length, includedCount: cleanList.length,
+              omittedLargeCount: omittedLargeCount, knowledgeTotalCount: knowledgeDocs.length,
+              knowledgeExportedAt: Date.now(), exportedAt: Date.now()
+            };
+            resolve(cleanList.concat(knowledgeDocs));
+          } catch (err) { reject(err); }
         };
-        req.onerror = function() {
-          reject(req.error || new Error("خواندن اسناد IndexedDB ناموفق بود."));
-        };
-        tx.onerror = function() {
-          reject(tx.error || new Error("تراکنش خواندن اسناد IndexedDB ناموفق بود."));
-        };
-        tx.onabort = function() {
-          reject(tx.error || new Error("تراکنش خواندن اسناد IndexedDB لغو شد."));
-        };
-      } catch (err) {
-        reject(err);
-      }
+        req.onerror = function() { reject(req.error || new Error("خواندن اسناد IndexedDB ناموفق بود.")); };
+        tx.onerror = function() { reject(tx.error || new Error("تراکنش خواندن اسناد IndexedDB ناموفق بود.")); };
+        tx.onabort = function() { reject(tx.error || new Error("تراکنش خواندن اسناد IndexedDB لغو شد.")); };
+      } catch (err) { reject(err); }
     });
   });
 };
 
-window.importIndexedDBDocs = function(docsList) {
-  return new Promise(function(resolve) {
-    if (!Array.isArray(docsList) || docsList.length === 0) return resolve(false);
-    openFilesDB(function(db) {
-      if (!db) return resolve(false);
+function exportNezaamKnowledgeIndex() {
+  return new Promise(function(resolve, reject) {
+    if (!window.indexedDB) return reject(new Error("مرورگر از IndexedDB پشتیبانی نمی‌کند؛ مخزن دانش در پشتیبان قرار نگرفت."));
+    var request;
+    try { request = indexedDB.open("Nezam636AgentKnowledge"); }
+    catch (err) { return reject(err); }
+    request.onupgradeneeded = function() {
+      var db = request.result;
+      if (!db.objectStoreNames.contains("documents")) db.createObjectStore("documents", { keyPath: "id" });
+    };
+    request.onerror = function() { reject(request.error || new Error("بازکردن مخزن دانش برای پشتیبان‌گیری ناموفق بود.")); };
+    request.onsuccess = function() {
+      var db = request.result;
+      if (!db.objectStoreNames.contains("documents")) { db.close(); return resolve([]); }
       try {
-        var tx = db.transaction(["docs"], "readwrite");
-        var store = tx.objectStore("docs");
-        for (var i = 0; i < docsList.length; i++) {
-          var d = docsList[i];
-          if (d && d.key) {
-            store.put({
-              key: d.key,
-              caseId: d.caseId,
-              docCode: d.docCode,
-              docTitle: d.docTitle,
-              fileName: d.fileName,
-              uploadDate: d.uploadDate,
-              dataUrl: d.dataUrl
+        var tx = db.transaction(["documents"], "readonly");
+        var getAll = tx.objectStore("documents").getAll();
+        getAll.onsuccess = function() {
+          var docs = Array.isArray(getAll.result) ? getAll.result : [];
+          var output = [], totalChars = 0;
+          var MAX_DOC_CHARS = 650000, MAX_TOTAL_CHARS = 8000000;
+          for (var i = 0; i < docs.length; i++) {
+            var d = docs[i] || {};
+            if (d.status !== "indexed" || !String(d.text || "").trim()) continue;
+            var body = String(d.text || "");
+            if (body.length > MAX_DOC_CHARS || totalChars + body.length > MAX_TOTAL_CHARS) {
+              db.close();
+              return reject(new Error("حجم متن شاخص‌شده مخزن دانش از سقف امن پشتیبان (۸ میلیون نویسه) بیشتر است. ابتدا اسناد را دسته‌بندی یا پشتیبان را به چند بخش تقسیم کنید؛ نسخه ابری ناقص ارسال نشد."));
+            }
+            totalChars += body.length;
+            output.push({
+              _type: "NEZAM636_KNOWLEDGE_DOC_V1", id: String(d.id || ""),
+              name: String(d.name || "سند بدون عنوان").slice(0, 180),
+              ext: String(d.ext || ""), mime: String(d.mime || ""), size: Number(d.size || 0),
+              category: String(d.category || "عمومی").slice(0, 80),
+              issuer: String(d.issuer || "").slice(0, 120),
+              effectiveDate: String(d.effectiveDate || "").slice(0, 32),
+              description: String(d.description || "").slice(0, 300),
+              createdAt: Number(d.createdAt || 0), status: "indexed", text: body,
+              chunks: Array.isArray(d.chunks) ? d.chunks.map(function(x){return String(x || "");}) : [],
+              keywords: Array.isArray(d.keywords) ? d.keywords.map(function(x){return String(x || "");}).slice(0, 100) : [],
+              charCount: Number(d.charCount || body.length), indexedAt: Number(d.indexedAt || 0),
+              extractionModel: String(d.extractionModel || ""), extractionNote: String(d.extractionNote || ""),
+              driveStatus: String(d.driveStatus || ""), driveSavedAt: Number(d.driveSavedAt || 0),
+              driveFileName: String(d.driveFileName || ""), driveUrl: String(d.driveUrl || ""),
+              driveTextStatus: String(d.driveTextStatus || ""), driveTextSavedAt: Number(d.driveTextSavedAt || 0),
+              driveTextUrl: String(d.driveTextUrl || ""), cloudIndexStatus: String(d.cloudIndexStatus || ""),
+              driveError: String(d.driveError || ""), cloudIndexError: String(d.cloudIndexError || "")
             });
           }
-        }
-        tx.oncomplete = function() {
-          renderActiveCaseDocsChecklist();
-          resolve(true);
+          db.close(); resolve(output);
         };
-        tx.onerror = function() { resolve(false); };
-      } catch (err) {
-        resolve(false);
-      }
-    });
+        getAll.onerror = function() { db.close(); reject(getAll.error || new Error("خواندن شاخص مخزن دانش ناموفق بود.")); };
+        tx.onerror = function() { db.close(); reject(tx.error || new Error("تراکنش خواندن مخزن دانش ناموفق بود.")); };
+      } catch (err) { db.close(); reject(err); }
+    };
+  });
+}
+
+window.importIndexedDBDocs = function(docsList) {
+  return new Promise(function(resolve) {
+    if (!Array.isArray(docsList)) return resolve(false);
+    var applicantDocs = docsList.filter(function(d) { return d && d._type !== "NEZAM636_KNOWLEDGE_DOC_V1"; });
+    var knowledgeDocs = docsList.filter(function(d) { return d && d._type === "NEZAM636_KNOWLEDGE_DOC_V1" && d.id && d.text; });
+    function importKnowledge(next) {
+      if (!knowledgeDocs.length) return next(true);
+      if (!window.indexedDB) return next(false);
+      var request;
+      try { request = indexedDB.open("Nezam636AgentKnowledge"); }
+      catch (err) { return next(false); }
+      request.onupgradeneeded = function() {
+        var db = request.result;
+        if (!db.objectStoreNames.contains("documents")) db.createObjectStore("documents", { keyPath: "id" });
+      };
+      request.onerror = function() { next(false); };
+      request.onsuccess = function() {
+        var db = request.result;
+        if (!db.objectStoreNames.contains("documents")) { db.close(); return next(false); }
+        try {
+          var tx = db.transaction(["documents"], "readwrite");
+          var store = tx.objectStore("documents");
+          knowledgeDocs.forEach(function(d) {
+            store.put({
+              id: String(d.id), name: String(d.name || "سند بدون عنوان"),
+              ext: String(d.ext || ""), mime: String(d.mime || ""), size: Number(d.size || 0),
+              blob: null, category: String(d.category || "عمومی"), issuer: String(d.issuer || ""),
+              effectiveDate: String(d.effectiveDate || ""), description: String(d.description || ""),
+              createdAt: Number(d.createdAt || 0), status: "indexed", text: String(d.text || ""),
+              chunks: Array.isArray(d.chunks) ? d.chunks : [], keywords: Array.isArray(d.keywords) ? d.keywords : [],
+              charCount: Number(d.charCount || String(d.text || "").length), indexedAt: Number(d.indexedAt || 0),
+              extractionModel: String(d.extractionModel || ""), extractionNote: String(d.extractionNote || ""),
+              driveStatus: String(d.driveStatus || ""), driveSavedAt: Number(d.driveSavedAt || 0),
+              driveFileName: String(d.driveFileName || ""), driveUrl: String(d.driveUrl || ""),
+              driveTextStatus: String(d.driveTextStatus || ""), driveTextSavedAt: Number(d.driveTextSavedAt || 0),
+              driveTextUrl: String(d.driveTextUrl || ""), cloudIndexStatus: String(d.cloudIndexStatus || ""),
+              driveError: String(d.driveError || ""), cloudIndexError: String(d.cloudIndexError || "")
+            });
+          });
+          tx.oncomplete = function() {
+            db.close();
+            if (window.Nezaam636Knowledge && typeof window.Nezaam636Knowledge.refresh === "function") {
+              Promise.resolve(window.Nezaam636Knowledge.refresh()).catch(function() {});
+            }
+            next(true);
+          };
+          tx.onerror = function() { db.close(); next(false); };
+          tx.onabort = function() { db.close(); next(false); };
+        } catch (err) { db.close(); next(false); }
+      };
+    }
+    function importApplicantDocs() {
+      if (!applicantDocs.length) return importKnowledge(resolve);
+      openFilesDB(function(db) {
+        if (!db) return resolve(false);
+        try {
+          var tx = db.transaction(["docs"], "readwrite");
+          var store = tx.objectStore("docs");
+          applicantDocs.forEach(function(d) {
+            if (d && d.key) store.put({
+              key: d.key, caseId: d.caseId, docCode: d.docCode, docTitle: d.docTitle,
+              fileName: d.fileName, uploadDate: d.uploadDate, dataUrl: d.dataUrl
+            });
+          });
+          tx.oncomplete = function() { renderActiveCaseDocsChecklist(); importKnowledge(resolve); };
+          tx.onerror = function() { resolve(false); };
+          tx.onabort = function() { resolve(false); };
+        } catch (err) { resolve(false); }
+      });
+    }
+    importApplicantDocs();
   });
 };
