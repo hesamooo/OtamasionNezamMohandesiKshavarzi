@@ -2876,8 +2876,10 @@ window.flushInMemoryStateToLocalStorage = function() {
     if (typeof currentPaperSize !== "undefined" && currentPaperSize) {
       localStorage.setItem("nezam636_paper_size", currentPaperSize);
     }
+    return true;
   } catch (e) {
-    console.warn("Flush to localStorage warning:", e);
+    console.error("Flush to localStorage failed; cloud snapshot must be stopped:", e);
+    return false;
   } finally {
     window.__gdriveInternalFlush = false;
   }
@@ -2961,19 +2963,21 @@ window.reloadAllStateFromLocalStorage = function() {
 };
 
 window.exportIndexedDBDocs = function() {
-  return new Promise(function(resolve) {
+  return new Promise(function(resolve, reject) {
     openFilesDB(function(db) {
-      if (!db) return resolve([]);
+      if (!db) return reject(new Error("پایگاه فایل‌های محلی IndexedDB قابل بازشدن نیست؛ ذخیره ابری برای جلوگیری از حذف پیوست‌ها متوقف شد."));
+      var tx;
       try {
-        var tx = db.transaction(["docs"], "readonly");
+        tx = db.transaction(["docs"], "readonly");
         var req = tx.objectStore("docs").getAll();
         req.onsuccess = function(e) {
-          var list = e.target.result || [];
+          var list = Array.isArray(e.target.result) ? e.target.result : [];
           var cleanList = [];
+          var omittedLargeCount = 0;
           for (var i = 0; i < list.length; i++) {
-            var item = list[i];
-            // فقط فایل‌های با حجم معقول (زیر ۲ مگابایت) در دیتابیس JSON همگام‌سازی می‌شوند تا محدودیت گوگل اسکریپت رد نشود
+            var item = list[i] || {};
             var dUrl = item.dataUrl || "";
+            // محدودیت حجم انتقال از Apps Script؛ فایل‌های بزرگ باید از مسیر بایگانی مستقیم Drive منتقل شوند.
             if (dUrl.length < 2200000) {
               cleanList.push({
                 key: item.key,
@@ -2984,13 +2988,29 @@ window.exportIndexedDBDocs = function() {
                 uploadDate: item.uploadDate,
                 dataUrl: dUrl
               });
+            } else {
+              omittedLargeCount++;
             }
           }
+          window.__nezam636IndexedDBExportStatus = {
+            totalCount: list.length,
+            includedCount: cleanList.length,
+            omittedLargeCount: omittedLargeCount,
+            exportedAt: Date.now()
+          };
           resolve(cleanList);
         };
-        req.onerror = function() { resolve([]); };
+        req.onerror = function() {
+          reject(req.error || new Error("خواندن اسناد IndexedDB ناموفق بود."));
+        };
+        tx.onerror = function() {
+          reject(tx.error || new Error("تراکنش خواندن اسناد IndexedDB ناموفق بود."));
+        };
+        tx.onabort = function() {
+          reject(tx.error || new Error("تراکنش خواندن اسناد IndexedDB لغو شد."));
+        };
       } catch (err) {
-        resolve([]);
+        reject(err);
       }
     });
   });
