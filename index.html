@@ -3992,7 +3992,15 @@
 
       const previousDirtyTs = getLocalChangeTimestamp();
       const nextDirtyTs = Math.max(Date.now(), previousDirtyTs + 1);
-      origSetItem.call(window.localStorage, '__gdrive_local_change_ts', String(nextDirtyTs));
+      try {
+        origSetItem.call(window.localStorage, '__gdrive_local_change_ts', String(nextDirtyTs));
+      } catch (dirtyMarkerError) {
+        // داده اصلی ذخیره شده است؛ خطای نشانگر نباید عملیات ذخیره پرونده را به‌اشتباه شکست‌خورده اعلام کند.
+        console.error('Could not persist local Drive dirty marker:', dirtyMarkerError);
+        if (typeof showToastMsg === 'function') {
+          showToastMsg('⚠️ فضای حافظه مرورگر کافی نیست؛ تغییرات محلی را فوراً به Google Drive ذخیره و نسخه پشتیبان تهیه کنید.', true);
+        }
+      }
 
       clearTimeout(syncTimer);
       syncTimer = setTimeout(() => syncAllDataToDrive(false), 1800);
