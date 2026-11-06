@@ -3113,7 +3113,7 @@
   <div id="smart-mouse-tooltip"></div>
 
   <!-- ماژول‌های اصلی اتوماسیون مرکز خدمات ۶۳۶ خفر -->
-  <script src="./nezam-core.js?v=20261103-secretariat-r9"></script>
+  <script src="./nezam-core.js?v=20261106-storage-sync-r10"></script>
   <script src="./nezam-drive-documents.js?v=20261104-drive-docs-r10"></script>
   <script src="./nezam-letter-attachments.js?v=20261104-letter-attachments-r2"></script>
   <script src="./nezam-customizer.js?v=20261103-secretariat-r19"></script>
@@ -3129,6 +3129,9 @@
     window.__nezamDriveReady = false;
     let isSyncInProgress = false;
     let syncRequestedWhileBusy = false;
+    let lastKnownCloudTs = null;
+    let syncConflictDetected = false;
+    let syncConflictNotified = false;
 
     // کلیدهای سیستمی که به تنهایی نباید باعث بازنویسی خودکار دیتابیس ابری در زمان لود صفحه شوند
     const IGNORED_STARTUP_KEYS = new Set([
@@ -3147,6 +3150,11 @@
       return key.startsWith('nezam636_') ||
         key.startsWith('nezam_croquis_') ||
         key === 'nezam_gemini_model';
+    }
+
+    function getLocalChangeTimestamp() {
+      const value = Number(localStorage.getItem('__gdrive_local_change_ts') || 0);
+      return Number.isFinite(value) && value > 0 ? value : 0;
     }
 
     // ۱. افزودن دکمه‌های «ذخیره در درایو» و «بازخوانی از درایو» در نوار بالای سایت
@@ -3201,24 +3209,55 @@
     // ۲. جمع‌آوری ۱۰۰٪ اطلاعات سامانه (از متغیرهای حافظه + localStorage + IndexedDB)
     async function collectCompleteSystemSnapshot() {
       if (typeof window.flushInMemoryStateToLocalStorage === 'function') {
-        window.flushInMemoryStateToLocalStorage();
+        const flushed = window.flushInMemoryStateToLocalStorage();
+        if (flushed === false) {
+          throw new Error('تبدیل اطلاعات حافظه به حافظه محلی کامل نشد؛ برای جلوگیری از ارسال نسخه ناقص، ذخیره ابری متوقف شد.');
+        }
       }
 
       const storageData = {};
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
-        if (isAllowedCloudStorageKey(k)) {
-          storageData[k] = localStorage.getItem(k);
-        }
+        if (isAllowedCloudStorageKey(k)) storageData[k] = localStorage.getItem(k);
       }
 
-      let idbDocs = [];
-      if (typeof window.exportIndexedDBDocs === 'function') {
-        try {
-          idbDocs = await window.exportIndexedDBDocs();
-        } catch (e) {
-          console.warn('IndexedDB export warning:', e);
+      function requireJsonArray(key, label) {
+        const raw = storageData[key];
+        if (typeof raw !== 'string') throw new Error('بخش «' + label + '» در حافظه محلی موجود نیست؛ ذخیره ابری متوقف شد.');
+        let parsed;
+        try { parsed = JSON.parse(raw); }
+        catch (e) { throw new Error('ساختار بخش «' + label + '» خراب است؛ از بازنویسی نسخه ابری جلوگیری شد.'); }
+        if (!Array.isArray(parsed)) throw new Error('ساختار بخش «' + label + '» معتبر نیست؛ ذخیره ابری متوقف شد.');
+      }
+
+      requireJsonArray('nezam636_unified_cases', 'پرونده‌ها');
+      requireJsonArray('nezam636_letters', 'نامه‌ها');
+
+      const rawManifest = storageData['nezam636_deletion_manifest_v1'];
+      if (typeof rawManifest !== 'string') throw new Error('فهرست حذف دائمی موجود نیست؛ ذخیره ابری متوقف شد.');
+      try {
+        const manifest = JSON.parse(rawManifest);
+        if (!manifest || typeof manifest !== 'object' ||
+            !Array.isArray(manifest.cases) || !Array.isArray(manifest.letters)) {
+          throw new Error('invalid manifest shape');
         }
+      } catch (e) {
+        throw new Error('ساختار فهرست حذف دائمی معتبر نیست؛ ذخیره ابری متوقف شد.');
+      }
+
+      if (typeof window.exportIndexedDBDocs !== 'function') {
+        throw new Error('ماژول خروجی اسناد محلی در دسترس نیست؛ ذخیره ابری برای جلوگیری از حذف پیوست‌ها متوقف شد.');
+      }
+      const idbDocs = await window.exportIndexedDBDocs();
+      if (!Array.isArray(idbDocs)) {
+        throw new Error('خروجی اسناد IndexedDB معتبر نیست؛ ذخیره ابری متوقف شد.');
+      }
+      const exportStatus = window.__nezam636IndexedDBExportStatus || {};
+      if (Number(exportStatus.omittedLargeCount || 0) > 0) {
+        throw new Error(
+          Number(exportStatus.omittedLargeCount) +
+          ' فایل محلی از محدودیت انتقال نسخه پشتیبان بزرگ‌تر است. ابتدا آن‌ها را از بخش بایگانی مدارک به Google Drive منتقل کنید؛ هیچ نسخه ناقصی ارسال نشد.'
+        );
       }
 
       return {
@@ -3227,7 +3266,7 @@
       };
     }
 
-    // ۳. ارسال و ذخیره کامل کل دیتابیس در گوگل درایو
+    // ۳. ارسال و ذخیره کامل کل دیتابیس در گوگل درایو    // ۳. ارسال و ذخیره کامل کل دیتابیس در گوگل درایو
     // تأیید پاسخ واقعی Apps Script؛ پاسخ HTML ورود یا خطای داخل JSON موفقیت محسوب نمی‌شود.
     function validateDriveWriteResponse(res, responseText) {
       if (!res || !res.ok) return { ok: false, message: 'پاسخ HTTP ناموفق از گوگل‌درایو (' + (res ? res.status : 'نامشخص') + ').' };
@@ -3269,7 +3308,10 @@
             typeof snapshot.storage[key] === 'string' &&
             remote.storage[key] === snapshot.storage[key]
           );
-          if (matches) return true;
+          if (matches) {
+            lastKnownCloudTs = Number(remote.updatedAt || expectedTs);
+            return true;
+          }
         } catch (error) {
           console.warn('Google Drive read-back verification attempt failed:', error);
         }
@@ -3279,8 +3321,21 @@
 
     async function syncAllDataToDrive(showAlert) {
       if (isRestoring) return false;
+      if (syncConflictDetected && !showAlert) {
+        setCloudStatus('⚠️ تعارض همگام‌سازی؛ ذخیره خودکار متوقف شد', '#b45309');
+        return false;
+      }
+      if (syncConflictDetected && showAlert) {
+        const proceedWithOverwrite = confirm(
+          'نسخه Google Drive بعد از آخرین همگام‌سازی تغییر کرده است.\n' +
+          'ذخیره این دستگاه، نسخه ابری فعلی را با اطلاعات محلی جایگزین می‌کند و ممکن است تغییرات دستگاه دیگر را حذف کند.\n\n' +
+          'فقط در صورت اطمینان از برتری اطلاعات این دستگاه ادامه دهید.'
+        );
+        if (!proceedWithOverwrite) return false;
+        syncConflictDetected = false;
+        syncConflictNotified = false;
+      }
       if (isSyncInProgress) {
-        // اگر هنگام ارسال نسخه قبلی تغییری مثل حذف رخ دهد، درخواست جدید را دور نمی‌اندازیم.
         syncRequestedWhileBusy = true;
         return false;
       }
@@ -3290,32 +3345,53 @@
       try {
         await window.NezamDriveDocuments.ensureReady();
         setCloudStatus('⏳ در حال ذخیره در درایو...', '#d97706');
-        const snapshot = await collectCompleteSystemSnapshot();
 
-        // جلوگیری از بازنویسی دیتابیس ابری با دیتای خالی
-        if (!snapshot.storage['nezam636_unified_cases'] && !showAlert) {
-          isSyncInProgress = false;
-          return false;
+        const dirtyAtBeforeSnapshot = getLocalChangeTimestamp();
+        const snapshot = await collectCompleteSystemSnapshot();
+        const snapshotMutationAt = getLocalChangeTimestamp();
+        if (snapshotMutationAt !== dirtyAtBeforeSnapshot) {
+          // اگر هنگام تهیه نسخه تغییری رخ داده باشد، پس از این ارسال یک نسخه تازه نیز صف می‌شود.
+          syncRequestedWhileBusy = true;
         }
 
-        const ts = Date.now();
+        // وجود پرونده خالی مجاز است، اما نبود کلید اصلی نشانه نسخه ناقص است.
+        if (typeof snapshot.storage['nezam636_unified_cases'] !== 'string') {
+          throw new Error('کلید اصلی پرونده‌ها در نسخه پشتیبان موجود نیست.');
+        }
+
+        if (lastKnownCloudTs === null) {
+          throw new Error('نسخه مبنای Google Drive هنوز خوانده نشده است؛ بازخوانی از درایو را انجام دهید.');
+        }
+
+        // کنترل خوش‌بینانه تعارض: اگر Drive از آخرین نسخه تأییدشده تغییر کرده باشد، بازنویسی ممنوع است.
+        const baselineTs = Number(lastKnownCloudTs || 0);
+        const beforeWriteRaw = await window.NezamDriveDocuments.readDatabase();
+        const beforeWriteRecord = parseCloudResponse(beforeWriteRaw).bestSyncRecord;
+        const beforeWriteTs = beforeWriteRecord ? Number(beforeWriteRecord.updatedAt || 0) : 0;
+        if (beforeWriteTs !== baselineTs) {
+          lastKnownCloudTs = beforeWriteTs;
+          syncConflictDetected = true;
+          throw new Error('نسخه Google Drive توسط دستگاه دیگری تغییر کرده است. اطلاعات محلی حفظ شد و برای جلوگیری از بازنویسی، همگام‌سازی متوقف شد.');
+        }
+
+        const ts = Math.max(Date.now(), baselineTs + 1);
         const faDate = new Date().toLocaleString('fa-IR');
 
         const syncRecord = {
           _type: 'FULL_STORAGE_SYNC',
           updatedAt: ts,
           updatedAtFa: faDate,
+          baseUpdatedAt: baselineTs,
           storage: snapshot.storage,
           indexedDBDocs: snapshot.indexedDBDocs
         };
 
         const serializedSync = JSON.stringify(syncRecord);
-
-        // ارسال همزمان در فرمت db (برای اسکریپت sync) و فرمت driveForm (برای اسکریپت پوشه‌ساز)
         const payload = {
           action: 'sync',
           sessionToken: window.NezamDriveDocuments.getAccessKey(),
           updatedAt: ts,
+          expectedUpdatedAt: baselineTs,
           fullDatabase: syncRecord,
           db: [syncRecord],
           fullName: 'پشتیبان_مرکزی_اتوماسیون_۶۳۶',
@@ -3331,7 +3407,8 @@
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify(payload),
-          redirect: 'follow'
+          redirect: 'follow',
+          cache: 'no-store'
         });
 
         const responseText = await res.text();
@@ -3341,28 +3418,43 @@
         if (!readBackConfirmed) {
           throw new Error('گوگل پاسخ اولیه را پذیرفت، اما نسخه جدید شامل پرونده‌ها، نامه‌ها و فهرست حذف دائمی در بازخوانی تأیید نشد.');
         }
-        localStorage.setItem('__gdrive_sync_ts', String(ts));
+
+        const confirmedTs = Number(lastKnownCloudTs || ts);
+        localStorage.setItem('__gdrive_sync_ts', String(confirmedTs));
         localStorage.setItem('__gdrive_has_local_data', '1');
+        if (getLocalChangeTimestamp() <= snapshotMutationAt) {
+          localStorage.removeItem('__gdrive_local_change_ts');
+        }
 
         setCloudStatus('✅ ذخیره در درایو انجام شد', '#15803d');
         if (showAlert) {
           if (typeof showToastMsg === 'function') {
-            showToastMsg('✅ تمامی اطلاعات سامانه (پرونده‌ها، کروکی‌ها، نامه‌ها و مدارک) در گوگل درایو ذخیره شد.');
+            showToastMsg('✅ اطلاعات سامانه پس از کنترل کامل بودن نسخه و بازخوانی مجدد در Google Drive تأیید شد.');
           } else {
-            alert('تمامی اطلاعات سامانه با موفقیت در گوگل درایو ذخیره شد.');
+            alert('اطلاعات سامانه در Google Drive ذخیره و بازخوانی آن تأیید شد.');
           }
         }
         return true;
       } catch (err) {
         console.error('Google Drive Sync Error:', err);
-        setCloudStatus('⚠️ خطا در ارتباط با درایو', '#dc2626');
+        if (syncConflictDetected) {
+          setCloudStatus('⚠️ تعارض همگام‌سازی؛ اطلاعات محلی حفظ شد', '#b45309');
+          if (!syncConflictNotified && typeof showToastMsg === 'function') {
+            showToastMsg('⚠️ نسخه Drive در دستگاه دیگری تغییر کرده است. اطلاعات محلی حذف یا بازنویسی نشد؛ برای انتخاب نسخه مرجع، بازخوانی یا ذخیره دستی را با دقت انجام دهید.', true);
+            syncConflictNotified = true;
+          }
+        } else {
+          setCloudStatus('⚠️ خطا در ارتباط با درایو', '#dc2626');
+        }
         if (showAlert) {
-          alert('ارتباط با Google Drive برقرار نشد.\nعلت فنی: ' + String(err && err.message ? err.message : err || 'خطای نامشخص').slice(0, 500) + '\n\nاین پیام را برای بررسی ارسال کنید.');
+          alert('ارتباط با Google Drive برقرار نشد یا نسخه امن قابل تأیید نبود.\nعلت فنی: ' +
+            String(err && err.message ? err.message : err || 'خطای نامشخص').slice(0, 500) +
+            '\n\nاطلاعات محلی حذف نشده است.');
         }
         return false;
       } finally {
         isSyncInProgress = false;
-        if (syncRequestedWhileBusy && isInitialLoadDone && !isRestoring) {
+        if (syncRequestedWhileBusy && isInitialLoadDone && !isRestoring && !syncConflictDetected) {
           syncRequestedWhileBusy = false;
           clearTimeout(syncTimer);
           syncTimer = setTimeout(() => syncAllDataToDrive(false), 350);
@@ -3370,7 +3462,7 @@
       }
     }
 
-    // ۴. ساخت پوشه اختصاصی متقاضی فعال در گوگل درایو به همراه تمام جزئیات پرونده، کروکی و نامه‌ها
+    // ۴. ساخت پوشه اختصاصی متقاضی فعال    // ۴. ساخت پوشه اختصاصی متقاضی فعال در گوگل درایو به همراه تمام جزئیات پرونده، کروکی و نامه‌ها
     async function saveApplicantFolderToDrive(manualTrigger) {
       if (isRestoring) return false;
 
@@ -3651,6 +3743,10 @@
 
     // ۵. بازخوانی کامل اطلاعات از گوگل درایو (هنگام ورود با مرورگر/دستگاه جدید یا کلیک روی دکمه بازخوانی)
     async function loadFromDriveOnStartup(manualForce = false) {
+      if (manualForce) {
+        syncConflictDetected = false;
+        syncConflictNotified = false;
+      }
       isRestoring = true;
       window.__nezamDriveReady = false;
       let syncAfterRestore = false;
@@ -3658,9 +3754,11 @@
       try {
         setCloudStatus('🔄 دریافت اطلاعات از درایو...', '#0284c7');
         const rawData = await window.NezamDriveDocuments.readDatabase();
-
         const { bestSyncRecord, recoveredCases, recoveredLetters } = parseCloudResponse(rawData);
         cloudReadSucceeded = true;
+
+        const cloudTs = bestSyncRecord ? Number(bestSyncRecord.updatedAt || 0) : 0;
+        lastKnownCloudTs = cloudTs;
 
         // ادغام حذف‌های محلی و ابری حتی وقتی نسخه محلی جدیدتر است و بدنه کامل ابر اعمال نمی‌شود.
         const localDeletionManifest = typeof window.readNezamDeletionManifest === 'function'
@@ -3679,7 +3777,6 @@
         const hasLocalOnlyDeletion =
           (localDeletionManifest.cases || []).some(item => item && !cloudCaseDeleteIds.has(String(item.id))) ||
           (localDeletionManifest.letters || []).some(item => item && !cloudLetterDeleteIds.has(String(item.id)));
-        if (hasLocalOnlyDeletion) syncAfterRestore = true;
         if (JSON.stringify(mergedDeletionManifest) !== JSON.stringify(localDeletionManifest)) {
           if (typeof window.persistNezamDeletionManifest === 'function' &&
               !window.persistNezamDeletionManifest(mergedDeletionManifest)) {
@@ -3691,52 +3788,99 @@
         }
 
         const localTs = Number(localStorage.getItem('__gdrive_sync_ts') || 0);
-        const hasLocalData = Boolean(localStorage.getItem('__gdrive_has_local_data') && localStorage.getItem('nezam636_unified_cases'));
-        let didRestore = false;
-        // ۱. بازگردانی نسخه کامل؛ فهرست حذف مرورگر و ابر ادغام می‌شود و بر همه داده‌ها اولویت دارد.
-        if (bestSyncRecord && bestSyncRecord.storage) {
-          const cloudTs = Number(bestSyncRecord.updatedAt || Date.now());
-          if (manualForce || !hasLocalData || localTs === 0 || cloudTs >= localTs) {
-            window.__gdriveInternalFlush = true;
-            try {
-              const entries = Object.entries(bestSyncRecord.storage);
-              for (const [k, originalValue] of entries) {
-                if (!isAllowedCloudStorageKey(k) || typeof originalValue !== 'string' ||
-                    k === 'nezam636_deletion_manifest_v1') continue;
-                let v = originalValue;
-                if (typeof window.filterNezamRecordsByDeletionManifest === 'function' &&
-                    (k === 'nezam636_unified_cases' || k === 'nezam636_letters')) {
-                  try {
-                    const decoded = JSON.parse(v);
-                    const filtered = window.filterNezamRecordsByDeletionManifest(
-                      k === 'nezam636_unified_cases' ? decoded : [],
-                      k === 'nezam636_letters' ? decoded : [],
-                      mergedDeletionManifest
-                    );
-                    v = JSON.stringify(k === 'nezam636_unified_cases' ? filtered.cases : filtered.letters);
-                  } catch (dataError) {
-                    throw new Error('ساختار اطلاعات پرونده یا نامه در نسخه ابری معتبر نیست؛ از بازنویسی داده جلوگیری شد.');
-                  }
-                }
-                localStorage.setItem(k, v);
-              }
-              if (typeof window.persistNezamDeletionManifest === 'function' &&
-                  !window.persistNezamDeletionManifest(mergedDeletionManifest)) {
-                throw new Error('فهرست حذف دائمی در حافظه مرورگر قابل ذخیره نبود.');
-              }
-              localStorage.setItem('__gdrive_sync_ts', String(cloudTs));
-              localStorage.setItem('__gdrive_has_local_data', '1');
-            } finally {
-              window.__gdriveInternalFlush = false;
-            }
+        const localChangeTs = getLocalChangeTimestamp();
+        const localCasesRaw = localStorage.getItem('nezam636_unified_cases');
+        const hasLocalData = Boolean(
+          localCasesRaw !== null &&
+          (localStorage.getItem('__gdrive_has_local_data') || localChangeTs > localTs)
+        );
+        const hasPendingLocalChanges =
+          (localCasesRaw !== null && localChangeTs > localTs) || hasLocalOnlyDeletion;
 
-            if (Array.isArray(bestSyncRecord.indexedDBDocs) &&
-                bestSyncRecord.indexedDBDocs.length > 0 &&
-                typeof window.importIndexedDBDocs === 'function') {
-              await window.importIndexedDBDocs(bestSyncRecord.indexedDBDocs);
-            }
-            didRestore = true;
+        // اگر نسخه ابر از مبنای محلی جلوتر است و این دستگاه تغییر ذخیره‌نشده دارد، هیچ‌یک را خودکار حذف نمی‌کنیم.
+        const cloudAdvancedSinceLocalBase = bestSyncRecord
+          ? cloudTs > localTs
+          : (hasLocalData && localTs > 0);
+        const cloudSnapshotMissing = hasLocalData && localTs > 0 && !bestSyncRecord;
+        const cloudSnapshotRolledBack = hasLocalData && !!bestSyncRecord && cloudTs < localTs;
+
+        if (manualForce && hasPendingLocalChanges && bestSyncRecord) {
+          const confirmRemoteRestore = confirm(
+            'در این دستگاه تغییرات محلیِ ذخیره‌نشده وجود دارد.\n' +
+            'بازخوانی اجباری، اطلاعات محلی را با نسخه Google Drive جایگزین می‌کند.\n\n' +
+            'قبل از ادامه از اطلاعات محلی نسخه پشتیبان تهیه کرده‌اید؟'
+          );
+          if (!confirmRemoteRestore) {
+            syncConflictDetected = true;
+            setCloudStatus('⚠️ تغییرات محلی حفظ شد؛ بازخوانی لغو شد', '#b45309');
+            return;
           }
+        }
+
+        if (!manualForce && hasPendingLocalChanges) {
+          if (cloudAdvancedSinceLocalBase || cloudSnapshotMissing || cloudSnapshotRolledBack) {
+            syncConflictDetected = true;
+          } else {
+            // Drive هنوز از آخرین نسخه تأییدشده جلوتر نیست؛ تغییرات محلی آفلاین را به صف ارسال می‌کنیم.
+            syncAfterRestore = true;
+          }
+        } else if (!manualForce && (cloudSnapshotMissing || cloudSnapshotRolledBack)) {
+          syncConflictDetected = true;
+        }
+
+        if (localChangeTs > 0 && localChangeTs <= localTs) {
+          localStorage.removeItem('__gdrive_local_change_ts');
+        }
+
+        let didRestore = false;
+        // نسخه کامل فقط وقتی بازگردانده می‌شود که تغییر محلیِ حل‌نشده یا تعارض نسخه وجود نداشته باشد.
+        if (bestSyncRecord && bestSyncRecord.storage && !syncConflictDetected &&
+            (manualForce || !hasLocalPendingChanges) &&
+            (manualForce || !hasLocalData || localTs === 0 || cloudTs >= localTs)) {
+          window.__gdriveInternalFlush = true;
+          try {
+            const entries = Object.entries(bestSyncRecord.storage);
+            for (const [k, originalValue] of entries) {
+              if (!isAllowedCloudStorageKey(k) || typeof originalValue !== 'string' ||
+                  k === 'nezam636_deletion_manifest_v1') continue;
+              let v = originalValue;
+              if (typeof window.filterNezamRecordsByDeletionManifest === 'function' &&
+                  (k === 'nezam636_unified_cases' || k === 'nezam636_letters')) {
+                try {
+                  const decoded = JSON.parse(v);
+                  const filtered = window.filterNezamRecordsByDeletionManifest(
+                    k === 'nezam636_unified_cases' ? decoded : [],
+                    k === 'nezam636_letters' ? decoded : [],
+                    mergedDeletionManifest
+                  );
+                  v = JSON.stringify(k === 'nezam636_unified_cases' ? filtered.cases : filtered.letters);
+                } catch (dataError) {
+                  throw new Error('ساختار اطلاعات پرونده یا نامه در نسخه ابری معتبر نیست؛ از بازنویسی داده جلوگیری شد.');
+                }
+              }
+              localStorage.setItem(k, v);
+            }
+            if (typeof window.persistNezamDeletionManifest === 'function' &&
+                !window.persistNezamDeletionManifest(mergedDeletionManifest)) {
+              throw new Error('فهرست حذف دائمی در حافظه مرورگر قابل ذخیره نبود.');
+            }
+            localStorage.setItem('__gdrive_sync_ts', String(cloudTs));
+            localStorage.setItem('__gdrive_has_local_data', '1');
+          } finally {
+            window.__gdriveInternalFlush = false;
+          }
+
+          if (Array.isArray(bestSyncRecord.indexedDBDocs) &&
+              bestSyncRecord.indexedDBDocs.length > 0 &&
+              typeof window.importIndexedDBDocs === 'function') {
+            const imported = await window.importIndexedDBDocs(bestSyncRecord.indexedDBDocs);
+            if (!imported) throw new Error('بازیابی فایل‌های محلی IndexedDB ناموفق بود؛ بازیابی کامل تأیید نشد.');
+          }
+          localStorage.removeItem('__gdrive_local_change_ts');
+          lastKnownCloudTs = cloudTs;
+          syncConflictDetected = false;
+          syncConflictNotified = false;
+          didRestore = true;
         }
 
         // نسخه‌های تکی پرونده که قبلاً در پوشه‌های Drive ساخته شده‌اند، فقط بایگانی‌اند.
@@ -3746,7 +3890,6 @@
           console.info('Legacy applicant-folder backups were detected and intentionally not merged into the live database.');
         }
 
-        // ۳. اعمال فوری اطلاعات بازخوانی‌شده روی تمام جداول، فرم‌ها و نقشه‌ها بدون نیاز به رفرش
         if (didRestore) {
           if (typeof window.applyNezamDeletionManifestToState === 'function') {
             window.applyNezamDeletionManifestToState();
@@ -3758,6 +3901,14 @@
           if (manualForce && typeof showToastMsg === 'function') {
             showToastMsg('✅ آخرین اطلاعات پرونده‌ها، کروکی‌ها و نامه‌ها از گوگل درایو بازخوانی شد.');
           }
+        } else if (syncConflictDetected) {
+          setCloudStatus('⚠️ تعارض نسخه‌ها؛ اطلاعات این دستگاه حفظ شد', '#b45309');
+          if (!syncConflictNotified && typeof showToastMsg === 'function') {
+            showToastMsg('⚠️ اطلاعات این دستگاه و Google Drive هر دو تغییر کرده‌اند یا نسخه ابری عقب‌تر است. هیچ‌کدام خودکار جایگزین نشدند.', true);
+            syncConflictNotified = true;
+          }
+        } else if (hasPendingLocalChanges) {
+          setCloudStatus('⏳ تغییرات آفلاین در صف ذخیره درایو است', '#b45309');
         } else if (!bestSyncRecord && (recoveredCases.length || recoveredLetters.length)) {
           setCloudStatus('⚠️ فقط پشتیبان‌های قدیمی Drive یافت شد', '#b45309');
           if (manualForce && typeof showToastMsg === 'function') {
@@ -3773,37 +3924,39 @@
         console.warn('Could not load from Google Drive:', err);
         setCloudStatus('☁️ حالت آفلاین', '#475569');
         if (manualForce) {
-          alert('امکان دریافت اطلاعات از گوگل درایو وجود ندارد. اتصال اینترنت را بررسی نمایید.');
+          alert('امکان دریافت اطلاعات از گوگل درایو وجود ندارد. اتصال اینترنت را بررسی نمایید.\nجزئیات: ' +
+            String(err && err.message ? err.message : err || 'خطای نامشخص').slice(0, 350));
         }
       } finally {
         isRestoring = false;
         isInitialLoadDone = true;
         window.__nezamDriveReady = true;
-        if (syncAfterRestore && cloudReadSucceeded) {
+        if (syncAfterRestore && cloudReadSucceeded && !syncConflictDetected) {
           clearTimeout(syncTimer);
           setTimeout(() => syncAllDataToDrive(false), 300);
         }
       }
     }
 
-    // ۶. اتصال هوشمند به تغییرات حافظه (فقط پس از اتمام بارگذاری اولیه از گوگل درایو)
+    // ۶. اتصال هوشمند به تغییرات حافظه    // ۶. اتصال هوشمند به تغییرات حافظه (فقط پس از اتمام بارگذاری اولیه از گوگل درایو)
     const origSetItem = Storage.prototype.setItem;
     Storage.prototype.setItem = function(key, value) {
       origSetItem.apply(this, arguments);
-      if (
-        isInitialLoadDone &&
-        !isRestoring &&
-        !window.__gdriveInternalFlush &&
-        key &&
-        !key.startsWith('__gdrive_') &&
-        !IGNORED_STARTUP_KEYS.has(key)
-      ) {
-        clearTimeout(syncTimer);
-        syncTimer = setTimeout(() => syncAllDataToDrive(false), 1800);
-      }
+
+      // Storage.prototype بین localStorage و sessionStorage مشترک است؛ نشست OTP نباید دیتابیس را sync کند.
+      if (this !== window.localStorage) return;
+      if (!isAllowedCloudStorageKey(key) || IGNORED_STARTUP_KEYS.has(key)) return;
+      if (!isInitialLoadDone || isRestoring || window.__gdriveInternalFlush) return;
+
+      const previousDirtyTs = getLocalChangeTimestamp();
+      const nextDirtyTs = Math.max(Date.now(), previousDirtyTs + 1);
+      origSetItem.call(window.localStorage, '__gdrive_local_change_ts', String(nextDirtyTs));
+
+      clearTimeout(syncTimer);
+      syncTimer = setTimeout(() => syncAllDataToDrive(false), 1800);
     };
 
-    // در دسترس قرار دادن توابع در سطح window
+    // در دسترس قرار دادن توابع در سطح window    // در دسترس قرار دادن توابع در سطح window
     window.syncAllDataToDrive = syncAllDataToDrive;
     window.syncDeletionToDrive = function() {
       // حذف باید فوراً ارسال شود، نه اینکه پشت debounce معمول ۱٫۸ ثانیه‌ای بماند.
