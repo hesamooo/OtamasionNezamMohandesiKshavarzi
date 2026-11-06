@@ -3790,12 +3790,15 @@
         const localTs = Number(localStorage.getItem('__gdrive_sync_ts') || 0);
         const localChangeTs = getLocalChangeTimestamp();
         const localCasesRaw = localStorage.getItem('nezam636_unified_cases');
+        const hasCloudMarker = Boolean(localStorage.getItem('__gdrive_has_local_data'));
+        // نصب‌های قدیمی dirty-marker نداشتند؛ دیتابیس محلیِ موجود بدون timestamp معتبر، داده تأییدنشده محسوب می‌شود.
+        const hasUntrackedLocalData = localCasesRaw !== null && localTs === 0 && !hasCloudMarker;
         const hasLocalData = Boolean(
           localCasesRaw !== null &&
-          (localStorage.getItem('__gdrive_has_local_data') || localChangeTs > localTs)
+          (hasCloudMarker || localChangeTs > localTs || hasUntrackedLocalData)
         );
         const hasPendingLocalChanges =
-          (localCasesRaw !== null && localChangeTs > localTs) || hasLocalOnlyDeletion;
+          (localCasesRaw !== null && (localChangeTs > localTs || hasUntrackedLocalData)) || hasLocalOnlyDeletion;
 
         // اگر نسخه ابر از مبنای محلی جلوتر است و این دستگاه تغییر ذخیره‌نشده دارد، هیچ‌یک را خودکار حذف نمی‌کنیم.
         const cloudAdvancedSinceLocalBase = bestSyncRecord
@@ -3804,9 +3807,9 @@
         const cloudSnapshotMissing = hasLocalData && localTs > 0 && !bestSyncRecord;
         const cloudSnapshotRolledBack = hasLocalData && !!bestSyncRecord && cloudTs < localTs;
 
-        if (manualForce && hasPendingLocalChanges && bestSyncRecord) {
+        if (manualForce && (hasPendingLocalChanges || cloudSnapshotRolledBack) && bestSyncRecord) {
           const confirmRemoteRestore = confirm(
-            'در این دستگاه تغییرات محلیِ ذخیره‌نشده وجود دارد.\n' +
+            'در این دستگاه تغییرات محلیِ ذخیره‌نشده وجود دارد یا نسخه Google Drive از نسخه تأییدشده محلی قدیمی‌تر است.\n' +
             'بازخوانی اجباری، اطلاعات محلی را با نسخه Google Drive جایگزین می‌کند.\n\n' +
             'قبل از ادامه از اطلاعات محلی نسخه پشتیبان تهیه کرده‌اید؟'
           );
