@@ -1332,7 +1332,7 @@
   <nav class="app-navbar no-print" aria-label="منوی بخش‌های اتوماسیون">
     <button type="button" id="nav-btn-dashboard" class="nav-link active" onclick="switchMainPane('pane-dashboard')">📊 پیشخوان</button>
     <button type="button" id="nav-btn-cases" class="nav-link" onclick="switchMainPane('pane-cases')">📁 پرونده‌ها</button>
-    <button type="button" id="nav-btn-croquis" class="nav-link" onclick="openCroquisWorkspace()">🗺️ کروکی UTM</button>
+    <button type="button" id="nav-btn-croquis" class="nav-link" onclick="switchMainPane('pane-croquis')">🗺️ کروکی UTM</button>
     <button type="button" id="nav-btn-letters" class="nav-link" onclick="switchMainPane('pane-letters')">✉️ دبیرخانه</button>
     <button type="button" id="nav-btn-print" class="nav-link" onclick="switchMainPane('pane-print')">🖨️ چاپ و فرم‌ها</button>
     <button type="button" id="nav-btn-office" class="nav-link" onclick="switchMainPane('pane-office')">💼 کارتابل</button>
@@ -2075,16 +2075,6 @@
          PANE 3: استودیو نقشه‌کشی: ترسیم چندلایه و کنترل هندسی UTM (مطابق صفحات ۵ و ۶ راهنمای PDF)
          ===================================================================== -->
     <section id="pane-croquis" class="sec-pane">
-      <div class="card-clean mb-3" id="crq-workspace-mode-card">
-        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
-          <div><strong class="text-success">حالت کاری کروکی</strong><div class="small text-muted" id="crq-workspace-mode-badge">کروکی متصل به پرونده فعال</div></div>
-          <div class="d-flex flex-wrap gap-2">
-            <button type="button" class="btn btn-sm btn-success" id="btn-crq-mode-case" onclick="setCroquisWorkspaceMode('CASE')">کروکی پرونده‌ای</button>
-            <button type="button" class="btn btn-sm btn-outline-primary" id="btn-crq-mode-free" onclick="setCroquisWorkspaceMode('FREE')">نقشه‌برداری آزاد</button>
-            <button type="button" class="btn btn-sm btn-outline-dark" onclick="exportActiveCroquisKml()">خروجی KML</button>
-          </div>
-        </div>
-      </div>
       <!-- نوار مدیریت نقشه‌های پرونده و بافر هوشمند حریم -->
       <div class="card-clean mb-3">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
@@ -3127,7 +3117,6 @@
   <script src="./nezam-drive-documents.js?v=20261104-drive-docs-r10"></script>
   <script src="./nezam-letter-attachments.js?v=20261104-letter-attachments-r2"></script>
   <script src="./nezam-customizer.js?v=20261103-secretariat-r19"></script>
-  <script src="./nezam-free-croquis.js?v=20261106-free-map-r1"></script>
   <script src="./nezam-ai-assistant.js?v=20261101-security-r3"></script>
 
   <!-- ماژول اصلاح‌شده و دوطرفه اتصال سامانه ۶۳۶ خفر به گوگل درایو (ذخیره و بازخوانی ۱۰۰٪ اطلاعات) -->
