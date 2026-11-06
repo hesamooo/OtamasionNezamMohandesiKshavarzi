@@ -1014,7 +1014,7 @@ function switchMainPane(paneId) {
   };
   var independentOfficeLetterFlow = window.__nezamOfficeLetterDraftMode === true;
 
-  if (guardedPanes[paneId] && !getActiveCase() && !(paneId === "pane-print" && independentOfficeLetterFlow) && !(paneId === "pane-croquis" && window.__nezamCroquisFreeMode === true)) {
+  if (guardedPanes[paneId] && !getActiveCase() && !(paneId === "pane-print" && independentOfficeLetterFlow)) {
     requireActiveCase(guardedPanes[paneId], function() {
       switchMainPane(paneId);
     });
