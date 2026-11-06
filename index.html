@@ -3890,6 +3890,7 @@
           console.info('Legacy applicant-folder backups were detected and intentionally not merged into the live database.');
         }
 
+        // ۳. اعمال فوری اطلاعات بازخوانی‌شده روی تمام جداول، فرم‌ها و نقشه‌ها بدون نیاز به رفرش
         if (didRestore) {
           if (typeof window.applyNezamDeletionManifestToState === 'function') {
             window.applyNezamDeletionManifestToState();
