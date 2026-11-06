@@ -623,3 +623,24 @@ test('common full applicant-name variable alias resolves consistently', () => {
   const customizer = read('nezam-customizer.js');
   assert.match(customizer, /"نامونامخانوادگی": "name"/);
 });
+
+test('Drive sync protects offline edits and rejects stale cloud baselines', () => {
+  const html = read('index.html');
+  assert.ok(html.includes('this !== window.localStorage'));
+  assert.ok(html.includes('__gdrive_local_change_ts'));
+  assert.ok(html.includes('beforeWriteTs !== baselineTs'));
+  assert.ok(html.includes('syncConflictDetected'));
+  assert.ok(html.includes('hasPendingLocalChanges'));
+});
+
+test('Drive snapshots fail closed when local flush or IndexedDB export is incomplete', () => {
+  const html = read('index.html');
+  const core = read('nezam-core.js');
+  assert.ok(html.includes('if (flushed === false)'));
+  assert.ok(html.includes("requireJsonArray('nezam636_unified_cases'"));
+  assert.ok(html.includes("requireJsonArray('nezam636_letters'"));
+  assert.ok(html.includes('omittedLargeCount'));
+  assert.ok(core.includes('cloud snapshot must be stopped'));
+  assert.ok(core.includes('if (!db) return reject(new Error'));
+  assert.ok(core.includes('req.onerror = function()'));
+});
