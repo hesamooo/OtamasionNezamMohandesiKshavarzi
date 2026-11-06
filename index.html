@@ -3835,7 +3835,7 @@
         let didRestore = false;
         // نسخه کامل فقط وقتی بازگردانده می‌شود که تغییر محلیِ حل‌نشده یا تعارض نسخه وجود نداشته باشد.
         if (bestSyncRecord && bestSyncRecord.storage && !syncConflictDetected &&
-            (manualForce || !hasLocalPendingChanges) &&
+            (manualForce || !hasPendingLocalChanges) &&
             (manualForce || !hasLocalData || localTs === 0 || cloudTs >= localTs)) {
           window.__gdriveInternalFlush = true;
           const entries = Object.entries(bestSyncRecord.storage).filter(([k, v]) =>
