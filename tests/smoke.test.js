@@ -535,7 +535,10 @@ test('local IndexedDB failures cannot indefinitely block Google Drive document l
   assert.match(core, /setTimeout\(function\(\) \{\s*if \(completed\) return;\s*completed = true;/);
   assert.match(vault, /function withTimeout\(promise, timeoutMs, message\)/);
   assert.match(vault, /15000, 'پاسخ Google Apps Script برای بررسی اتصال در ۱۵ ثانیه دریافت نشد/);
-  assert.match(vault, /18000,\s*'پاسخ Google Apps Script در ۱۸ ثانیه دریافت نشد/);
+  assert.match(vault, /function getActionTimeout_\(action\)/);
+  assert.match(vault, /readDatabase: 35000/);
+  assert.match(vault, /getCaseDocumentContent: 60000/);
+  assert.match(vault, /uploadCaseDocument: 90000/);
 });
 
 
