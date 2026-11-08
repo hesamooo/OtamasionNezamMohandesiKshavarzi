@@ -664,10 +664,10 @@ test('Apps Script accepts Drive-only snapshots and strips legacy IndexedDB paylo
   const code = read('apps-script/Code.gs');
   assert.doesNotThrow(() => new Function(code));
   const start = code.indexOf('function validateMasterSyncRecord_(syncObj) {');
-  const end = code.indexOf('\\nfunction writeMasterSyncRecord_', start);
+  const end = code.indexOf('\nfunction writeMasterSyncRecord_', start);
   assert.notEqual(start, -1);
   assert.notEqual(end, -1);
-  const validate = new Function(code.slice(start, end) + '\\nreturn validateMasterSyncRecord_;')();
+  const validate = new Function(code.slice(start, end) + '\nreturn validateMasterSyncRecord_;')();
   const storage = {
     nezam636_unified_cases: '[]',
     nezam636_letters: '[]',
@@ -690,4 +690,3 @@ test('old Apps Script IndexedDB validation errors point to the required backend 
   assert.ok(html.includes('نسخه Code.gs در Google Apps Script قدیمی است'));
   assert.ok(html.includes('با «New version» دوباره منتشر کنید'));
 });
-;
