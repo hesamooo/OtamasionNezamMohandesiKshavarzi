@@ -685,6 +685,13 @@ test('Apps Script accepts Drive-only snapshots and strips legacy IndexedDB paylo
   assert.ok(code.includes('delete clean.fullDatabase.indexedDBDocs'));
 });
 
+test('Drive save failures expose the backend error instead of a generic connection label', () => {
+  const html = read('index.html');
+  assert.ok(html.includes("setCloudStatus('⚠️ خطا: ' + driveErrorText.slice(0, 28)"));
+  assert.ok(html.includes("statusButton.title = 'جزئیات خطای ذخیره‌سازی Google Drive: ' + driveErrorText"));
+  assert.ok(html.includes('20261108-drive-only-r3'));
+});
+
 test('old Apps Script IndexedDB validation errors point to the required backend deployment', () => {
   const html = read('index.html');
   assert.ok(html.includes('نسخه Code.gs در Google Apps Script قدیمی است'));
