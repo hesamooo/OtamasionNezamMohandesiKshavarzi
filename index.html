@@ -3111,8 +3111,8 @@
   <div id="smart-mouse-tooltip"></div>
 
   <!-- ماژول‌های اصلی اتوماسیون مرکز خدمات ۶۳۶ خفر -->
-  <script src="./nezam-core.js?v=20261108-drive-only-r2"></script>
-  <script src="./nezam-drive-documents.js?v=20261108-drive-only-r2"></script>
+  <script src="./nezam-core.js?v=20261108-drive-only-r3"></script>
+  <script src="./nezam-drive-documents.js?v=20261108-drive-only-r3"></script>
   <script src="./nezam-letter-attachments.js?v=20261104-letter-attachments-r2"></script>
   <script src="./nezam-customizer.js?v=20261103-secretariat-r19"></script>
   <script src="./nezam-ai-assistant.js?v=20261101-security-r3"></script>
@@ -3432,7 +3432,12 @@
             syncConflictNotified = true;
           }
         } else {
-          setCloudStatus('⚠️ خطا در ارتباط با درایو', '#dc2626');
+          const driveErrorText = String(err && err.message ? err.message : err || 'خطای نامشخص')
+            .replace(/\s+/g, ' ')
+            .trim();
+          setCloudStatus('⚠️ خطا: ' + driveErrorText.slice(0, 28), '#dc2626');
+          const statusButton = document.getElementById('gdrive-status-btn');
+          if (statusButton) statusButton.title = 'جزئیات خطای ذخیره‌سازی Google Drive: ' + driveErrorText;
         }
         if (showAlert) {
           alert('ارتباط با Google Drive برقرار نشد یا نسخه امن قابل تأیید نبود.\nعلت فنی: ' +
@@ -5217,7 +5222,7 @@
 }
 </style>
 
-  <script defer src="./nezam-operations.js?v=20261108-drive-only-r2"></script>
+  <script defer src="./nezam-operations.js?v=20261108-drive-only-r3"></script>
   <script defer src="./nezam-agent-engine.js?v=20261102-agent-v2-r6"></script>
   <script defer src="./nezam-agent-knowledge.js?v=20261101-agent-knowledge-r4"></script>
   <script defer src="./nezam-rule-advisor.js?v=20261101-rule-advisor-r2"></script>
