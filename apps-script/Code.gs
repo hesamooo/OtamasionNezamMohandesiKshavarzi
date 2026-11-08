@@ -674,9 +674,8 @@ function validateMasterSyncRecord_(syncObj) {
     throw new Error("ساختار فهرست حذف دائمی معتبر نیست.");
   }
 
-  // قرارداد جدید فقط Google Drive است. فایل‌های پیوست با API مستقل در پوشه پرونده ذخیره می‌شوند؛
-  // IndexedDB دیگر بخشی از نسخه مرکزی نیست. فیلد قدیمی را بی‌سروصدا حذف می‌کنیم تا
-  // نسخه‌های قبلی کلاینت نیز بتوانند بدون بازگرداندن فایل‌های محلی با سرور کار کنند.
+  // قرارداد ذخیره‌سازی فعلی فقط Google Drive است؛ فایل‌های پیوست با API مستقل در پوشه پرونده ذخیره می‌شوند.
+  // فیلد indexedDBDocs در نسخه‌های قدیمی نادیده گرفته می‌شود تا کلاینت‌های جدید و قدیمی سازگار بمانند.
   const normalized = Object.assign({}, syncObj, { _type: "FULL_STORAGE_SYNC", storage: storage });
   delete normalized.indexedDBDocs;
   return normalized;
@@ -891,8 +890,8 @@ function readDatabaseSnapshot_() {
     : (parsed && typeof parsed === "object" ? [parsed] : null);
   if (!records) throw new Error("ساختار فایل پایگاه داده در Google Drive معتبر نیست.");
 
-  // در نسخه‌های قدیمی ممکن است فیلد پیوست‌های محلی وجود داشته باشد؛ آن را به کلاینت برنمی‌گردانیم.
-  // فایل‌های واقعی پیوست فقط از API مستقل پوشه همان پرونده خوانده می‌شوند.
+  // فیلد پیوست محلی از داده‌های قدیمی هنگام بازخوانی حذف می‌شود؛
+  // فایل‌های واقعی پیوست فقط از API مستقل Google Drive خوانده می‌شوند.
   return records.map(function(record) {
     if (!record || typeof record !== "object" || Array.isArray(record)) return record;
     const clean = Object.assign({}, record);
