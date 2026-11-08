@@ -463,35 +463,6 @@
     return result;
   }
 
-  function migrateLegacyDocs(context) {
-    return new Promise(function (resolve,reject) {
-      if (typeof window.getUploadedDocsForCase !== 'function') return reject(new Error('خواندن فایل‌های قدیمی مرورگر در دسترس نیست.'));
-      window.getUploadedDocsForCase(context.caseId,async function(map) {
-        var entries=Object.keys(map||{}).map(function(key){return map[key];}).filter(function(item){return item&&item.dataUrl;});
-        if(!entries.length)return resolve({successes:[],failures:[]});
-        var successes=[],failures=[];
-        setProgress(0,entries.length,'','بررسی مدارک قدیمی این مرورگر...');
-        for(var i=0;i<entries.length;i++){
-          var item=entries[i];
-          try{
-            var dataUrl=String(item.dataUrl||'');
-            var comma=dataUrl.indexOf(',');
-            if(comma<0)throw new Error('محتوای فایل قدیمی معتبر نیست.');
-            var base64=dataUrl.slice(comma+1);
-            var size=Math.floor(base64.length*0.75);
-            if(!size||size>MAX_FILE_BYTES)throw new Error('حجم فایل قدیمی بیش از ۱۰ مگابایت است؛ آن را جداگانه از فایل اصلی بارگذاری کنید.');
-            var mime=dataUrl.slice(5,dataUrl.indexOf(';'))||'application/octet-stream';
-            var result=await uploadRawFile({file:{name:item.fileName,type:mime},fileName:item.fileName,fileType:mime,fileData:base64},Object.assign({},context,{docCode:item.docCode,docTitle:item.docTitle}));
-            successes.push(result.document);
-          }catch(error){failures.push({fileName:item.fileName||'فایل قدیمی',message:error.message||String(error)});}
-          setProgress(i+1,entries.length,item.fileName,(i+1)+' از '+entries.length+' فایل قدیمی منتقل شد');
-        }
-        if(typeof window.renderActiveCaseDocsChecklist==='function')window.renderActiveCaseDocsChecklist();
-        resolve({successes:successes,failures:failures});
-      });
-    });
-  }
-
   async function retryFailed() {
     if (!lastFailedFiles.length) throw new Error('فایل ناموفقی برای تلاش مجدد باقی نمانده است.');
     var pending = lastFailedFiles.slice();
@@ -506,7 +477,7 @@
   }
 
   window.NezamDriveDocuments={
-    list:list,readDatabase:readDatabase,uploadFiles:uploadFiles,retryFailed:retryFailed,remove:remove,migrateLegacyDocs:migrateLegacyDocs,
+    list:list,readDatabase:readDatabase,uploadFiles:uploadFiles,retryFailed:retryFailed,remove:remove,
     getCaseContext:getCaseContext,getFileContent:getFileContent,getAccessKey:function(){return getAccessKey(false);},ensureReady:ensureReady,
     clearAccessKey:clearSession,
     maxFileBytes:MAX_FILE_BYTES
