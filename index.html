@@ -3111,8 +3111,8 @@
   <div id="smart-mouse-tooltip"></div>
 
   <!-- ماژول‌های اصلی اتوماسیون مرکز خدمات ۶۳۶ خفر -->
-  <script src="./nezam-core.js?v=20261108-drive-only-r1"></script>
-  <script src="./nezam-drive-documents.js?v=20261108-drive-only-r1"></script>
+  <script src="./nezam-core.js?v=20261108-drive-only-r2"></script>
+  <script src="./nezam-drive-documents.js?v=20261108-drive-only-r2"></script>
   <script src="./nezam-letter-attachments.js?v=20261104-letter-attachments-r2"></script>
   <script src="./nezam-customizer.js?v=20261103-secretariat-r19"></script>
   <script src="./nezam-ai-assistant.js?v=20261101-security-r3"></script>
@@ -3204,7 +3204,7 @@
       }
     }
 
-    // ۲. جمع‌آوری ۱۰۰٪ اطلاعات سامانه (از متغیرهای حافظه + localStorage + IndexedDB)
+    // ۲. جمع‌آوری اطلاعات اصلی سامانه از حافظه کاری و localStorage؛ پیوست‌ها مستقل در Google Drive هستند
     async function collectCompleteSystemSnapshot() {
       if (typeof window.flushInMemoryStateToLocalStorage === 'function') {
         const flushed = window.flushInMemoryStateToLocalStorage();
@@ -3260,7 +3260,14 @@
       try {
         const data = JSON.parse(raw);
         if (data === false || (data && (data.success === false || data.ok === false || data.error))) {
-          return { ok: false, message: (data && (data.message || data.error)) || 'اسکریپت گوگل خطای ذخیره گزارش کرد.' };
+          const serverMessage = String((data && (data.message || data.error)) || 'اسکریپت گوگل خطای ذخیره گزارش کرد.');
+          if (/فهرست اسناد IndexedDB در نسخه ارسالی وجود ندارد یا معتبر نیست/i.test(serverMessage)) {
+            return {
+              ok: false,
+              message: 'نسخه Code.gs در Google Apps Script قدیمی است و هنوز پیوست‌های محلی IndexedDB را اجباری می‌داند. فایل apps-script/Code.gs نسخه جدید را جایگزین کنید و Web App را با «New version» دوباره منتشر کنید.'
+            };
+          }
+          return { ok: false, message: serverMessage };
         }
         const status = data && typeof data === 'object' ? String(data.status || data.result || '').toLowerCase() : '';
         if (data && typeof data === 'object' &&
@@ -5210,7 +5217,7 @@
 }
 </style>
 
-  <script defer src="./nezam-operations.js?v=20261108-drive-only-r1"></script>
+  <script defer src="./nezam-operations.js?v=20261108-drive-only-r2"></script>
   <script defer src="./nezam-agent-engine.js?v=20261102-agent-v2-r6"></script>
   <script defer src="./nezam-agent-knowledge.js?v=20261101-agent-knowledge-r4"></script>
   <script defer src="./nezam-rule-advisor.js?v=20261101-rule-advisor-r2"></script>
