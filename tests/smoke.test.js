@@ -636,14 +636,58 @@ test('Drive sync protects offline edits and rejects stale cloud baselines', () =
   assert.ok(html.includes('hasPendingLocalChanges'));
 });
 
-test('Drive snapshots fail closed when local flush or IndexedDB export is incomplete', () => {
+test('Drive-only snapshots keep applicant records but never depend on browser IndexedDB', () => {
   const html = read('index.html');
   const core = read('nezam-core.js');
-  assert.ok(html.includes('if (flushed === false)'));
-  assert.ok(html.includes("requireJsonArray('nezam636_unified_cases'"));
-  assert.ok(html.includes("requireJsonArray('nezam636_letters'"));
-  assert.ok(html.includes('omittedLargeCount'));
-  assert.ok(core.includes('cloud snapshot must be stopped'));
-  assert.ok(core.includes('if (!db) return reject(new Error'));
-  assert.ok(core.includes('req.onerror = function()'));
+  const start = html.indexOf('async function collectCompleteSystemSnapshot()');
+  const end = html.indexOf('function validateDriveWriteResponse', start);
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+  const snapshot = html.slice(start, end);
+  assert.ok(snapshot.includes("requireJsonArray('nezam636_unified_cases'"));
+  assert.ok(snapshot.includes("requireJsonArray('nezam636_letters'"));
+  assert.ok(snapshot.includes('return { storage: storageData }'));
+  assert.equal(snapshot.includes('indexedDBDocs'), false);
+  assert.equal(snapshot.includes('exportIndexedDBDocs'), false);
+  assert.equal(html.includes('snapshot.indexedDBDocs'), false);
+  assert.equal(html.includes('window.importIndexedDBDocs'), false);
+  assert.equal(html.includes('window.exportIndexedDBDocs'), false);
+  assert.equal(core.includes('openFilesDB('), false);
+  assert.equal(core.includes('getUploadedDocsForCase('), false);
+  assert.equal(core.includes('importIndexedDBDocs'), false);
+  assert.equal(core.includes('exportIndexedDBDocs'), false);
+  assert.ok(core.includes('NezamDriveDocuments.uploadFiles'));
+  assert.ok(core.includes('NezamDriveDocuments.list'));
 });
+
+test('Apps Script accepts Drive-only snapshots and strips legacy IndexedDB payloads', () => {
+  const code = read('apps-script/Code.gs');
+  assert.doesNotThrow(() => new Function(code));
+  const start = code.indexOf('function validateMasterSyncRecord_(syncObj) {');
+  const end = code.indexOf('\\nfunction writeMasterSyncRecord_', start);
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+  const validate = new Function(code.slice(start, end) + '\\nreturn validateMasterSyncRecord_;')();
+  const storage = {
+    nezam636_unified_cases: '[]',
+    nezam636_letters: '[]',
+    nezam636_deletion_manifest_v1: JSON.stringify({ version: 1, cases: [], letters: [] })
+  };
+  const driveOnly = validate({ _type: 'FULL_STORAGE_SYNC', storage });
+  assert.equal(Object.prototype.hasOwnProperty.call(driveOnly, 'indexedDBDocs'), false);
+  const legacy = validate({ _type: 'FULL_STORAGE_SYNC', storage, indexedDBDocs: [{ key: 'old-local' }] });
+  assert.equal(Object.prototype.hasOwnProperty.call(legacy, 'indexedDBDocs'), false);
+  assert.throws(() => validate({
+    _type: 'FULL_STORAGE_SYNC',
+    storage: { ...storage, nezam636_letters: '{}' }
+  }));
+  assert.ok(code.includes('delete clean.indexedDBDocs'));
+  assert.ok(code.includes('delete clean.fullDatabase.indexedDBDocs'));
+});
+
+test('old Apps Script IndexedDB validation errors point to the required backend deployment', () => {
+  const html = read('index.html');
+  assert.ok(html.includes('نسخه Code.gs در Google Apps Script قدیمی است'));
+  assert.ok(html.includes('با «New version» دوباره منتشر کنید'));
+});
+;
