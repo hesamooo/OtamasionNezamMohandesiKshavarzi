@@ -1656,99 +1656,6 @@ function renderUnifiedCasesMatrix() {
     });
   }
 }
-function openFilesDB(cb) {
-  var settled = false;
-  var timer = setTimeout(function() { finish(null); }, 4500);
-  function finish(db) {
-    if (settled) return;
-    settled = true;
-    clearTimeout(timer);
-    try { cb(db || null); }
-    catch (callbackError) { console.error("IndexedDB callback failed:", callbackError); }
-  }
-
-  if (idbInstance) {
-    try {
-      // دسترسی به transaction هم وضعیت بسته‌شدن DB را آشکار می‌کند.
-      idbInstance.transaction(["docs"], "readonly");
-      return finish(idbInstance);
-    } catch (closedError) {
-      try { idbInstance.close(); } catch (e) {}
-      idbInstance = null;
-    }
-  }
-  if (!window.indexedDB) return finish(null);
-
-  var req;
-  try {
-    req = window.indexedDB.open("Nezam636_UnifiedFiles_DB", 1);
-  } catch (openError) {
-    console.warn("Could not open local document database:", openError);
-    return finish(null);
-  }
-  req.onupgradeneeded = function(e) {
-    var db = e.target.result;
-    if (!db.objectStoreNames.contains("docs")) db.createObjectStore("docs", { keyPath: "key" });
-  };
-  req.onsuccess = function(e) {
-    var db = e.target.result;
-    idbInstance = db;
-    db.onversionchange = function() {
-      try { db.close(); } catch (closeError) {}
-      if (idbInstance === db) idbInstance = null;
-    };
-    finish(db);
-  };
-  req.onerror = function() {
-    console.warn("IndexedDB open failed:", req.error || "unknown error");
-    finish(null);
-  };
-  req.onblocked = function() {
-    console.warn("IndexedDB open is blocked by another tab or connection.");
-    finish(null);
-  };
-}
-
-function getUploadedDocsForCase(caseId, cb) {
-  var completed = false;
-  var fallbackTimer = setTimeout(function() {
-    if (completed) return;
-    completed = true;
-    console.warn("Local document lookup timed out; continuing with Google Drive inventory.");
-    cb({});
-  }, 5000);
-
-  function finish(map) {
-    if (completed) return;
-    completed = true;
-    clearTimeout(fallbackTimer);
-    cb(map || {});
-  }
-
-  openFilesDB(function(db) {
-    if (!db) return finish({});
-    var tx;
-    try {
-      tx = db.transaction(["docs"], "readonly");
-      var req = tx.objectStore("docs").getAll();
-      req.onsuccess = function(e) {
-        var list = e.target.result || [];
-        var map = {};
-        for (var i = 0; i < list.length; i++) {
-          if (String(list[i].caseId) === String(caseId)) map[list[i].docCode] = list[i];
-        }
-        finish(map);
-      };
-      req.onerror = function() { finish({}); };
-      tx.onerror = function() { finish({}); };
-      tx.onabort = function() { finish({}); };
-    } catch (readError) {
-      console.warn("Local document lookup failed:", readError);
-      finish({});
-    }
-  });
-}
-
 function uploadCaseDocFile(event, docCode, docTitle, replaceFileId) {
   var input = event && event.target;
   var files = input && input.files ? Array.prototype.slice.call(input.files) : [];
@@ -1794,136 +1701,6 @@ function uploadCaseDocFile(event, docCode, docTitle, replaceFileId) {
   if (typeof showToastMsg === "function") showToastMsg("اتصال بایگانی Google Drive آماده نیست؛ فایل بارگذاری نشد. صفحه را تازه‌سازی کنید و وضعیت اتصال را بررسی کنید.", true);
   if (input) input.value = "";
   return false;
-}
-
-function uploadCaseDocFileLegacy(event, docCode, docTitle) {
-  var input = event && event.target;
-  var file = input && input.files ? input.files[0] : null;
-  if (!file) return;
-  var active = requireActiveCase("بارگذاری فایل مدرک در پرونده");
-  if (!active) { input.value = ""; return; }
-
-  var extensionMatch = String(file.name || "").toLowerCase().match(/\.([a-z0-9]+)$/);
-  var extension = extensionMatch ? extensionMatch[1] : "";
-  var allowedTypes = {
-    pdf: ["application/pdf"],
-    jpg: ["image/jpeg"],
-    jpeg: ["image/jpeg"],
-    png: ["image/png"],
-    webp: ["image/webp"]
-  };
-  var accepted = allowedTypes[extension];
-  var mime = String(file.type || "").toLowerCase();
-  if (!accepted || (mime && accepted.indexOf(mime) === -1)) {
-    alert("فقط فایل‌های PDF، JPG، PNG و WEBP قابل بارگذاری هستند.");
-    input.value = "";
-    return;
-  }
-  if (file.size <= 0 || file.size > 12 * 1024 * 1024) {
-    alert("حجم هر مدرک باید بیشتر از صفر و حداکثر ۱۲ مگابایت باشد.");
-    input.value = "";
-    return;
-  }
-
-  // بررسی امضای ابتدایی فایل؛ پسوند به‌تنهایی قابل جعل است.
-  var signatureReader = new FileReader();
-  signatureReader.onerror = function () {
-    alert("بررسی نوع واقعی فایل ناموفق بود.");
-    input.value = "";
-  };
-  signatureReader.onload = function(signatureEvent) {
-    var bytes = new Uint8Array(signatureEvent.target.result || new ArrayBuffer(0));
-    var validSignature = false;
-    if (extension === "pdf") {
-      validSignature = bytes.length >= 5 && bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46 && bytes[4] === 0x2d;
-    } else if (extension === "jpg" || extension === "jpeg") {
-      validSignature = bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
-    } else if (extension === "png") {
-      validSignature = bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47 && bytes[4] === 0x0d && bytes[5] === 0x0a && bytes[6] === 0x1a && bytes[7] === 0x0a;
-    } else if (extension === "webp") {
-      validSignature = bytes.length >= 12 && bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 && bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50;
-    }
-    if (!validSignature) {
-      alert("محتوای واقعی فایل با پسوند انتخاب‌شده مطابقت ندارد.");
-      input.value = "";
-      return;
-    }
-
-    var reader = new FileReader();
-    reader.onerror = function () {
-      alert("خواندن فایل ناموفق بود. فایل را دوباره انتخاب کنید.");
-      input.value = "";
-    };
-    reader.onload = function(e) {
-      if (!e.target || typeof e.target.result !== "string" || e.target.result.indexOf("data:") !== 0) {
-        alert("محتوای فایل معتبر نیست.");
-        input.value = "";
-        return;
-      }
-      openFilesDB(function(db) {
-        if (!db) {
-          alert("مخزن فایل‌های مرورگر در دسترس نیست.");
-          input.value = "";
-          return;
-        }
-        try {
-          var tx = db.transaction(["docs"], "readwrite");
-          tx.objectStore("docs").put({
-            key: active.id + "__" + docCode,
-            caseId: active.id,
-            docCode: docCode,
-            docTitle: docTitle,
-            fileName: String(file.name || "document." + extension).replace(/[\\/:*?"<>|\u0000-\u001f]/g, "_").slice(0, 140),
-            uploadDate: todayShamsi(),
-            dataUrl: e.target.result,
-            rawBlob: file
-          });
-          tx.oncomplete = function() {
-            logCaseAction(active, "بارگذاری مدرک «" + docTitle + "» (" + file.name + ")");
-            saveAllDB();
-            renderActiveCaseDocsChecklist();
-            showToastMsg("فایل «" + docTitle + "» در پرونده «" + active.name + "» ذخیره شد.");
-            input.value = "";
-          };
-          tx.onerror = function() {
-            alert("ذخیره فایل در مرورگر ناموفق بود. فضای ذخیره‌سازی را بررسی کنید.");
-            input.value = "";
-          };
-        } catch (storageError) {
-          console.error("Document storage failed:", storageError);
-          alert("ذخیره فایل انجام نشد؛ احتمالاً فضای کافی در مرورگر وجود ندارد.");
-          input.value = "";
-        }
-      });
-    };
-    reader.readAsDataURL(file);
-  };
-  signatureReader.readAsArrayBuffer(file.slice(0, 12));
-}
-
-function downloadCaseDocFile(docCode) {
-  var c = getActiveCase();
-  if (!c) return;
-  getUploadedDocsForCase(c.id, function(map) {
-    var rec = map[docCode];
-    if (!rec || !rec.dataUrl) return;
-    var a = document.createElement("a");
-    a.href = rec.dataUrl;
-    a.download = rec.fileName;
-    a.click();
-  });
-}
-
-function removeCaseDocFile(docCode) {
-  var c = getActiveCase();
-  if (!c) return;
-  if (!confirm("فایل بارگذاری‌شده حذف شود؟")) return;
-  openFilesDB(function(db) {
-    if (!db) return;
-    var tx = db.transaction(["docs"], "readwrite");
-    tx.objectStore("docs").delete(c.id + "__" + docCode);
-    tx.oncomplete = function() { renderActiveCaseDocsChecklist(); };
-  });
 }
 
 function addCustomDocToChecklist() {
@@ -2160,8 +1937,6 @@ function renderActiveCaseDocsChecklist() {
           btn.disabled = false;
           renderActiveCaseDocsChecklist();
         });
-      } else if (action === "download-local") {
-        downloadCaseDocFile(code);
       }
     });
   }
@@ -2247,7 +2022,7 @@ function renderActiveCaseDocsChecklist() {
     renderDriveLibrary([], error && error.message ? error.message : String(error), "");
   });
 
-  getUploadedDocsForCase(c.id, function(localMap) {
+  Promise.resolve().then(function() {
     if (!getActiveCase() || String(getActiveCase().id) !== String(c.id)) return;
 
     function renderRows(cloudFiles, cloudError, folderUrl) {
@@ -2263,15 +2038,12 @@ function renderActiveCaseDocsChecklist() {
         var safeCode = escapeHtmlCore(d.code);
         var safeTitle = escapeHtmlCore(d.title);
         var filesForDoc = managedFiles.filter(function(file) { return String(file.docCode) === String(d.code); });
-        var localFile = localMap[d.code];
         if (filesForDoc.length) doneCount++;
         else missing.push(d.title);
 
         var statusHtml = filesForDoc.length
           ? '<span class="badge bg-success">✅ در Google Drive (' + escapeHtmlCore(toFa(filesForDoc.length)) + ' فایل)</span>'
-          : (localFile
-            ? '<span class="badge bg-warning text-dark">⚠️ فقط در این مرورگر؛ هنوز به Drive منتقل نشده</span><br><small>' + escapeHtmlCore(localFile.fileName || "") + '</small>'
-            : '<span class="badge bg-danger">❌ مدرک در بایگانی ابری موجود نیست</span>');
+          : '<span class="badge bg-danger">❌ مدرک در بایگانی ابری موجود نیست</span>';
 
         var fileActions = filesForDoc.map(function(file) {
           var safeId = escapeHtmlCore(file.fileId || file.id || "");
@@ -2292,7 +2064,7 @@ function renderActiveCaseDocsChecklist() {
         rows += '<tr class="' + (filesForDoc.length ? 'table-success' : '') + '">' +
           '<td class="text-center fw-bold">' + escapeHtmlCore(toFa(i + 1)) + '</td>' +
           '<td><b>' + safeTitle + '</b>' + (d.legalRef ? '<br><small class="text-primary">⚖️ مستند قانونی: ' + escapeHtmlCore(d.legalRef) + '</small>' : '') + '</td>' +
-          '<td>' + statusHtml + (filesForDoc.length && localFile ? '<br><small class="text-warning">یک نسخه قدیمی محلی نیز وجود دارد.</small>' : '') + '</td>' +
+          '<td>' + statusHtml + '</td>' +
           '<td><div class="d-flex flex-column gap-1">' +
           '<label class="btn btn-sm btn-primary fw-bold m-0" style="cursor:pointer;">📤 افزودن فایل<input type="file" multiple data-doc-action="upload" data-doc-code="' + safeCode + '" data-doc-title="' + safeTitle + '" accept=".pdf,.jpg,.jpeg,.png,.webp,.gif,.tif,.tiff,.bmp,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.rtf,.odt,.ods,.odp" hidden></label>' +
           fileActions +
@@ -2426,59 +2198,27 @@ function renderActiveCaseDocsChecklist() {
   });
 }
 async function syncActiveCaseFolderToDrive() {
-  var c = requireActiveCase("ساخت پوشه اختصاصی متقاضی در درایو");
-  if (!c) return;
-  if (!window.showDirectoryPicker) {
-    downloadWindowsBatFolderCreator();
-    return;
-  }
+  var c = requireActiveCase("ساخت پوشه اختصاصی متقاضی در Google Drive");
+  if (!c) return false;
   try {
-    if (!rootDriveHandle) {
-      rootDriveHandle = await window.showDirectoryPicker({ mode: "readwrite" });
+    if (typeof window.saveApplicantFolderToDrive !== "function") {
+      throw new Error("ماژول ذخیره پرونده در Google Drive آماده نیست.");
     }
-    var folderName = (c.name + " - " + toEn(c.nid || "000")).replace(/[\\/:*?"<>|]/g, "_").trim();
-    var caseDir = await rootDriveHandle.getDirectoryHandle(folderName, { create: true });
-
-    var sp = ACT_SPECS[c.actType] || ACT_SPECS.sheep_high;
-    var reqDocs = DOC_CHECKLISTS[sp.docGroup || "LIVESTOCK"] || DOC_CHECKLISTS.LIVESTOCK;
-
-    getUploadedDocsForCase(c.id, async function(upMap) {
-      var savedCount = 0;
-      var repLines = ["گزارش وضعیت مدارک پرونده: " + c.name + " (کدملی: " + toFa(c.nid) + ")", "طرح: " + c.project + " | موقعیت: " + c.loc, "----------------------------------------"];
-      for (var i = 0; i < reqDocs.length; i++) {
-        var d = reqDocs[i];
-        var up = upMap[d.code];
-        if (up && up.rawBlob) {
-          var fHandle = await caseDir.getFileHandle(String(i + 1).padStart(2, "0") + "_" + up.fileName, { create: true });
-          var w = await fHandle.createWritable();
-          await w.write(up.rawBlob);
-          await w.close();
-          savedCount++;
-          repLines.push("[تکمیل] " + d.title);
-        } else {
-          repLines.push("[ناقص] " + d.title);
-        }
-      }
-      var txtHandle = await caseDir.getFileHandle("00_وضعیت_مدارک_و_نواقص.txt", { create: true });
-      var tw = await txtHandle.createWritable();
-      await tw.write(repLines.join("\r\n"));
-      await tw.close();
-      alert("✅ پوشه «" + folderName + "» در درایو کامپیوتر شما ساخته شد و " + toFa(savedCount) + " فایل مدرک + گزارش نواقص داخل آن ذخیره گردید.");
-    });
-  } catch (e) {}
-}
-
-function downloadWindowsBatFolderCreator() {
-  var bat = "@echo off\r\nchcp 65001 > nul\r\nmkdir \"بایگانی_متقاضیان_مرکز_636\"\r\ncd \"بایگانی_متقاضیان_مرکز_636\"\r\n";
-  for (var i = 0; i < casesDB.length; i++) {
-    var fn = (casesDB[i].name + " - " + toEn(casesDB[i].nid || "000")).replace(/[\\/:*?"<>|]/g, "_");
-    bat += "mkdir \"" + fn + "\"\r\n";
+    var folderSaved = await window.saveApplicantFolderToDrive(true);
+    var databaseSaved = typeof window.syncAllDataToDrive === "function"
+      ? await window.syncAllDataToDrive(true)
+      : false;
+    if (!folderSaved || !databaseSaved) {
+      throw new Error("ذخیره کامل پرونده در Google Drive تأیید نشد؛ وضعیت اتصال را بررسی کنید.");
+    }
+    if (typeof showToastMsg === "function") showToastMsg("پوشه و اطلاعات پرونده در Google Drive به‌روزرسانی شد.");
+    return true;
+  } catch (error) {
+    console.error("Google Drive case-folder sync failed:", error);
+    if (typeof showToastMsg === "function") showToastMsg(error.message || "همگام‌سازی پرونده با Google Drive ناموفق بود.", true);
+    else alert(error.message || "همگام‌سازی پرونده با Google Drive ناموفق بود.");
+    return false;
   }
-  var a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([bat], { type: "application/x-bat;charset=utf-8" }));
-  a.download = "Make_Folders_636.bat";
-  a.click();
-  showToastMsg("فایل ساخت پوشه همه متقاضیان دانلود شد.");
 }
 
 /* =========================================================================
@@ -2962,90 +2702,3 @@ window.reloadAllStateFromLocalStorage = function() {
   }
 };
 
-window.exportIndexedDBDocs = function() {
-  return new Promise(function(resolve, reject) {
-    openFilesDB(function(db) {
-      if (!db) return reject(new Error("پایگاه فایل‌های محلی IndexedDB قابل بازشدن نیست؛ ذخیره ابری برای جلوگیری از حذف پیوست‌ها متوقف شد."));
-      var tx;
-      try {
-        tx = db.transaction(["docs"], "readonly");
-        var req = tx.objectStore("docs").getAll();
-        req.onsuccess = function(e) {
-          var list = Array.isArray(e.target.result) ? e.target.result : [];
-          var cleanList = [];
-          var omittedLargeCount = 0;
-          for (var i = 0; i < list.length; i++) {
-            var item = list[i] || {};
-            var dUrl = item.dataUrl || "";
-            // محدودیت حجم انتقال از Apps Script؛ فایل‌های بزرگ باید از مسیر بایگانی مستقیم Drive منتقل شوند.
-            if (dUrl.length < 2200000) {
-              cleanList.push({
-                key: item.key,
-                caseId: item.caseId,
-                docCode: item.docCode,
-                docTitle: item.docTitle,
-                fileName: item.fileName,
-                uploadDate: item.uploadDate,
-                dataUrl: dUrl
-              });
-            } else {
-              omittedLargeCount++;
-            }
-          }
-          window.__nezam636IndexedDBExportStatus = {
-            totalCount: list.length,
-            includedCount: cleanList.length,
-            omittedLargeCount: omittedLargeCount,
-            exportedAt: Date.now()
-          };
-          resolve(cleanList);
-        };
-        req.onerror = function() {
-          reject(req.error || new Error("خواندن اسناد IndexedDB ناموفق بود."));
-        };
-        tx.onerror = function() {
-          reject(tx.error || new Error("تراکنش خواندن اسناد IndexedDB ناموفق بود."));
-        };
-        tx.onabort = function() {
-          reject(tx.error || new Error("تراکنش خواندن اسناد IndexedDB لغو شد."));
-        };
-      } catch (err) {
-        reject(err);
-      }
-    });
-  });
-};
-
-window.importIndexedDBDocs = function(docsList) {
-  return new Promise(function(resolve) {
-    if (!Array.isArray(docsList) || docsList.length === 0) return resolve(false);
-    openFilesDB(function(db) {
-      if (!db) return resolve(false);
-      try {
-        var tx = db.transaction(["docs"], "readwrite");
-        var store = tx.objectStore("docs");
-        for (var i = 0; i < docsList.length; i++) {
-          var d = docsList[i];
-          if (d && d.key) {
-            store.put({
-              key: d.key,
-              caseId: d.caseId,
-              docCode: d.docCode,
-              docTitle: d.docTitle,
-              fileName: d.fileName,
-              uploadDate: d.uploadDate,
-              dataUrl: d.dataUrl
-            });
-          }
-        }
-        tx.oncomplete = function() {
-          renderActiveCaseDocsChecklist();
-          resolve(true);
-        };
-        tx.onerror = function() { resolve(false); };
-      } catch (err) {
-        resolve(false);
-      }
-    });
-  });
-};
