@@ -2693,11 +2693,11 @@
     </section>
 
     <!-- =====================================================================
-         PANE 6: پایداری مطلق، عملکرد ۱۰۰٪ آفلاین، پشتیبان JSON و تنظیمات (مطابق صفحه ۱۳ راهنمای PDF)
+         PANE 6: مدیریت اطلاعات ابری Google Drive و تنظیمات (مطابق صفحه ۱۳ راهنمای PDF)
          ===================================================================== -->
     <section id="pane-office" class="sec-pane">
       <div class="row">
-        <!-- ستون راست: کارتابل وظایف و پایداری مطلق آفلاین/ابری (صفحه ۱۳ راهنمای PDF) -->
+        <!-- ستون راست: کارتابل وظایف و مدیریت پایگاه مرکزی Google Drive -->
         <div class="col-md-6 mb-3">
           <div class="card-clean mb-3">
             <strong class="text-primary d-block mb-2">📅 کارتابل وظایف، پیگیری استعلام‌ها و نوبت بازدید</strong>
@@ -2722,22 +2722,20 @@
             <div id="tasks-list-holder" class="row g-2"></div>
           </div>
 
-          <!-- کارت گرافیکی پایداری مطلق: عملکرد ۱۰۰٪ آفلاین و مدیریت داده‌ها (صفحه ۱۳ راهنمای PDF) -->
-          <div class="card-clean" style="background: linear-gradient(135deg, #ffffff 0%, #e6efe9 100%);">
+          <div class="card-clean">
             <div class="d-flex justify-content-between align-items-center mb-2 pb-1 border-bottom">
-              <strong class="text-success" style="font-size:1rem;">🛡️ پایداری مطلق: عملکرد ۱۰۰٪ آفلاین و مدیریت داده‌ها</strong>
-              <span class="badge bg-success">محلی (آفلاین) ⇄ ابر (آنلاین)</span>
+              <strong class="text-success" style="font-size:1rem;">☁️ مدیریت اطلاعات در Google Drive</strong>
+              <span class="badge bg-success">مرجع اصلی اطلاعات</span>
             </div>
             <p class="small text-muted mb-3">
-              تمامی کدها، فونت‌ها و اسکریپت‌ها به صورت محلی ذخیره شده‌اند؛ قابلیت دانلود نسخه تک‌فایلی ویندوز و دریافت خروجی کامل JSON جهت حفظ داده‌ها و انتقال ایمن بین سیستم‌ها.
+              پرونده‌ها، نامه‌ها و سوابق در پایگاه مرکزی Google Drive همگام‌سازی می‌شوند. پیوست‌ها نیز مستقیماً در پوشه اختصاصی هر پرونده در Drive نگهداری می‌شوند.
             </p>
             <div class="d-flex flex-wrap gap-2">
-              <button type="button" class="btn btn-sm btn-warning fw-bold" onclick="downloadStandaloneWindowsHTML()">💻 اجرای مستقل روی ویندوز (دانلود تک‌فایلی .html)</button>
-              <button type="button" class="btn btn-sm btn-dark" onclick="downloadNezam636ProtectedBackup('پشتیبان دستی از کارت مدیریت')">📦 پشتیبان‌گیری امن (بسته پشتیبان JSON)</button>
-              <label class="btn btn-sm btn-outline-primary m-0" style="cursor:pointer;">
-                📂 بازیابی بسته پشتیبان (.json)
-                <input type="file" accept=".json" hidden onchange="restoreNezam636ProtectedBackup(this.files && this.files[0]); this.value='';" />
-              </label>
+              <button type="button" class="btn btn-sm btn-primary fw-bold" onclick="window.loadFromDriveOnStartup(true)">🔄 بازخوانی آخرین اطلاعات از Drive</button>
+              <button type="button" class="btn btn-sm btn-success fw-bold" onclick="window.syncAllDataToDrive(true)">☁️ ذخیره و همگام‌سازی در Drive</button>
+            </div>
+            <div class="small text-muted mt-2">
+              گزینه‌های پشتیبان‌گیری محلی و بازیابی فایل JSON از این بخش حذف شده‌اند. مرورگر فقط برای اجرای سامانه و نمایش موقت داده‌ها استفاده می‌شود؛ نسخه مرجع و پیوست‌ها در Google Drive هستند.
             </div>
           </div>
         </div>
@@ -3113,8 +3111,8 @@
   <div id="smart-mouse-tooltip"></div>
 
   <!-- ماژول‌های اصلی اتوماسیون مرکز خدمات ۶۳۶ خفر -->
-  <script src="./nezam-core.js?v=20261106-storage-sync-r10"></script>
-  <script src="./nezam-drive-documents.js?v=20261106-drive-read-optim-r12"></script>
+  <script src="./nezam-core.js?v=20261108-drive-only-r1"></script>
+  <script src="./nezam-drive-documents.js?v=20261108-drive-only-r1"></script>
   <script src="./nezam-letter-attachments.js?v=20261104-letter-attachments-r2"></script>
   <script src="./nezam-customizer.js?v=20261103-secretariat-r19"></script>
   <script src="./nezam-ai-assistant.js?v=20261101-security-r3"></script>
@@ -3245,25 +3243,9 @@
         throw new Error('ساختار فهرست حذف دائمی معتبر نیست؛ ذخیره ابری متوقف شد.');
       }
 
-      if (typeof window.exportIndexedDBDocs !== 'function') {
-        throw new Error('ماژول خروجی اسناد محلی در دسترس نیست؛ ذخیره ابری برای جلوگیری از حذف پیوست‌ها متوقف شد.');
-      }
-      const idbDocs = await window.exportIndexedDBDocs();
-      if (!Array.isArray(idbDocs)) {
-        throw new Error('خروجی اسناد IndexedDB معتبر نیست؛ ذخیره ابری متوقف شد.');
-      }
-      const exportStatus = window.__nezam636IndexedDBExportStatus || {};
-      if (Number(exportStatus.omittedLargeCount || 0) > 0) {
-        throw new Error(
-          Number(exportStatus.omittedLargeCount) +
-          ' فایل محلی از محدودیت انتقال نسخه پشتیبان بزرگ‌تر است. ابتدا آن‌ها را از بخش بایگانی مدارک به Google Drive منتقل کنید؛ هیچ نسخه ناقصی ارسال نشد.'
-        );
-      }
-
-      return {
-        storage: storageData,
-        indexedDBDocs: idbDocs
-      };
+      // فایل‌های پیوست فقط از مسیر بایگانی Google Drive مدیریت می‌شوند.
+      // IndexedDB محلی بخشی از نسخه مرکزی نیست و نمی‌تواند بازیابی ابری را متوقف کند.
+      return { storage: storageData };
     }
 
     // ۳. ارسال و ذخیره کامل کل دیتابیس در گوگل درایو    // ۳. ارسال و ذخیره کامل کل دیتابیس در گوگل درایو
@@ -3382,8 +3364,7 @@
           updatedAt: ts,
           updatedAtFa: faDate,
           baseUpdatedAt: baselineTs,
-          storage: snapshot.storage,
-          indexedDBDocs: snapshot.indexedDBDocs
+          storage: snapshot.storage
         };
 
         const serializedSync = JSON.stringify(syncRecord);
@@ -3889,13 +3870,8 @@
             localStorage.setItem('__gdrive_sync_ts', String(cloudTs));
             localStorage.setItem('__gdrive_has_local_data', '1');
 
-            if (Array.isArray(bestSyncRecord.indexedDBDocs) && bestSyncRecord.indexedDBDocs.length > 0) {
-              if (typeof window.importIndexedDBDocs !== 'function') {
-                throw new Error('ماژول بازیابی پیوست‌های IndexedDB در دسترس نیست.');
-              }
-              const imported = await window.importIndexedDBDocs(bestSyncRecord.indexedDBDocs);
-              if (!imported) throw new Error('بازیابی فایل‌های محلی IndexedDB ناموفق بود؛ بازیابی کامل تأیید نشد.');
-            }
+            // پیوست‌ها در پوشه اختصاصی پرونده داخل Google Drive قرار دارند.
+            // نسخه‌های قدیمی دارای indexedDBDocs عمداً به مخزن محلی وارد نمی‌شوند.
           } catch (restoreError) {
             const rollbackFailures = [];
             for (let i = rollbackKeys.length - 1; i >= 0; i--) {
@@ -5234,7 +5210,7 @@
 }
 </style>
 
-  <script defer src="./nezam-operations.js?v=20261103-tombstone-r3"></script>
+  <script defer src="./nezam-operations.js?v=20261108-drive-only-r1"></script>
   <script defer src="./nezam-agent-engine.js?v=20261102-agent-v2-r6"></script>
   <script defer src="./nezam-agent-knowledge.js?v=20261101-agent-knowledge-r4"></script>
   <script defer src="./nezam-rule-advisor.js?v=20261101-rule-advisor-r2"></script>
