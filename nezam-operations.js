@@ -1,16 +1,12 @@
-/* افزونه بهبودهای سه‌گانه مرکز ۶۳۶ خفر
-   ۱) پشتیبان محلی نسخه‌ای + کنترل سلامت داده
-   ۲) داشبورد عملیاتی مبتنی بر داده‌های واقعی سامانه
+/* افزونه عملیات مرکز ۶۳۶ خفر
+   ۱) پایش سلامت ساختار اطلاعات و وضعیت Google Drive
+   ۲) داشبورد عملیاتی مبتنی بر داده‌های سامانه
    ۳) دستیار هوشمند با ارسال اختیاری خلاصه پرونده فعال
 */
 (function () {
   'use strict';
   if (window.__nezam636OperationsSuiteLoaded) return;
   window.__nezam636OperationsSuiteLoaded = true;
-
-  var VAULT_DB_NAME = 'Nezam636SafetyVault';
-  var VAULT_DB_VERSION = 1;
-  var AUTO_SNAPSHOT_INTERVAL = 24 * 60 * 60 * 1000;
 
   function byId(id) { return document.getElementById(id); }
   function escapeHtml(value) {
@@ -135,252 +131,6 @@
     renderOperationsDashboard();
   }
 
-  function openVaultDB() {
-    return new Promise(function (resolve, reject) {
-      if (!window.indexedDB) return reject(new Error('مرورگر از IndexedDB پشتیبانی نمی‌کند.'));
-      var req = indexedDB.open(VAULT_DB_NAME, VAULT_DB_VERSION);
-      req.onupgradeneeded = function () {
-        var db = req.result;
-        if (!db.objectStoreNames.contains('snapshots')) db.createObjectStore('snapshots', { keyPath: 'id' });
-        if (!db.objectStoreNames.contains('meta')) db.createObjectStore('meta', { keyPath: 'key' });
-      };
-      req.onsuccess = function () { resolve(req.result); };
-      req.onerror = function () { reject(req.error || new Error('خطا در بازکردن مخزن پشتیبان محلی.')); };
-    });
-  }
-
-  function collectSafeStorage() {
-    var data = {};
-    for (var i = 0; i < localStorage.length; i++) {
-      var key = localStorage.key(i);
-      if (!key) continue;
-      var allowed = key.indexOf('nezam636_') === 0 || key.indexOf('nezam_croquis_') === 0 || key === 'nezam_gemini_model';
-      if (!allowed || /api.?key|password|token|secret/i.test(key)) continue;
-      data[key] = localStorage.getItem(key);
-    }
-    return data;
-  }
-
-  async function collectProtectedBackup() {
-    if (typeof window.flushInMemoryStateToLocalStorage === 'function') window.flushInMemoryStateToLocalStorage();
-    var docs = [];
-    if (typeof window.exportIndexedDBDocs === 'function') {
-      try { docs = await window.exportIndexedDBDocs(); } catch (e) { console.warn('Backup documents could not be read:', e); }
-    }
-    return {
-      format: 'NEZAM636_PROTECTED_BACKUP',
-      version: 1,
-      createdAt: new Date().toISOString(),
-      createdAtFa: typeof window.todayShamsi === 'function' ? window.todayShamsi() : '',
-      storage: collectSafeStorage(),
-      indexedDBDocs: Array.isArray(docs) ? docs : [],
-      note: 'کلیدهای API و رمزهای عبور عمداً در فایل پشتیبان قرار نمی‌گیرند. ممکن است برخی پیوست‌های بسیار بزرگ، به‌دلیل محدودیت خروجی فعلی IndexedDB، در بسته قرار نگیرند.'
-    };
-  }
-
-  async function downloadProtectedBackup(label) {
-    try {
-      notify('در حال تهیه پشتیبان کامل از داده‌های سامانه و پیوست‌ها...');
-      var data = await collectProtectedBackup();
-      data.label = label || 'پشتیبان دستی';
-      var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json;charset=utf-8' });
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement('a');
-      a.href = url;
-      a.download = 'Nezam636_Protected_' + new Date().toISOString().slice(0, 10) + '.json';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
-      notify('پشتیبان آماده شد. تعداد پیوست‌های قابل‌انتقال: ' + fa(data.indexedDBDocs.length));
-    } catch (err) {
-      console.error(err);
-      notify('تهیه پشتیبان انجام نشد: ' + (err.message || 'خطای ناشناخته'), true);
-    }
-  }
-
-  function readFileAsText(file) {
-    return new Promise(function (resolve, reject) {
-      var reader = new FileReader();
-      reader.onload = function () { resolve(String(reader.result || '')); };
-      reader.onerror = function () { reject(new Error('خواندن فایل پشتیبان ناموفق بود.')); };
-      reader.readAsText(file);
-    });
-  }
-
-  function normalizeBackupData(data) {
-    if (!data || typeof data !== 'object') throw new Error('ساختار فایل پشتیبان معتبر نیست.');
-    if (data.format === 'NEZAM636_PROTECTED_BACKUP' && data.storage && typeof data.storage === 'object') {
-      return { storage: data.storage, docs: Array.isArray(data.indexedDBDocs) ? data.indexedDBDocs : [] };
-    }
-    var storage = {};
-    if (Array.isArray(data.casesDB)) storage.nezam636_unified_cases = JSON.stringify(data.casesDB);
-    if (Array.isArray(data.lettersDB)) storage.nezam636_letters = JSON.stringify(data.lettersDB);
-    if (Array.isArray(data.tasksDB)) storage.nezam636_tasks = JSON.stringify(data.tasksDB);
-    if (data.docChecklists && typeof data.docChecklists === 'object') storage.nezam636_doc_checklists_v2 = JSON.stringify(data.docChecklists);
-    if (data.actSpecs && typeof data.actSpecs === 'object') storage.nezam636_act_specs_v3 = JSON.stringify(data.actSpecs);
-    if (!Object.keys(storage).length) throw new Error('این فایل شامل داده‌های قابل‌بازیابی سامانه نیست.');
-    return { storage: storage, docs: Array.isArray(data.indexedDBDocs) ? data.indexedDBDocs : [] };
-  }
-
-  async function applyBackupPayload(payload, label) {
-    var safeEntries = Object.entries(payload.storage || {});
-    if (!safeEntries.length) throw new Error('هیچ داده‌ای برای بازیابی در فایل وجود ندارد.');
-
-    // نسخه‌های پشتیبان محلی قدیمی نباید فهرست حذف دائمی فعلی را پاک کنند.
-    var localDeletionManifest = typeof window.readNezamDeletionManifest === 'function'
-      ? window.readNezamDeletionManifest() : { version: 1, cases: [], letters: [] };
-    var backupDeletionManifest = { version: 1, cases: [], letters: [] };
-    try {
-      var backupManifestRaw = payload.storage.nezam636_deletion_manifest_v1;
-      if (typeof backupManifestRaw === 'string') backupDeletionManifest = JSON.parse(backupManifestRaw);
-    } catch (manifestError) {}
-    var mergedDeletionManifest = typeof window.mergeNezamDeletionManifests === 'function'
-      ? window.mergeNezamDeletionManifests(localDeletionManifest, backupDeletionManifest)
-      : localDeletionManifest;
-
-    for (var i = 0; i < safeEntries.length; i++) {
-      var key = safeEntries[i][0];
-      var value = safeEntries[i][1];
-      var allowed = key.indexOf('nezam636_') === 0 || key.indexOf('nezam_croquis_') === 0 || key === 'nezam_gemini_model';
-      if (!allowed || /api.?key|password|token|secret/i.test(key) || typeof value !== 'string') continue;
-      if (key === 'nezam636_deletion_manifest_v1') continue;
-      if (typeof window.filterNezamRecordsByDeletionManifest === 'function' &&
-          (key === 'nezam636_unified_cases' || key === 'nezam636_letters')) {
-        try {
-          var decodedRecords = JSON.parse(value);
-          var filteredRecords = window.filterNezamRecordsByDeletionManifest(
-            key === 'nezam636_unified_cases' ? decodedRecords : [],
-            key === 'nezam636_letters' ? decodedRecords : [],
-            mergedDeletionManifest
-          );
-          value = JSON.stringify(key === 'nezam636_unified_cases' ? filteredRecords.cases : filteredRecords.letters);
-        } catch (dataError) {
-          throw new Error('ساختار پرونده یا نامه در نسخه پشتیبان معتبر نیست؛ بازیابی متوقف شد.');
-        }
-      }
-      localStorage.setItem(key, value);
-    }
-    if (typeof window.persistNezamDeletionManifest === 'function' &&
-        !window.persistNezamDeletionManifest(mergedDeletionManifest)) {
-      throw new Error('فهرست حذف دائمی در حافظه مرورگر ذخیره نشد؛ بازیابی متوقف شد.');
-    }
-    if (payload.docs.length && typeof window.importIndexedDBDocs === 'function') {
-      var imported = await window.importIndexedDBDocs(payload.docs);
-      if (!imported) throw new Error('داده‌های اصلی بازیابی شد، اما انتقال برخی پیوست‌ها ناموفق بود.');
-    }
-    if (typeof window.reloadAllStateFromLocalStorage === 'function') window.reloadAllStateFromLocalStorage();
-    if (typeof window.loadActiveCaseIntoForm === 'function') window.loadActiveCaseIntoForm();
-    if (typeof window.refreshAllViews === 'function') window.refreshAllViews();
-    renderOperationsDashboard();
-    refreshSafetyPanel();
-    notify('بازیابی ' + (label || 'اطلاعات') + ' انجام شد. وضعیت پیوست‌ها را نیز بررسی کنید.');
-  }
-
-  async function restoreProtectedBackup(file) {
-    if (!file) return;
-    try {
-      var data = JSON.parse(await readFileAsText(file));
-      var payload = normalizeBackupData(data);
-      if (!confirm('بازیابی اطلاعات، داده‌های فعلی پرونده‌ها و نامه‌ها را جایگزین می‌کند. ابتدا یک نسخه بازگشت محلی تهیه می‌شود. ادامه می‌دهید؟')) return;
-      await createVaultSnapshot('نسخه قبل از بازیابی فایل');
-      await applyBackupPayload(payload, 'فایل پشتیبان');
-    } catch (err) {
-      console.error(err);
-      notify('بازیابی ناموفق بود: ' + (err.message || 'فایل نامعتبر است.'), true);
-    } finally {
-      var input = byId('nezam-protected-backup-input');
-      if (input) input.value = '';
-    }
-  }
-
-  async function createVaultSnapshot(label) {
-    var backup = await collectProtectedBackup();
-    var db = await openVaultDB();
-    return new Promise(function (resolve, reject) {
-      var tx = db.transaction(['snapshots', 'meta'], 'readwrite');
-      var now = Date.now();
-      tx.objectStore('snapshots').put({
-        id: String(now),
-        createdAt: now,
-        label: label || 'نسخه پشتیبان خودکار',
-        storage: backup.storage,
-        indexedDBDocs: backup.indexedDBDocs
-      });
-      tx.objectStore('meta').put({ key: 'lastSnapshotAt', value: now });
-      tx.objectStore('meta').put({ key: 'latestSnapshotInfo', value: { id: String(now), createdAt: now, label: label || 'نسخه پشتیبان خودکار' } });
-      tx.oncomplete = function () {
-        var readTx = db.transaction(['snapshots'], 'readonly');
-        var req = readTx.objectStore('snapshots').getAll();
-        req.onsuccess = function () {
-          var all = req.result || [];
-          all.sort(function (a, b) { return b.createdAt - a.createdAt; });
-          if (all.length > 4) {
-            var trimTx = db.transaction(['snapshots'], 'readwrite');
-            all.slice(4).forEach(function (item) { trimTx.objectStore('snapshots').delete(item.id); });
-            trimTx.oncomplete = function () { db.close(); resolve(true); };
-            trimTx.onerror = function () { db.close(); resolve(true); };
-          } else {
-            db.close();
-            resolve(true);
-          }
-        };
-        req.onerror = function () { db.close(); resolve(true); };
-      };
-      tx.onerror = function () { db.close(); reject(tx.error || new Error('ذخیره نسخه محلی ناموفق بود.')); };
-    });
-  }
-
-  async function getLatestVaultSnapshot() {
-    var db = await openVaultDB();
-    return new Promise(function (resolve, reject) {
-      var tx = db.transaction(['snapshots'], 'readonly');
-      var req = tx.objectStore('snapshots').getAll();
-      req.onsuccess = function () {
-        db.close();
-        var all = req.result || [];
-        all.sort(function (a, b) { return b.createdAt - a.createdAt; });
-        resolve(all[0] || null);
-      };
-      req.onerror = function () { db.close(); reject(req.error || new Error('خواندن نسخه محلی ناموفق بود.')); };
-    });
-  }
-
-  async function restoreLatestVaultSnapshot() {
-    try {
-      var snapshot = await getLatestVaultSnapshot();
-      if (!snapshot) {
-        notify('هنوز نسخه پشتیبان محلی ثبت نشده است.', true);
-        return;
-      }
-      if (!confirm('آخرین نسخه محلی (' + new Date(snapshot.createdAt).toLocaleString('fa-IR') + ') جایگزین اطلاعات فعلی می‌شود. قبل از آن نسخه فعلی نیز در مخزن محلی نگهداری خواهد شد. ادامه می‌دهید؟')) return;
-      await createVaultSnapshot('نسخه قبل از بازگردانی');
-      await applyBackupPayload({ storage: snapshot.storage, docs: snapshot.indexedDBDocs || [] }, 'نسخه محلی');
-    } catch (err) {
-      console.error(err);
-      notify('بازگردانی نسخه محلی ناموفق بود: ' + (err.message || ''), true);
-    }
-  }
-
-  async function maybeCreateAutomaticSnapshot() {
-    try {
-      var db = await openVaultDB();
-      var last = await new Promise(function (resolve, reject) {
-        var tx = db.transaction(['meta'], 'readonly');
-        var req = tx.objectStore('meta').get('lastSnapshotAt');
-        req.onsuccess = function () { resolve(req.result ? Number(req.result.value) : 0); };
-        req.onerror = function () { reject(req.error); };
-      });
-      db.close();
-      var cases = Array.isArray(window.casesDB) ? window.casesDB : [];
-      if (!cases.length || Date.now() - last < AUTO_SNAPSHOT_INTERVAL) return;
-      await createVaultSnapshot('پشتیبان خودکار ۲۴ ساعته');
-      refreshSafetyPanel();
-    } catch (err) {
-      console.warn('Automatic safety snapshot skipped:', err);
-    }
-  }
-
   function diagnoseData() {
     var issues = [];
     var checks = [
@@ -408,54 +158,29 @@
     return issues;
   }
 
-  async function getLatestVaultSnapshotInfo() {
-    var db = await openVaultDB();
-    return new Promise(function (resolve, reject) {
-      var tx = db.transaction(['meta'], 'readonly');
-      var req = tx.objectStore('meta').get('latestSnapshotInfo');
-      req.onsuccess = function () {
-        db.close();
-        resolve(req.result ? req.result.value : null);
-      };
-      req.onerror = function () {
-        db.close();
-        reject(req.error || new Error('خواندن اطلاعات نسخه محلی ناموفق بود.'));
-      };
-    });
-  }
-
   async function refreshSafetyPanel() {
     var panel = byId('nezam-safety-panel');
     if (!panel) return;
     var health = byId('nezam-data-health');
-    var localSize = byId('nezam-local-storage-size');
     var lastCloud = byId('nezam-last-cloud-sync');
-    var vaultStatus = byId('nezam-vault-status');
+    var driveStatus = byId('nezam-drive-status');
     var issues = diagnoseData();
     if (health) {
-      health.textContent = issues.length ? 'نیازمند بررسی: ' + fa(issues.length) + ' مورد' : 'ساختار داده‌های اصلی سالم است';
+      health.textContent = issues.length ? 'نیازمند بررسی: ' + fa(issues.length) + ' مورد' : 'ساختار اطلاعات معتبر است';
       health.className = issues.length ? 'badge bg-warning text-dark' : 'badge bg-success';
       health.title = issues.join(' | ');
     }
-    if (localSize) {
-      try {
-        var estimate = navigator.storage && navigator.storage.estimate ? await navigator.storage.estimate() : null;
-        localSize.textContent = estimate && estimate.usage != null
-          ? 'فضای مرورگر: ' + (estimate.usage / 1048576).toFixed(1) + ' / ' + (estimate.quota / 1048576).toFixed(0) + ' MB'
-          : 'فضای ذخیره‌سازی مرورگر: در دسترس نیست';
-      } catch (e) { localSize.textContent = 'اطلاعات فضای مرورگر در دسترس نیست'; }
-    }
     if (lastCloud) {
       var ts = Number(localStorage.getItem('__gdrive_sync_ts') || 0);
-      lastCloud.textContent = ts ? 'آخرین ذخیره تأییدشده در درایو: ' + new Date(ts).toLocaleString('fa-IR') : 'هنوز ذخیره ابری تأییدشده ثبت نشده است';
+      lastCloud.textContent = ts
+        ? 'آخرین ذخیره تأییدشده در Google Drive: ' + new Date(ts).toLocaleString('fa-IR')
+        : 'هنوز ذخیره‌ای در Google Drive تأیید نشده است';
     }
-    if (vaultStatus) {
-      try {
-        var latestInfo = await getLatestVaultSnapshotInfo();
-        vaultStatus.textContent = latestInfo
-          ? 'آخرین پشتیبان محلی: ' + new Date(latestInfo.createdAt).toLocaleString('fa-IR') + ' (' + (latestInfo.label || 'نسخه محلی') + ')'
-          : 'نسخه پشتیبان محلی هنوز ایجاد نشده است';
-      } catch (e) { vaultStatus.textContent = 'مخزن پشتیبان محلی در دسترس نیست'; }
+    if (driveStatus) {
+      var cloudButton = byId('gdrive-status-btn');
+      driveStatus.textContent = cloudButton
+        ? String(cloudButton.textContent || '').trim()
+        : 'وضعیت اتصال در نوار بالای سامانه نمایش داده می‌شود';
     }
   }
 
@@ -469,24 +194,22 @@
     card.className = 'card-clean mb-3';
     card.innerHTML =
       '<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2 pb-2 border-bottom">' +
-        '<strong class="text-success">🛡️ مرکز حفاظت، سلامت و نسخه‌های پشتیبان</strong>' +
+        '<strong class="text-success">☁️ پایش اطلاعات و اتصال Google Drive</strong>' +
         '<span id="nezam-data-health" class="badge bg-secondary">در حال بررسی...</span>' +
       '</div>' +
-      '<div class="nezam-safety-row"><span class="small text-muted">وضعیت مخزن محلی</span><b id="nezam-vault-status" class="small">در حال بررسی...</b></div>' +
-      '<div class="nezam-safety-row"><span class="small text-muted">همگام‌سازی گوگل‌درایو</span><b id="nezam-last-cloud-sync" class="small">در حال بررسی...</b></div>' +
-      '<div class="nezam-safety-row"><span class="small text-muted">حجم مصرفی ذخیره‌سازی مرورگر</span><b id="nezam-local-storage-size" class="small">در حال بررسی...</b></div>' +
+      '<div class="nezam-safety-row"><span class="small text-muted">مرجع اصلی اطلاعات و پیوست‌ها</span><b class="small">Google Drive</b></div>' +
+      '<div class="nezam-safety-row"><span class="small text-muted">وضعیت اتصال</span><b id="nezam-drive-status" class="small">در حال بررسی...</b></div>' +
+      '<div class="nezam-safety-row"><span class="small text-muted">آخرین ذخیره تأییدشده</span><b id="nezam-last-cloud-sync" class="small">در حال بررسی...</b></div>' +
       '<div class="d-flex flex-wrap gap-2 mt-3">' +
-        '<button type="button" class="btn btn-sm btn-success" id="nezam-create-backup-btn">📦 دریافت پشتیبان کامل</button>' +
-        '<button type="button" class="btn btn-sm btn-outline-success" id="nezam-restore-vault-btn">↩️ بازگردانی آخرین نسخه محلی</button>' +
-        '<label class="btn btn-sm btn-outline-primary m-0" for="nezam-protected-backup-input">📂 بازیابی فایل پشتیبان</label>' +
-        '<input type="file" id="nezam-protected-backup-input" accept=".json,application/json" hidden>' +
-        '<button type="button" class="btn btn-sm btn-outline-secondary" id="nezam-refresh-health-btn">بررسی مجدد سلامت</button>' +
+        '<button type="button" class="btn btn-sm btn-primary" id="nezam-refresh-drive-btn">🔄 بازخوانی از Google Drive</button>' +
+        '<button type="button" class="btn btn-sm btn-outline-secondary" id="nezam-refresh-health-btn">بررسی سلامت اطلاعات</button>' +
       '</div>' +
-      '<div class="small text-muted mt-2">نسخه محلی روی همین مرورگر ذخیره می‌شود. فایل پشتیبان را جداگانه روی رایانه یا فضای امن نگهداری کنید. کلید Gemini در پشتیبان قرار نمی‌گیرد؛ پیوست‌های خیلی بزرگ ممکن است در خروجی نیایند.</div>';
+      '<div class="small text-muted mt-2">نسخه مرجع پرونده‌ها و نامه‌ها و همچنین فایل‌های پیوست در Google Drive نگهداری می‌شوند.</div>';
     taskCard.insertAdjacentElement('afterend', card);
-    byId('nezam-create-backup-btn').addEventListener('click', function () { downloadProtectedBackup('پشتیبان دستی'); });
-    byId('nezam-restore-vault-btn').addEventListener('click', restoreLatestVaultSnapshot);
-    byId('nezam-protected-backup-input').addEventListener('change', function (e) { restoreProtectedBackup(e.target.files && e.target.files[0]); });
+    byId('nezam-refresh-drive-btn').addEventListener('click', function () {
+      if (typeof window.loadFromDriveOnStartup === 'function') window.loadFromDriveOnStartup(true);
+      else notify('ماژول همگام‌سازی Google Drive آماده نیست.', true);
+    });
     byId('nezam-refresh-health-btn').addEventListener('click', refreshSafetyPanel);
     refreshSafetyPanel();
   }
@@ -580,19 +303,6 @@
       wrappedRefresh.__nezamWrapped = true;
       window.refreshAllViews = wrappedRefresh;
     }
-    if (typeof window.saveAllDB === 'function' && !window.saveAllDB.__nezamWrapped) {
-      var originalSave = window.saveAllDB;
-      var wrappedSave = function () {
-        var result = originalSave.apply(this, arguments);
-        if (result) {
-          window.clearTimeout(window.__nezam636VaultTimer);
-          window.__nezam636VaultTimer = window.setTimeout(maybeCreateAutomaticSnapshot, 2500);
-        }
-        return result;
-      };
-      wrappedSave.__nezamWrapped = true;
-      window.saveAllDB = wrappedSave;
-    }
   }
 
   function init() {
@@ -604,13 +314,8 @@
     installRefreshHooks();
     renderOperationsDashboard();
     refreshSafetyPanel();
-    window.setTimeout(maybeCreateAutomaticSnapshot, 90000);
     window.setInterval(refreshSafetyPanel, 20000);
   }
-
-  window.downloadNezam636ProtectedBackup = downloadProtectedBackup;
-  window.restoreNezam636ProtectedBackup = restoreProtectedBackup;
-  window.restoreNezam636VaultSnapshot = restoreLatestVaultSnapshot;
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
