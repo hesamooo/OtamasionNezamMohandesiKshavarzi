@@ -807,3 +807,18 @@ test('croquis clearance, move, and landscape print controls are wired without ch
   assert.ok(!module.includes('localStorage.setItem'));
   assert.ok(!module.includes('indexedDB'));
 });
+
+
+test('UTM polygon area uses local coordinates for stable high-value Easting and Northing', () => {
+  const source = read('nezam-croquis-enhancements.js');
+  const start = source.indexOf('  window.computeStableUtmPolygonGeometry = function');
+  const end = source.indexOf('\n  };', start) + 5;
+  assert.ok(start >= 0 && end > 5);
+  const measure = new Function('window', source.slice(start, end) + '\nreturn window.computeStableUtmPolygonGeometry;')({});
+  const x = 714868.12, y = 3203130.13, width = 1100 / 45;
+  const geometry = measure([
+    { x, y }, { x: x + 45, y }, { x: x + 45, y: y + width }, { x, y: y + width }
+  ]);
+  assert.ok(Math.abs(geometry.area - 1100) < 1e-7, 'area must remain accurate at real UTM coordinate magnitudes');
+  assert.ok(Math.abs(geometry.perim - (90 + 2 * width)) < 1e-7);
+});
