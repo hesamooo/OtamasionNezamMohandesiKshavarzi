@@ -697,3 +697,33 @@ test('old Apps Script IndexedDB validation errors point to the required backend 
   assert.ok(html.includes('نسخه Code.gs در Google Apps Script قدیمی است'));
   assert.ok(html.includes('با «New version» دوباره منتشر کنید'));
 });
+
+test('UTM conversion preserves centimetre precision for KML and map overlays', () => {
+  const source = read('nezam-customizer.js');
+  const match = source.match(/function latLngToUtmWGS84\\([\\s\\S]*?\\n\\}/);
+  assert.ok(match, 'latLngToUtmWGS84 must exist');
+  const convert = new Function(match[0] + '\\nreturn latLngToUtmWGS84;')();
+  const actual = convert(28.93858203107952, 53.20444413167027, 39);
+
+  // Reference WGS84 / UTM zone 39N projection for the first vertex of the
+  // Khafr parcel. The old Math.round() implementation missed by up to 0.5 m.
+  assert.ok(Math.abs(actual.x - 714867.905415) < 0.01, 'Easting must stay within 1 cm');
+  assert.ok(Math.abs(actual.y - 3203181.780886) < 0.01, 'Northing must stay within 1 cm');
+  assert.notEqual(actual.x, Math.round(actual.x), 'Easting must not be rounded to whole metres');
+});
+
+test('parcel containment treats a point on the boundary as inside', () => {
+  const source = read('nezam-customizer.js');
+  const segmentMatch = source.match(/function isPointOnSegment2D\\([\\s\\S]*?\\n\\}/);
+  const polygonMatch = source.match(/function isPointInPolygon2D\\([\\s\\S]*?\\n\\}/);
+  assert.ok(segmentMatch, 'isPointOnSegment2D must exist');
+  assert.ok(polygonMatch, 'isPointInPolygon2D must exist');
+  const isInside = new Function(segmentMatch[0] + '\\n' + polygonMatch[0] + '\\nreturn isPointInPolygon2D;')();
+  const parcel = [
+    { x: 0, y: 0 }, { x: 20, y: 0 }, { x: 20, y: 20 }, { x: 0, y: 20 }
+  ];
+
+  assert.equal(isInside({ x: 10, y: 0 }, parcel), true, 'boundary point should be included');
+  assert.equal(isInside({ x: 10, y: 10 }, parcel), true, 'interior point should be included');
+  assert.equal(isInside({ x: 20.1, y: 10 }, parcel), false, 'a point clearly outside must remain outside');
+});
