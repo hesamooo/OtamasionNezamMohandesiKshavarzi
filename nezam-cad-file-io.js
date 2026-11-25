@@ -164,7 +164,8 @@
     pair(out,14,10.0);pair(out,24,10.0);pair(out,15,10.0);pair(out,25,10.0);
     pair(out,16,0.0);pair(out,26,0.0);pair(out,36,1.0);
     pair(out,17,dxfNum(centerX));pair(out,27,dxfNum(centerY));pair(out,37,0.0);
-    pair(out,42,50.0);pair(out,43,0.0);pair(out,44,0.0);pair(out,45,dxfNum(viewHeight));
+    pair(out,40,dxfNum(viewHeight));pair(out,41,1.55);
+    pair(out,42,50.0);pair(out,43,0.0);pair(out,44,0.0);
     pair(out,50,0.0);pair(out,51,0.0);pair(out,71,0);pair(out,72,100);pair(out,74,3);
     tableEnd();
 
