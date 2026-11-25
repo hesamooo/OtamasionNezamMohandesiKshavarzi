@@ -256,7 +256,7 @@
     toolbar.id = "crq-cad-offline-toolbar";
     toolbar.setAttribute("role", "toolbar");
     toolbar.setAttribute("aria-label", "ابزارهای ترسیم نقشه آفلاین");
-    toolbar.style.cssText = "position:absolute;top:10px;left:10px;z-index:1200;width:48px;padding:5px;direction:rtl;background:rgba(255,255,255,.97);border:1px solid #cbd5e1;border-radius:12px;box-shadow:0 3px 14px rgba(15,23,42,.22);";
+    toolbar.style.cssText = "position:absolute;top:10px;left:64px;z-index:1200;width:48px;padding:5px;direction:rtl;background:rgba(255,255,255,.97);border:1px solid #cbd5e1;border-radius:12px;box-shadow:0 3px 14px rgba(15,23,42,.22);";
     var toolbarButtons = document.createElement("div");
     toolbarButtons.className = "d-flex flex-column gap-1";
     toolbarButtons.appendChild(buildButton("📍", "ثبت نقطه", function () { window.setCroquisCadOfflineDrawingMode("POINT"); }, "crq-cad-offline-point"));
@@ -271,7 +271,7 @@
 
     var more = document.createElement("div");
     more.id = "crq-cad-offline-more";
-    more.style.cssText = "display:none;position:absolute;top:10px;left:64px;z-index:1200;width:min(330px,calc(100% - 78px));max-height:min(70vh,560px);overflow-y:auto;overscroll-behavior:contain;padding:10px;background:rgba(255,255,255,.97);border:1px solid #cbd5e1;border-radius:10px;box-shadow:0 3px 14px rgba(15,23,42,.22);direction:rtl;color:#172033;";
+    more.style.cssText = "display:none;position:absolute;top:10px;left:118px;z-index:1200;width:min(330px,calc(100% - 132px));max-height:min(70vh,560px);overflow-y:auto;overscroll-behavior:contain;padding:10px;background:rgba(255,255,255,.97);border:1px solid #cbd5e1;border-radius:10px;box-shadow:0 3px 14px rgba(15,23,42,.22);direction:rtl;color:#172033;";
     var closeRow = document.createElement("div");
     closeRow.className = "d-flex justify-content-between align-items-center mb-2";
     var title = document.createElement("strong");
@@ -553,7 +553,7 @@
     setModeButtons();return true;
   };
   window.toggleCroquisCadOfflinePolygonMove = function () {
-    if(state.mode==="MOVE_POLYGON")state.mode="";
+    if(state.mode==="MOVE_POLYGON"){state.mode="";state.targetLayerId=null;}
     else{
       if(state.mode)window.cancelCroquisCadOfflineDrawing();
       var layer=activeLayer();
@@ -595,7 +595,7 @@
       if(state.mode==="PICK_PLACEMENT"){
         var x=document.getElementById("crq-cad-shape-x"),y=document.getElementById("crq-cad-shape-y");
         if(x)x.value=(Math.round(utm.x*100)/100).toFixed(2);if(y)y.value=(Math.round(utm.y*100)/100).toFixed(2);
-        state.mode="";setModeButtons();status("مرکز شکل با مختصات UTM ثبت شد.");return;
+        state.mode="";state.targetLayerId=null;setModeButtons();status("مرکز شکل با مختصات UTM ثبت شد.");return;
       }
       if(state.mode==="POINT"){
         var targetLayer=layerById(map,state.targetLayerId)||layer;
@@ -698,6 +698,7 @@
   };
   window.pickCroquisCadOfflineShapeAnchor = function(){
     if(state.mode)window.cancelCroquisCadOfflineDrawing();
+    state.targetLayerId=null;state.pointReplace=false;
     state.mode="PICK_PLACEMENT";setModeButtons();status("روی بوم آفلاین کلیک کنید تا مرکز شکل یا رأس اول ثبت شود.");return true;
   };
   window.createCroquisCadOfflineShape = function(){
