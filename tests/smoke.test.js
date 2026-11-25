@@ -861,6 +861,24 @@ test('standard CAD scale remains exact at 1:500, 1:1000 and 1:5000', () => {
 });
 
 
+
+test('croquis first sheet includes per-map print stroke width, colored layer area key and applicant acknowledgement', () => {
+  const html = read('index.html');
+  const customizer = read('nezam-customizer.js');
+  const cad = read('nezam-cad-view-tools.js');
+  assert.ok(html.includes('nezam-customizer.js?v=20261125-print-selection-r2'));
+  assert.ok(html.includes('nezam-cad-view-tools.js?v=20261125-cad-view-r5'));
+  assert.ok(customizer.includes('window.setCroquisPrintLineWidth'));
+  assert.ok(customizer.includes('id="crq-print-line-width"'));
+  assert.ok(customizer.includes('croquis-sheet1-layer-legend'));
+  assert.ok(customizer.includes('راهنمای رنگ لایه‌ها و مساحت'));
+  assert.ok(customizer.includes('croquis-applicant-survey-declaration'));
+  assert.ok(customizer.includes('امضاء و اثر انگشت متقاضی'));
+  assert.ok(customizer.includes('مسئولیت‌های قانونی و حرفه‌ای اشخاص تهیه‌کننده'));
+  assert.ok(cad.includes('printLineWidth: 2'));
+  assert.ok(cad.includes('Number(view.printLineWidth)'));
+});
+
 test('prevailing wind direction uses meteorological from-direction and draws flow toward the opposite bearing', () => {
   const source = read('nezam-cad-view-tools.js');
   const start = source.indexOf('  var WIND_COMPASS_16 = [');
