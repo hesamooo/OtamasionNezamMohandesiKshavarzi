@@ -1223,8 +1223,22 @@ test('DXF export writes R12-compatible entities, active UTM viewport and accurat
   assert.ok(dxf.includes('AC1009'));
   assert.ok(dxf.includes('VPORT'));
   assert.ok(dxf.includes('*ACTIVE'));
-  assert.ok(dxf.includes('40' + String.fromCharCode(13, 10)));
-  assert.ok(dxf.includes('41' + String.fromCharCode(13, 10)));
+  const vportStart = dxf.indexOf('TABLE' + String.fromCharCode(13,10) + '2' + String.fromCharCode(13,10) + 'VPORT');
+  const vportEnd = dxf.indexOf('ENDTAB', vportStart);
+  assert.ok(vportStart >= 0 && vportEnd > vportStart);
+  const vport = dxf.slice(vportStart, vportEnd);
+  const vportValue = code => {
+    const rows = vport.split(String.fromCharCode(13,10));
+    for (let i=0;i<rows.length-1;i++) if (rows[i] === String(code)) return Number(rows[i+1]);
+    return NaN;
+  };
+  // DCS center is relative to target; world-space UTM center belongs in group 17/27.
+  assert.equal(vportValue(12), 0);
+  assert.equal(vportValue(22), 0);
+  assert.equal(vportValue(17), 714800);
+  assert.equal(vportValue(27), 3203166.625);
+  assert.equal(vportValue(40), 393.235);
+  assert.equal(vportValue(41), 1.55);
   assert.ok(dxf.includes('$EXTMIN'));
   assert.ok(dxf.includes('$EXTMAX'));
   assert.ok(dxf.includes('$VIEWCTR'));
