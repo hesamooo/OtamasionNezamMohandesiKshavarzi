@@ -943,7 +943,7 @@ test('first croquis map sheet prints main-land and project UTM vertices in a ded
 test('croquis coordinate print appendix provides layer selection, continuation pages and applicant declaration', () => {
   const source = read('nezam-croquis-print-declaration.js');
   const html = read('index.html');
-  assert.ok(html.includes('nezam-croquis-print-declaration.js?v=20261125-print-declaration-r1'));
+  assert.ok(html.includes('nezam-croquis-print-declaration.js?v=20261125-print-declaration-r2'));
   assert.ok(source.includes('croquis-coordinate-print-selection'));
   assert.ok(source.includes('setCroquisCoordinatePrintLayer'));
   assert.ok(source.includes('coordinateTable(page)'));
