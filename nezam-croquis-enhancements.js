@@ -565,7 +565,6 @@
       "html, body { width:auto !important; min-width:0 !important; max-width:none !important; }",
       "#pane-print, .a4-stage-bg, #a4-preview-stage { width:auto !important; min-width:0 !important; max-width:none !important; overflow:visible !important; }",
       "#a4-preview-stage .a4-page.croquis-map-landscape, .a4-page.croquis-map-landscape, .a4-page.croquis-map-landscape.paper-a5 { page:croquisMapLandscape !important; width:297mm !important; min-width:297mm !important; max-width:297mm !important; height:210mm !important; min-height:210mm !important; max-height:210mm !important; margin:0 !important; page-break-after:always !important; break-after:page !important; }",
-      "#a4-preview-stage .a4-page:not(.croquis-map-landscape) { width:210mm !important; min-width:210mm !important; max-width:210mm !important; height:297mm !important; min-height:297mm !important; max-height:297mm !important; }",
       ".a4-page.croquis-map-landscape .lh-body { overflow:hidden !important; }",
       "}"
     ].join("\n");
