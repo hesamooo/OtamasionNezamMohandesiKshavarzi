@@ -2334,6 +2334,7 @@
                 <input id="crq-dxf-file" type="file" accept=".dxf,application/dxf,text/plain" hidden onchange="importCroquisDXFFile(event)" />
                 <button type="button" class="btn btn-sm btn-outline-secondary" onclick="downloadCroquisCoordinatesCSV()">📊 جدول اکسل (CSV)</button>
                 <small class="text-muted w-100">ورود/خروجی DXF با مختصات UTM؛ لایه‌های POINT، LINE، POLYLINE، CIRCLE و ARC پشتیبانی می‌شوند. برای DWG، در AutoCAD با Save As به DXF تبدیل کنید.</small>
+                <small class="text-muted w-100">برای فایل LISP: در AutoCAD دستور APPLOAD را اجرا و فایل را بارگذاری کنید، سپس DRAW636 را بنویسید. فایل DXF مستقیماً باز می‌شود و محدوده UTM و نمای آغازین آن تنظیم شده است.</small>
               </div>
             </div>
 
@@ -3323,11 +3324,11 @@
   <script src="./nezam-core.js?v=20261108-drive-only-r3"></script>
   <script src="./nezam-drive-documents.js?v=20261108-drive-only-r3"></script>
   <script src="./nezam-letter-attachments.js?v=20261104-letter-attachments-r2"></script>
-  <script src="./nezam-customizer.js?v=20261125-print-selection-r2"></script>
+  <script src="./nezam-customizer.js?v=20261125-autocad-output-r3"></script>
   <script src="./nezam-croquis-enhancements.js?v=20261125-placement-rotation-r1"></script>
   <script src="./nezam-croquis-print-declaration.js?v=20261125-layer-print-selection-r1"></script>
   <script src="./nezam-cad-view-tools.js?v=20261125-cad-view-r6"></script>
-  <script src="./nezam-cad-file-io.js?v=20261125-cad-io-r2"></script>
+  <script src="./nezam-cad-file-io.js?v=20261125-cad-io-r3"></script>
   <script src="./nezam-cad-offline-tools.js?v=20261125-offline-tools-r2"></script>
   <script src="./nezam-ai-assistant.js?v=20261101-security-r3"></script>
 

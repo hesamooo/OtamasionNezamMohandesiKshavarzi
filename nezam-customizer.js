@@ -5173,27 +5173,188 @@ function importKmlFileToActiveLayer(event) {
   r.readAsText(f);
 }
 
+window.buildCaseAutoCADLispText = function (map) {
+  if (!map || !Array.isArray(map.layers)) throw new Error("نقشه فعال معتبر نیست.");
+  function numberValue(value, fallback) {
+    if (value === undefined || value === null || value === "") return fallback;
+    if (typeof value === "number") return Number.isFinite(value) ? value : fallback;
+    var raw = String(value).trim();
+    var fa = "۰۱۲۳۴۵۶۷۸۹", ar = "٠١٢٣٤٥٦٧٨٩";
+    raw = raw.replace(/[۰-۹]/g, function (ch) { return String(fa.indexOf(ch)); })
+      .replace(/[٠-٩]/g, function (ch) { return String(ar.indexOf(ch)); })
+      .replace(/[٫]/g, ".").replace(/[٬,]/g, "");
+    var n = Number(raw);
+    return Number.isFinite(n) ? n : fallback;
+  }
+  function fmt(value) {
+    var n = Number(value);
+    if (!Number.isFinite(n)) throw new Error("مختصات نامعتبر در اسکریپت اتوکد وجود دارد.");
+    return (Object.is(n, -0) ? 0 : n).toFixed(4);
+  }
+  function colorIndex(hex) {
+    var value = String(hex || "").toLowerCase();
+    var exact = { "#ff0000": 1, "#ffff00": 2, "#00ff00": 3, "#00ffff": 4,
+      "#0000ff": 5, "#ff00ff": 6, "#ffffff": 7, "#000000": 7 };
+    if (exact[value]) return exact[value];
+    var match = /^#?([0-9a-f]{6})$/i.exec(value);
+    if (!match) return 7;
+    var rgb = [parseInt(match[1].slice(0,2),16),parseInt(match[1].slice(2,4),16),parseInt(match[1].slice(4,6),16)];
+    var palette = [{n:1,r:255,g:0,b:0},{n:2,r:255,g:255,b:0},{n:3,r:0,g:255,b:0},
+      {n:4,r:0,g:255,b:255},{n:5,r:0,g:0,b:255},{n:6,r:255,g:0,b:255},{n:7,r:255,g:255,b:255}];
+    var best = palette[0], bestD = Infinity;
+    palette.forEach(function (p) {
+      var d = Math.pow(rgb[0]-p.r,2)+Math.pow(rgb[1]-p.g,2)+Math.pow(rgb[2]-p.b,2);
+      if (d < bestD) { bestD=d; best=p; }
+    });
+    return best.n;
+  }
+
+  var layers = [], allPoints = [];
+  map.layers.forEach(function (layer) {
+    if (!layer || layer.visible === false || !Array.isArray(layer.points)) return;
+    var points = layer.points.map(function (p) {
+      if (!p) return null;
+      var x = numberValue(p.x, NaN), y = numberValue(p.y, NaN);
+      var zRaw = p.elev !== undefined && p.elev !== null && p.elev !== "" ? p.elev : p.z;
+      var z = numberValue(zRaw, 0);
+      if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return null;
+      return { x: x, y: y, z: z };
+    }).filter(Boolean);
+    if (!points.length) return;
+    var geomType = String(layer.geomType || "").toUpperCase();
+    if (geomType === "POLYGON" && points.length > 3) {
+      var first = points[0], last = points[points.length - 1];
+      if (Math.abs(first.x-last.x)<0.0001 && Math.abs(first.y-last.y)<0.0001 && Math.abs(first.z-last.z)<0.0001) points.pop();
+    }
+    if (geomType !== "POINT" && points.length === 1) geomType = "POINT";
+    else if (geomType !== "POINT" && geomType !== "POLYGON") geomType = "LINE";
+    var item = {
+      name: "N636_" + String(layers.length + 1).padStart(3, "0"),
+      geomType: geomType,
+      color: colorIndex(layer.color),
+      points: points,
+      flat: points.every(function (p) { return Math.abs(p.z - points[0].z) < 0.0001; })
+    };
+    layers.push(item);
+    allPoints = allPoints.concat(points);
+  });
+  if (!layers.length || !allPoints.length) {
+    throw new Error("هیچ مختصات معتبری در لایه‌های مرئی نقشه برای اتوکد پیدا نشد.");
+  }
+
+  var lines = [
+    "; Nezam 636 - AutoCAD WCS/UTM export",
+    "; Units: meters | UTM zone: " + String(map.utmZone || "39R"),
+    "; Load this file with APPLOAD, then run command DRAW636.",
+    "(defun c:DRAW636 (/ oldEcho oldOs oldLayer oldPdMode oldPdSize oldLuPrec)",
+    "  (setq oldEcho (getvar \"CMDECHO\"))",
+    "  (setq oldOs (getvar \"OSMODE\"))",
+    "  (setq oldLayer (getvar \"CLAYER\"))",
+    "  (setq oldPdMode (getvar \"PDMODE\"))",
+    "  (setq oldPdSize (getvar \"PDSIZE\"))",
+    "  (setq oldLuPrec (getvar \"LUPREC\"))",
+    "  (setvar \"TILEMODE\" 1)",
+    "  (setvar \"CMDECHO\" 0)",
+    "  (setvar \"OSMODE\" 0)",
+    "  (setvar \"PDMODE\" 35)",
+    "  (setvar \"PDSIZE\" -2.0)",
+    "  (setvar \"LUPREC\" 4)",
+    "  (princ \"\\nNEZAM636: creating UTM geometry in model space...\")"
+  ];
+  var entityCount = 0, vertexCount = 0;
+  layers.forEach(function (layer) {
+    lines.push(
+      "  (if (not (tblsearch \"LAYER\" \"" + layer.name + "\"))",
+      "    (entmake (list (cons 0 \"LAYER\") (cons 100 \"AcDbSymbolTableRecord\") (cons 100 \"AcDbLayerTableRecord\")",
+      "      (cons 2 \"" + layer.name + "\") (cons 70 0) (cons 62 " + layer.color + ") (cons 6 \"CONTINUOUS\"))))"
+    );
+    if (layer.geomType === "POINT" || layer.points.length === 1) {
+      layer.points.forEach(function (point) {
+        lines.push(
+          "  (entmake (list (cons 0 \"POINT\") (cons 100 \"AcDbEntity\") (cons 8 \"" + layer.name + "\")",
+          "    (cons 100 \"AcDbPoint\") (cons 10 (list " + fmt(point.x) + " " + fmt(point.y) + " " + fmt(point.z) + "))))"
+        );
+        entityCount++; vertexCount++;
+      });
+    } else if (layer.flat) {
+      var closed = layer.geomType === "POLYGON" && layer.points.length >= 3;
+      lines.push(
+        "  (entmake (list (cons 0 \"LWPOLYLINE\") (cons 100 \"AcDbEntity\") (cons 8 \"" + layer.name + "\")",
+        "    (cons 100 \"AcDbPolyline\") (cons 90 " + layer.points.length + ") (cons 70 " + (closed ? 1 : 0) + ") (cons 38 " + fmt(layer.points[0].z) + ")"
+      );
+      layer.points.forEach(function (point) {
+        lines.push("    (cons 10 (list " + fmt(point.x) + " " + fmt(point.y) + "))");
+        vertexCount++;
+      });
+      lines.push("  ))");
+      entityCount++;
+    } else {
+      var closed3d = layer.geomType === "POLYGON" && layer.points.length >= 3;
+      lines.push(
+        "  (entmake (list (cons 0 \"POLYLINE\") (cons 100 \"AcDbEntity\") (cons 8 \"" + layer.name + "\")",
+        "    (cons 100 \"AcDb3dPolyline\") (cons 66 1) (cons 70 " + (closed3d ? 9 : 8) + ") (cons 10 (list 0.0 0.0 0.0))))"
+      );
+      layer.points.forEach(function (point) {
+        lines.push(
+          "  (entmake (list (cons 0 \"VERTEX\") (cons 100 \"AcDbEntity\") (cons 8 \"" + layer.name + "\")",
+          "    (cons 100 \"AcDbVertex\") (cons 100 \"AcDb3dPolylineVertex\")",
+          "    (cons 10 (list " + fmt(point.x) + " " + fmt(point.y) + " " + fmt(point.z) + ")) (cons 70 32)))"
+        );
+        vertexCount++;
+      });
+      lines.push("  (entmake (list (cons 0 \"SEQEND\") (cons 100 \"AcDbEntity\") (cons 8 \"0\")))");
+      entityCount++;
+    }
+  });
+  lines.push(
+    "  (command \"_.REGENALL\")",
+    "  (command \"_.ZOOM\" \"_E\")",
+    "  (setvar \"CLAYER\" oldLayer)",
+    "  (setvar \"PDMODE\" oldPdMode)",
+    "  (setvar \"PDSIZE\" oldPdSize)",
+    "  (setvar \"LUPREC\" oldLuPrec)",
+    "  (setvar \"OSMODE\" oldOs)",
+    "  (setvar \"CMDECHO\" oldEcho)",
+    "  (princ \"\\nNEZAM636: " + entityCount + " entities / " + vertexCount + " vertices created. UTM meters.\")",
+    "  (princ)",
+    ")",
+    ""
+  );
+  return {
+    text: lines.join("\r\n"),
+    entityCount: entityCount,
+    layerCount: layers.length,
+    vertexCount: vertexCount,
+    zone: String(map.utmZone || "39R")
+  };
+};
+
 function downloadCaseAutoCAD() {
   var c = requireActiveCase("خروجی LISP اتوکد");
   if (!c) return;
   var m = getActiveCroquisMap();
-  if (!m) return;
-  var lsp = ";; AutoCAD LISP Generated by Center 636 Khafr\n(defun c:Draw636 ()\n";
-  for (var i = 0; i < m.layers.length; i++) {
-    var l = m.layers[i];
-    if (!l.visible || l.points.length < 2) continue;
-    lsp += "  (command \"_.PLINE\" ";
-    for (var j = 0; j < l.points.length; j++) {
-      var zElev = parseFloat(l.points[j].elev) || 0.0;
-      lsp += "(list " + l.points[j].x + " " + l.points[j].y + " " + zElev.toFixed(2) + ") ";
-    }
-    lsp += (l.geomType === "POLYGON" ? "\"_C\")\n" : "\"\")\n");
+  if (!m) {
+    alert("ابتدا نقشه کروکی فعال را انتخاب کنید.");
+    return;
   }
-  lsp += "  (command \"_.ZOOM\" \"_E\") (princ))\n";
+  var result;
+  try {
+    result = window.buildCaseAutoCADLispText(m);
+  } catch (error) {
+    alert(error && error.message ? error.message : "ساخت اسکریپت اتوکد ناموفق بود.");
+    return;
+  }
+  var blob = new Blob([result.text], { type: "text/plain;charset=utf-8" });
+  var url = URL.createObjectURL(blob);
   var a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([lsp], { type: "text/plain;charset=utf-8" }));
-  a.download = "Croquis636_" + c.name.replace(/\s+/g, "_") + ".lsp";
+  a.href = url;
+  a.download = "Nezam636_" + String(c.name || "Case").replace(/[\\\\/:*?""<>|]+/g, "_").replace(/\\s+/g, "_") + ".lsp";
+  document.body.appendChild(a);
   a.click();
+  a.remove();
+  window.setTimeout(function () { URL.revokeObjectURL(url); }, 30000);
+  showToastMsg("اسکریپت اتوکد آماده شد: " + result.entityCount + " عارضه و " +
+    result.vertexCount + " رأس. در AutoCAD با APPLOAD بارگذاری و دستور DRAW636 را اجرا کنید.");
 }
 
 function downloadCroquisCoordinatesCSV() {

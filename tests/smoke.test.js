@@ -860,13 +860,13 @@ test('moving a croquis polygon translates every UTM vertex without changing its 
 test('CAD script tags are independently closed and offline toolbar module is actually loaded', () => {
   const html = read('index.html');
   assert.ok(html.includes('<script src="./nezam-cad-view-tools.js?v=20261125-cad-view-r6"></script>'));
-  assert.ok(html.includes('<script src="./nezam-cad-file-io.js?v=20261125-cad-io-r2"></script>'));
+  assert.ok(html.includes('<script src="./nezam-cad-file-io.js?v=20261125-cad-io-r3"></script>'));
   assert.ok(html.includes('<script src="./nezam-cad-offline-tools.js?v=20261125-offline-tools-r2"></script>'));
   assert.ok(!html.includes('cad-io-r2\\n  <script'));
   assert.ok(!html.includes('offline-tools-r1"></script>"></script>'));
   const orderedRefs = [
     html.indexOf('<script src="./nezam-cad-view-tools.js?v=20261125-cad-view-r6"></script>'),
-    html.indexOf('<script src="./nezam-cad-file-io.js?v=20261125-cad-io-r2"></script>'),
+    html.indexOf('<script src="./nezam-cad-file-io.js?v=20261125-cad-io-r3"></script>'),
     html.indexOf('<script src="./nezam-cad-offline-tools.js?v=20261125-offline-tools-r2"></script>')
   ];
   assert.ok(orderedRefs[0] < orderedRefs[1] && orderedRefs[1] < orderedRefs[2]);
@@ -1189,7 +1189,7 @@ test('DXF export and import module passes ASCII UTM round-trip for supported ent
   const text=apiWindow.buildCroquisDXFText(map);
   assert.ok(text.includes('NEZAM636_UTM_ZONE=39R'));
   assert.ok(text.includes('NEZAM636_COORDINATES=UTM_METERS'));
-  assert.ok(text.includes('$INSUNITS'));
+  assert.ok(text.includes('AC1009'));
   assert.ok(text.includes('714800.1200'));
   const parsed=apiWindow.parseCroquisDXFText(text);
   assert.equal(parsed.zone,'39R');
@@ -1199,6 +1199,133 @@ test('DXF export and import module passes ASCII UTM round-trip for supported ent
   assert.equal(parsed.features[0].points.length,4);
   assert.equal(parsed.features[1].geomType,'LINE');
   assert.equal(parsed.features[2].geomType,'POINT');
+});
+
+
+test('DXF export writes R12-compatible entities, active UTM viewport and accurate extents', () => {
+  const apiWindow = {};
+  new Function('window', read('nezam-cad-file-io.js'))(apiWindow);
+  const map = { utmZone: '39R', layers: [
+    { name: 'زمین اصلی', color: '#15803d', geomType: 'POLYGON', points: [
+      {x:714800.12,y:3203100.34,z:0},{x:714850.12,y:3203100.34,z:0},
+      {x:714850.12,y:3203150.34,z:0},{x:714800.12,y:3203150.34,z:0}
+    ]},
+    { name: 'مسیر سه‌بعدی', color: '#2563eb', visible: true, geomType: 'LINE', points: [
+      {x:714700,y:3203000,z:2},{x:714900,y:3203200,z:3}
+    ]},
+    { name: 'چاه', color: '#dc2626', visible: true, geomType: 'POINT', points: [
+      {x:714777.5,y:3203333.25,z:4}
+    ]},
+    { name: 'مخفی', color: '#777777', visible: false, geomType: 'POINT', points: [{x:1,y:2,z:0}]}
+  ]};
+  const dxf = apiWindow.buildCroquisDXFText(map);
+  const parsed = apiWindow.parseCroquisDXFText(dxf);
+  assert.ok(dxf.includes('AC1009'));
+  assert.ok(dxf.includes('VPORT'));
+  assert.ok(dxf.includes('*ACTIVE'));
+  const vportStart = dxf.indexOf('TABLE' + String.fromCharCode(13,10) + '2' + String.fromCharCode(13,10) + 'VPORT');
+  const vportEnd = dxf.indexOf('ENDTAB', vportStart);
+  assert.ok(vportStart >= 0 && vportEnd > vportStart);
+  const vport = dxf.slice(vportStart, vportEnd);
+  const vportValue = code => {
+    const rows = vport.split(String.fromCharCode(13,10));
+    for (let i=0;i<rows.length-1;i++) if (rows[i] === String(code)) return Number(rows[i+1]);
+    return NaN;
+  };
+  // DCS center is relative to target; world-space UTM center belongs in group 17/27.
+  assert.equal(vportValue(12), 0);
+  assert.equal(vportValue(22), 0);
+  assert.equal(vportValue(17), 714800);
+  assert.equal(vportValue(27), 3203166.625);
+  assert.equal(vportValue(40), 393.235);
+  assert.equal(vportValue(41), 1.55);
+  assert.ok(dxf.includes('$EXTMIN'));
+  assert.ok(dxf.includes('$EXTMAX'));
+  assert.ok(dxf.includes('$VIEWCTR'));
+  assert.ok(dxf.includes('$VIEWSIZE'));
+  assert.ok(dxf.includes('NEZAM636_COORDINATES=UTM_METERS'));
+  assert.ok(dxf.includes('N636_001'));
+  assert.ok(dxf.includes('N636_002'));
+  assert.ok(dxf.includes('N636_003'));
+  assert.equal(dxf.includes('N636_004'), false);
+  assert.equal(parsed.zone, '39R');
+  assert.equal(parsed.unitScale, 1);
+  assert.equal(parsed.features.length, 3);
+  assert.deepEqual(parsed.features.map(x => x.geomType), ['POLYGON','LINE','POINT']);
+  assert.deepEqual(parsed.features.map(x => x.points.length), [4,2,1]);
+  assert.equal(parsed.features[1].points[1].z, 3);
+  const allXY = parsed.features.flatMap(x => x.points);
+  assert.equal(Math.min(...allXY.map(p=>p.x)),714700);
+  assert.equal(Math.max(...allXY.map(p=>p.x)),714900);
+  assert.equal(Math.min(...allXY.map(p=>p.y)),3203000);
+  assert.equal(Math.max(...allXY.map(p=>p.y)),3203333.25);
+  assert.ok(dxf.includes('NEZAM636_ENTITY_COUNT=3'));
+});
+
+test('DXF export refuses invalid visible geometry rather than silently writing incomplete coordinates', () => {
+  const apiWindow = {};
+  new Function('window', read('nezam-cad-file-io.js'))(apiWindow);
+  assert.throws(() => apiWindow.buildCroquisDXFText({ layers: [
+    {name:'خراب', visible:true, geomType:'POLYGON', points:[
+      {x:714800,y:3203100},{x:'مختصات نامعتبر',y:3203150},{x:714850,y:3203200}
+    ]}
+  ]}), /مختصات X\/Y\/Z/);
+  assert.throws(() => apiWindow.buildCroquisDXFText({ layers: [
+    {name:'پنهان', visible:false, geomType:'POINT', points:[{x:1,y:2}]}
+  ]}), /هیچ نقطه معتبر/);
+});
+
+test('AutoCAD LISP export creates visible WCS entities, preserves layers and runs zoom extents', () => {
+  const source = read('nezam-customizer.js');
+  const start = source.indexOf('window.buildCaseAutoCADLispText = function (map) {');
+  const end = source.indexOf('function downloadCaseAutoCAD()', start);
+  assert.ok(start >= 0 && end > start);
+  const apiWindow = {};
+  new Function('window', source.slice(start, end))(apiWindow);
+  const map = { utmZone:'39R', layers: [
+    {name:'زمین',color:'#15803d',geomType:'POLYGON',points:[
+      {x:714800.12,y:3203100.34,z:0},{x:714850.12,y:3203100.34,z:0},
+      {x:714850.12,y:3203150.34,z:0},{x:714800.12,y:3203150.34,z:0}
+    ]},
+    {name:'مسیر',color:'#2563eb',geomType:'LINE',points:[
+      {x:714700,y:3203000,z:2},{x:714900,y:3203200,z:3}
+    ]},
+    {name:'چاه',color:'#dc2626',geomType:'POINT',points:[{x:714777.5,y:3203333.25,z:4}]},
+    {name:'مخفی',visible:false,geomType:'POINT',points:[{x:1,y:2,z:0}]}
+  ]};
+  const result = apiWindow.buildCaseAutoCADLispText(map);
+  const lisp = result.text;
+  assert.equal(result.entityCount,3);
+  assert.equal(result.layerCount,3);
+  assert.equal(result.vertexCount,7);
+  assert.ok(lisp.includes('(defun c:DRAW636'));
+  assert.ok(lisp.includes('(setvar "TILEMODE" 1)'));
+  assert.ok(lisp.includes('(entmake (list (cons 0 "LWPOLYLINE")'));
+  assert.ok(lisp.includes('"AcDb3dPolyline"'));
+  assert.ok(lisp.includes('(cons 0 "POINT")'));
+  assert.ok(lisp.includes('(command "_.ZOOM" "_E")'));
+  assert.ok(lisp.includes('(list 714800.1200 3203100.3400)'));
+  assert.ok(!lisp.includes('N636_004'));
+  let depth=0, quoted=false, escaped=false, comment=false;
+  for (const ch of lisp) {
+    if (comment) { if (ch === '\n') comment=false; continue; }
+    if (quoted) {
+      if (escaped) { escaped=false; continue; }
+      if (ch === '\\') { escaped=true; continue; }
+      if (ch === '"') quoted=false;
+      continue;
+    }
+    if (ch === ';') { comment=true; continue; }
+    if (ch === '"') { quoted=true; continue; }
+    if (ch === '(') depth++;
+    if (ch === ')') depth--;
+    assert.ok(depth >= 0, 'AutoLISP parenthesis closed too early');
+  }
+  assert.equal(depth,0,'AutoLISP parentheses must be balanced');
+  assert.equal(quoted,false,'AutoLISP strings must be closed');
+  assert.throws(() => apiWindow.buildCaseAutoCADLispText({layers:[
+    {name:'مخفی',visible:false,geomType:'POINT',points:[{x:1,y:2}]}
+  ]}), /هیچ مختصات معتبری/);
 });
 
 test('DXF import detects common units and approximates ARC as an open line', () => {
@@ -1221,7 +1348,7 @@ test('DXF controls are backed by a loaded module and automatic unit detection is
   assert.ok(html.includes('onclick="downloadCroquisDXF()"'));
   assert.ok(html.includes('onclick="triggerCroquisDXFImport()"'));
   assert.ok(html.includes('onchange="importCroquisDXFFile(event)"'));
-  assert.ok(html.includes('nezam-cad-file-io.js?v=20261125-cad-io-r2'));
+  assert.ok(html.includes('nezam-cad-file-io.js?v=20261125-cad-io-r3'));
   assert.ok(html.includes('<option value="AUTO" selected>واحد: تشخیص خودکار</option>'));
   assert.ok(source.includes('window.exportActiveCroquisToDXF'));
   assert.ok(source.includes('window.importCroquisDXFFile'));
