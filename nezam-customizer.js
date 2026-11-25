@@ -5262,7 +5262,7 @@ window.buildCaseAutoCADLispText = function (map) {
     lines.push(
       "  (if (not (tblsearch \"LAYER\" \"" + layer.name + "\"))",
       "    (entmake (list (cons 0 \"LAYER\") (cons 100 \"AcDbSymbolTableRecord\") (cons 100 \"AcDbLayerTableRecord\")",
-      "      (cons 2 \"" + layer.name + "\") (cons 70 0) (cons 62 " + layer.color + ") (cons 6 \"CONTINUOUS\")))"
+      "      (cons 2 \"" + layer.name + "\") (cons 70 0) (cons 62 " + layer.color + ") (cons 6 \"CONTINUOUS\"))))"
     );
     if (layer.geomType === "POINT" || layer.points.length === 1) {
       layer.points.forEach(function (point) {
