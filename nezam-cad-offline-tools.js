@@ -256,7 +256,7 @@
     toolbar.id = "crq-cad-offline-toolbar";
     toolbar.setAttribute("role", "toolbar");
     toolbar.setAttribute("aria-label", "ابزارهای ترسیم نقشه آفلاین");
-    toolbar.style.cssText = "position:absolute;top:10px;left:64px;z-index:1200;width:48px;padding:5px;direction:rtl;background:rgba(255,255,255,.97);border:1px solid #cbd5e1;border-radius:12px;box-shadow:0 3px 14px rgba(15,23,42,.22);";
+    toolbar.style.cssText = "position:absolute;top:10px;left:130px;z-index:1200;width:48px;padding:5px;direction:rtl;background:rgba(255,255,255,.97);border:1px solid #cbd5e1;border-radius:12px;box-shadow:0 3px 14px rgba(15,23,42,.22);";
     var toolbarButtons = document.createElement("div");
     toolbarButtons.className = "d-flex flex-column gap-1";
     toolbarButtons.appendChild(buildButton("📍", "ثبت نقطه", function () { window.setCroquisCadOfflineDrawingMode("POINT"); }, "crq-cad-offline-point"));
@@ -271,7 +271,7 @@
 
     var more = document.createElement("div");
     more.id = "crq-cad-offline-more";
-    more.style.cssText = "display:none;position:absolute;top:10px;left:118px;z-index:1200;width:min(330px,calc(100% - 132px));max-height:min(70vh,560px);overflow-y:auto;overscroll-behavior:contain;padding:10px;background:rgba(255,255,255,.97);border:1px solid #cbd5e1;border-radius:10px;box-shadow:0 3px 14px rgba(15,23,42,.22);direction:rtl;color:#172033;";
+    more.style.cssText = "display:none;position:absolute;top:10px;left:184px;z-index:1200;width:min(330px,calc(100% - 194px));max-height:min(70vh,560px);overflow-y:auto;overscroll-behavior:contain;padding:10px;background:rgba(255,255,255,.97);border:1px solid #cbd5e1;border-radius:10px;box-shadow:0 3px 14px rgba(15,23,42,.22);direction:rtl;color:#172033;";
     var closeRow = document.createElement("div");
     closeRow.className = "d-flex justify-content-between align-items-center mb-2";
     var title = document.createElement("strong");
