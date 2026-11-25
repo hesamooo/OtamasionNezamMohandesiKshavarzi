@@ -11,7 +11,9 @@
     panY: 0,
     showPointLabels: false,
     showSideLengths: false,
-    showLayerLabels: false
+    showLayerLabels: false,
+    showPrevailingWind: false,
+    prevailingWindFromDeg: 315
   };
 
   function activeMap() {
@@ -40,8 +42,51 @@
     map.cadView.zoomPercent = Math.min(200, Math.max(50, Number(map.cadView.zoomPercent) || 100));
     map.cadView.panX = Math.max(-1000, Math.min(1000, Number(map.cadView.panX) || 0));
     map.cadView.panY = Math.max(-1000, Math.min(1000, Number(map.cadView.panY) || 0));
+    var windDeg = Number(map.cadView.prevailingWindFromDeg);
+    if (!Number.isFinite(windDeg)) windDeg = 315;
+    map.cadView.prevailingWindFromDeg = ((windDeg % 360) + 360) % 360;
+    map.cadView.showPrevailingWind = !!map.cadView.showPrevailingWind;
     return map.cadView;
   }
+
+  var WIND_COMPASS_16 = [
+    { deg: 0, name: "شمال" },
+    { deg: 22.5, name: "شمال‌شمال‌شرق" },
+    { deg: 45, name: "شمال‌شرق" },
+    { deg: 67.5, name: "شرق‌شمال‌شرق" },
+    { deg: 90, name: "شرق" },
+    { deg: 112.5, name: "شرق‌جنوب‌شرق" },
+    { deg: 135, name: "جنوب‌شرق" },
+    { deg: 157.5, name: "جنوب‌جنوب‌شرق" },
+    { deg: 180, name: "جنوب" },
+    { deg: 202.5, name: "جنوب‌جنوب‌غرب" },
+    { deg: 225, name: "جنوب‌غرب" },
+    { deg: 247.5, name: "غرب‌جنوب‌غرب" },
+    { deg: 270, name: "غرب" },
+    { deg: 292.5, name: "غرب‌شمال‌غرب" },
+    { deg: 315, name: "شمال‌غرب" },
+    { deg: 337.5, name: "شمال‌شمال‌غرب" }
+  ];
+
+  window.describeCroquisPrevailingWind = function (directionFromDeg) {
+    var fromDeg = Number(directionFromDeg);
+    if (!Number.isFinite(fromDeg)) throw new Error("زاویه باد معتبر نیست.");
+    fromDeg = ((fromDeg % 360) + 360) % 360;
+    var sector = Math.round(fromDeg / 22.5) % 16;
+    var fromName = WIND_COMPASS_16[sector].name;
+    var toDeg = (fromDeg + 180) % 360;
+    var toName = WIND_COMPASS_16[(sector + 8) % 16].name;
+    var flowRadians = toDeg * Math.PI / 180;
+    return {
+      fromDeg: fromDeg,
+      toDeg: toDeg,
+      fromName: fromName,
+      toName: toName,
+      // SVG screen coordinates: x increases east, y increases south.
+      dx: Math.sin(flowRadians),
+      dy: -Math.cos(flowRadians)
+    };
+  };
 
   function selectedLayers(map, mode) {
     var visible = (map.layers || []).filter(function (layer) {
@@ -251,11 +296,37 @@
         '<text x="' + (barPixels / 2).toFixed(1) + '" y="-7" text-anchor="middle" font-size="9.5" font-weight="bold" fill="' + text + '" paint-order="stroke" stroke="' + bg + '" stroke-width="2">۱:' + fa(Math.round(effectiveDenominator)) + ' | ' + fa(barMeters) + ' متر</text>' +
       '</g>';
 
-    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + svgW + ' ' + svgH + '" width="100%" height="' + (forPrint ? svgH + "px" : "100%") + '" style="' +
+    var prevailingWindHud = "";
+    if (view.showPrevailingWind) {
+      var wind = window.describeCroquisPrevailingWind(view.prevailingWindFromDeg);
+      var windCx = 77, windCy = 59, windLen = 20;
+      var tailX = windCx - wind.dx * windLen;
+      var tailY = windCy - wind.dy * windLen;
+      var tipX = windCx + wind.dx * windLen;
+      var tipY = windCy + wind.dy * windLen;
+      var perpX = -wind.dy, perpY = wind.dx;
+      var headBaseX = tipX - wind.dx * 8;
+      var headBaseY = tipY - wind.dy * 8;
+      var arrowHead = tipX.toFixed(1) + "," + tipY.toFixed(1) + " " +
+        (headBaseX + perpX * 4).toFixed(1) + "," + (headBaseY + perpY * 4).toFixed(1) + " " +
+        (headBaseX - perpX * 4).toFixed(1) + "," + (headBaseY - perpY * 4).toFixed(1);
+      prevailingWindHud =
+        '<g transform="translate(' + (svgW - 166) + ',14)">' +
+          '<rect x="0" y="0" width="152" height="104" rx="8" fill="' + bg + '" fill-opacity="' + (forPrint ? "0.96" : "0.90") + '" stroke="#0ea5e9" stroke-width="1.8"/>' +
+          '<text x="76" y="15" text-anchor="middle" font-size="10" font-weight="900" fill="' + text + '">جهت باد غالب</text>' +
+          '<text x="76" y="30" text-anchor="middle" font-size="10" font-weight="bold" fill="#0ea5e9">از: ' + wind.fromName + '</text>' +
+          '<circle cx="' + windCx + '" cy="' + windCy + '" r="25" fill="none" stroke="' + grid + '" stroke-width="1"/>' +
+          '<line x1="' + tailX.toFixed(1) + '" y1="' + tailY.toFixed(1) + '" x2="' + tipX.toFixed(1) + '" y2="' + tipY.toFixed(1) + '" stroke="#0ea5e9" stroke-width="3.5" stroke-linecap="round"/>' +
+          '<polygon points="' + arrowHead + '" fill="#0ea5e9"/>' +
+          '<text x="76" y="96" text-anchor="middle" font-size="9" font-weight="bold" fill="' + text + '">به: ' + wind.toName + ' | ' + fa(wind.fromDeg.toFixed(1)) + '°</text>' +
+        '</g>';
+    }
+
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + svgW + ' ' + svgH + '" width="100%" height="' + (forPrint ? svgH + "px" : "100%") + '" style="'
       (forPrint ? 'display:block;width:100%;height:' + svgH + 'px;' : 'display:block;width:100%;height:100%;') +
       'background:' + bg + ';border-radius:8px;border:1px solid #cbd5e1;overflow:hidden;">' +
       '<defs><pattern id="' + svgId + '-grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="' + grid + '" stroke-width="1"/></pattern><clipPath id="' + svgId + '-clip"><rect x="0" y="0" width="' + svgW + '" height="' + svgH + '"/></clipPath></defs>' +
-      '<rect width="100%" height="100%" fill="url(#' + svgId + '-grid)"/><g clip-path="url(#' + svgId + '-clip)">' + shapes + hud + '</g></svg>';
+      '<rect width="100%" height="100%" fill="url(#' + svgId + '-grid)"/><g clip-path="url(#' + svgId + '-clip)">' + shapes + hud + prevailingWindHud + '</g></svg>';
   }
 
   function refreshControls() {
@@ -270,6 +341,9 @@
     var pointLabels = document.getElementById("crq-cad-show-points");
     var sideLabels = document.getElementById("crq-cad-show-sides");
     var layerLabels = document.getElementById("crq-cad-show-layer-labels");
+    var windEnabled = document.getElementById("crq-cad-wind-enabled");
+    var windPreset = document.getElementById("crq-cad-wind-preset");
+    var windDegrees = document.getElementById("crq-cad-wind-degrees");
     if (focus) focus.value = view.focusMode;
     if (scale) scale.value = String(view.scaleDenominator);
     if (zoom) zoom.value = String(view.zoomPercent);
@@ -277,6 +351,12 @@
     if (pointLabels) pointLabels.checked = !!view.showPointLabels;
     if (sideLabels) sideLabels.checked = !!view.showSideLengths;
     if (layerLabels) layerLabels.checked = !!view.showLayerLabels;
+    if (windEnabled) windEnabled.checked = !!view.showPrevailingWind;
+    if (windDegrees) windDegrees.value = String(Number(view.prevailingWindFromDeg).toFixed(1).replace(/\.0$/, ""));
+    if (windPreset) {
+      var matchedPreset = WIND_COMPASS_16.find(function (item) { return Math.abs(item.deg - view.prevailingWindFromDeg) < 0.05; });
+      windPreset.value = matchedPreset ? String(matchedPreset.deg) : "CUSTOM";
+    }
   }
 
   function setViewValue(key, value) {
@@ -292,8 +372,16 @@
       view.zoomPercent = Math.max(50, Math.min(200, Number(value) || 100));
     } else if (["panX", "panY"].indexOf(key) !== -1) {
       view[key] = Math.max(-1000, Math.min(1000, Number(value) || 0));
-    } else if (["showPointLabels", "showSideLengths", "showLayerLabels"].indexOf(key) !== -1) {
+    } else if (["showPointLabels", "showSideLengths", "showLayerLabels", "showPrevailingWind"].indexOf(key) !== -1) {
       view[key] = !!value;
+    } else if (key === "prevailingWindFromDeg") {
+      var wind = Number(value);
+      if (!Number.isFinite(wind) || wind < 0 || wind >= 360) {
+        alert("زاویه باد باید عددی بین صفر تا ۳۵۹٫۹ درجه باشد.");
+        refreshControls();
+        return;
+      }
+      view.prevailingWindFromDeg = Math.round(wind * 10) / 10;
     }
     if (typeof saveAllDB === "function") saveAllDB();
     if (typeof renderCroquisVisualCanvas === "function") renderCroquisVisualCanvas();
@@ -302,6 +390,11 @@
 
   window.setCroquisCadViewOption = function (key, value) {
     setViewValue(key, value);
+  };
+  window.selectCroquisPrevailingWindPreset = function (value) {
+    if (String(value) === "CUSTOM") return;
+    setViewValue("prevailingWindFromDeg", value);
+    refreshControls();
   };
   window.panCroquisCadView = function (direction) {
     var map = activeMap();
