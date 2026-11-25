@@ -609,7 +609,11 @@
       var originalPrint = window.printUtmSketchSheet;
       var wrappedPrint = function () {
         var result = originalPrint.apply(this, arguments);
-        decorateCroquisPrintPage();
+        // Do not accidentally rotate a prior letter/form if printing was cancelled
+        // or an active applicant has not yet been selected.
+        if (typeof currentPreviewMode !== "undefined" && currentPreviewMode === "CROQUIS") {
+          decorateCroquisPrintPage();
+        }
         return result;
       };
       wrappedPrint.__croquisLandscapeWrapped = true;
