@@ -74,8 +74,11 @@
       scale = Math.min((svgW - 2 * pad) / Math.max(spanX, 20), (svgH - 2 * pad) / Math.max(spanY, 20));
     } else {
       var d = Number(denominator);
+      // The drawable inner frame is the scale reference. Keep its physical
+      // width fixed and derive height from the SVG aspect ratio so the chosen
+      // standard scale is not silently distorted by vertical fitting.
       var physicalWidthMm = forPrint ? 270 : 250;
-      var physicalHeightMm = forPrint ? 155 : 155;
+      var physicalHeightMm = physicalWidthMm * (svgH - 2 * pad) / (svgW - 2 * pad);
       scale = Math.min(
         (svgW - 2 * pad) / (physicalWidthMm * d / 1000),
         (svgH - 2 * pad) / (physicalHeightMm * d / 1000)
@@ -215,7 +218,7 @@
       }
     });
 
-    var effectiveDenominator = 1000 * svgW / (scale * (forPrint ? 270 : 250));
+    var effectiveDenominator = 1000 * (svgW - 2 * pad) / (scale * (forPrint ? 270 : 250));
     var barMeters = niceDistance(82 / scale);
     var barPixels = Math.min(150, barMeters * scale);
     var ratioText = "۱:" + fa(Math.round(effectiveDenominator));
@@ -293,8 +296,11 @@
     else if (direction === "right") view.panX += step;
     else if (direction === "up") view.panY -= step;
     else if (direction === "down") view.panY += step;
-    setViewValue("panX", view.panX);
-    if (direction === "up" || direction === "down") setViewValue("panY", view.panY);
+    view.panX = Math.max(-1000, Math.min(1000, view.panX));
+    view.panY = Math.max(-1000, Math.min(1000, view.panY));
+    if (typeof saveAllDB === "function") saveAllDB();
+    if (typeof renderCroquisVisualCanvas === "function") renderCroquisVisualCanvas();
+    refreshControls();
   };
   window.resetCroquisCadView = function () {
     var map = activeMap();
