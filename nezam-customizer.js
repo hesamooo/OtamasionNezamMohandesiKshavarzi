@@ -4725,6 +4725,47 @@ window.setCroquisPrintFocusLayer = function(layerId) {
   }
 };
 
+/* انتخاب لایه‌های مجاز برای درج در جدول مختصات شیت دوم؛ تنظیم مستقل برای هر نقشه */
+function getCroquisCoordinatePrintLayerIds(map) {
+  if (!map || !Array.isArray(map.layers)) return [];
+  var visibleIds = map.layers.filter(function(layer) {
+    return layer && layer.visible && Array.isArray(layer.points) && layer.points.length > 0;
+  }).map(function(layer) { return String(layer.id || ""); }).filter(Boolean);
+  if (!Array.isArray(map.printCoordinateLayerIds)) {
+    map.printCoordinateLayerIds = visibleIds.slice();
+  }
+  map.printCoordinateLayerIds = map.printCoordinateLayerIds.map(String).filter(function(id) {
+    return visibleIds.indexOf(id) !== -1;
+  });
+  return map.printCoordinateLayerIds;
+}
+
+window.setCroquisCoordinatePrintLayer = function(layerId, checked) {
+  var map = getActiveCroquisMap();
+  if (!map) return false;
+  var selected = getCroquisCoordinatePrintLayerIds(map);
+  var id = String(layerId || "");
+  if (!id) return false;
+  if (checked && selected.indexOf(id) === -1) selected.push(id);
+  if (!checked) selected = selected.filter(function(item) { return item !== id; });
+  map.printCoordinateLayerIds = selected;
+  saveAllDB();
+  if (currentPreviewMode === "CROQUIS") printUtmSketchSheet();
+  return true;
+};
+
+window.setAllCroquisCoordinatePrintLayers = function(checked) {
+  var map = getActiveCroquisMap();
+  if (!map) return false;
+  var visibleIds = (map.layers || []).filter(function(layer) {
+    return layer && layer.visible && Array.isArray(layer.points) && layer.points.length > 0;
+  }).map(function(layer) { return String(layer.id || ""); }).filter(Boolean);
+  map.printCoordinateLayerIds = checked ? visibleIds : [];
+  saveAllDB();
+  if (currentPreviewMode === "CROQUIS") printUtmSketchSheet();
+  return true;
+};
+
 /* چاپ رسمی کروکی چندلایه زمین به تفکیک ۲ برگه مجزا (برگه اول: نقشه ماهواره‌ای با ابزار تعاملی برش کادر و برگه دوم: جداول مساحت و مختصات کامل X, Y, ارتفاع, Zone) */
 function printUtmSketchSheet() {
   var c = getActiveCase();
@@ -4795,6 +4836,25 @@ function printUtmSketchSheet() {
   var allowedCoordModes = ["OUTER_CODE","OUTER_CALLOUT_XY","OUTER_WITH_SUBLAYERS","NONE"];
   var cMode = allowedCoordModes.indexOf(croquisPrintLabelOpts.coordDisplayMode) !== -1 ? croquisPrintLabelOpts.coordDisplayMode : "OUTER_CODE";
 
+  var coordinatePrintLayerIds = getCroquisCoordinatePrintLayerIds(m);
+  var coordinatePrintLayers = m.layers.filter(function(layer) {
+    return layer && layer.visible && Array.isArray(layer.points) && layer.points.length > 0;
+  });
+  var coordinatePrintAllSelected = coordinatePrintLayers.length > 0 &&
+    coordinatePrintLayers.every(function(layer) { return coordinatePrintLayerIds.indexOf(String(layer.id)) !== -1; });
+  var coordinateLayerChecksHtml = coordinatePrintLayers.map(function(layer) {
+    var layerId = safeHtmlText(String(layer.id || ""));
+    var checked = coordinatePrintLayerIds.indexOf(String(layer.id)) !== -1 ? " checked" : "";
+    var color = safeHexColor(layer.color, "#15803d");
+    return '<label class="d-inline-flex align-items-center gap-1 border rounded px-2 py-1 bg-white small mb-1" style="margin-left:4px;">' +
+      '<input type="checkbox" class="form-check-input m-0" value="' + layerId + '"' + checked +
+      ' onchange="setCroquisCoordinatePrintLayer(this.value,this.checked)" />' +
+      '<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:' + color + ';"></span>' +
+      '<span>' + safeHtmlText(layer.name || "لایه بدون نام") + '</span>' +
+      '<span class="text-muted">(' + toFa(layer.points.length) + ' نقطه)</span>' +
+    '</label>';
+  }).join("");
+
   // پنل تعاملی تنظیم کادر برش نقشه گوگل‌ارث (Interactive Crop Area) و فاصله برچسب‌ها از پولیگون (بدون چاپ در کاغذ)
   var mapModeControls =
     '<div class="no-print mb-2 p-2 rounded bg-white shadow-sm border border-2 border-success" style="font-size:8.4pt; max-width:210mm; margin:0 auto 10px auto;">' +
@@ -4851,6 +4911,15 @@ function printUtmSketchSheet() {
           '<button type="button" class="btn btn-sm btn-outline-danger py-0 px-2 fw-bold" onclick="resetCroquisCropAndLabels()" title="بازنشانی کادر برش و فاصله برچسب‌ها">🔄 بازنشانی کادر</button>' +
         '</div>' +
       '</div>' +
+      '<div class="mt-2 pt-2 border-top no-print">' +
+        '<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1">' +
+          '<b class="text-primary">📍 انتخاب لایه‌های جدول مختصات شیت دوم</b>' +
+          '<label class="small d-inline-flex align-items-center gap-1 mb-0"><input type="checkbox" class="form-check-input m-0" ' + (coordinatePrintAllSelected ? "checked" : "") +
+            ' onchange="setAllCroquisCoordinatePrintLayers(this.checked)" /> انتخاب همه لایه‌ها</label>' +
+        '</div>' +
+        '<div class="small text-muted mb-1">فقط نقاط لایه‌های انتخاب‌شده در جدول مختصات چاپ می‌شوند؛ جدول مساحت لایه‌های مرئی مستقل باقی می‌ماند.</div>' +
+        (coordinateLayerChecksHtml || '<span class="small text-muted">لایه مرئی دارای نقطه‌ای برای انتخاب وجود ندارد.</span>') +
+      '</div>' +
     '</div>';
 
   // برگه اول: نقشه و کروکی ماهواره‌ای زمین و عوارض
@@ -4867,8 +4936,7 @@ function printUtmSketchSheet() {
       '<span><b>تاریخ کروکی:</b> ' + safeHtmlText(toFa(m.date || todayShamsi())) + '</span>' +
     '</div>' +
     '<div id="printed-croquis-map-holder" style="width:100%;text-align:center;margin-bottom:' + (isA5Sheet ? '1.2mm' : '2mm') + ';">' + printedMapMarkup + '</div>' +
-    '<div style="font-size:' + (isA5Sheet ? '7.4pt' : '8.5pt') + ';margin-bottom:1mm;"><b>راهنمای لایه‌ها و عوارض جانمایی‌شده:</b><br>' + legendPills + '</div>' +
-    (m.notes ? '<div style="font-size:' + (isA5Sheet ? '7.2pt' : '8.4pt') + ';background:#f1f5f9;padding:1.5mm 2mm;border-radius:4px;border:1px solid #e2e8f0;"><b>توضیحات کارشناس:</b> ' + safeHtmlText(m.notes) + '</div>' : '');
+    '<div style="font-size:' + (isA5Sheet ? '7.4pt' : '8.5pt') + ';margin-bottom:1mm;"><b>راهنمای لایه‌ها و عوارض جانمایی‌شده:</b><br>' + legendPills + '</div>';
 
   // برگه دوم: جداول تفکیک مساحت و مختصات کامل (X, Y, ارتفاع, Zone, Lat/Lng) زمین اصلی و کلیه عوارض
   var layersRows = "";
