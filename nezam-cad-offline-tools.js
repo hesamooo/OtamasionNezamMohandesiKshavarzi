@@ -625,6 +625,15 @@
     if(typeof window.rotateCroquisActivePolygon!=="function"){status("ابزار چرخش چندضلعی بارگذاری نشده است.",true);return false;}
     var result=window.rotateCroquisActivePolygon(degrees);if(result)render();return result;
   };
+  window.rotateCroquisCadActivePolygon = function(){
+    var input=document.getElementById("crq-cad-offline-rotate");
+    var degrees=input?(typeof localizedNumber==="function"?localizedNumber(input.value):Number(input.value)):0;
+    if(typeof window.rotateCroquisActivePolygon!=="function"){status("ابزار چرخش چندضلعی بارگذاری نشده است.",true);return false;}
+    var result=window.rotateCroquisActivePolygon(degrees);
+    if(result)render();
+    return result;
+  };
+
   window.locateCroquisCadOfflineGPS = function(){
     if(!navigator.geolocation){status("مرورگر از GPS پشتیبانی نمی‌کند.",true);return;}
     navigator.geolocation.getCurrentPosition(function(position){
