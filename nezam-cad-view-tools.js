@@ -326,7 +326,7 @@
         '</g>';
     }
 
-    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + svgW + ' ' + svgH + '" width="100%" height="' + (forPrint ? "auto" : "100%") + '" style="' +
+    return '<svg xmlns="http://www.w3.org/2000/svg" data-cad-center-x="' + centerX + '" data-cad-center-y="' + centerY + '" data-cad-scale="' + scale + '" data-cad-pan-x="' + panX + '" data-cad-pan-y="' + panY + '" data-cad-width="' + svgW + '" data-cad-height="' + svgH + '" viewBox="0 0 ' + svgW + ' ' + svgH + '" width="100%" height="' + (forPrint ? "auto" : "100%") + '" style="' +
       (forPrint ? 'display:block;width:100%;height:auto;max-height:none;' : 'display:block;width:100%;height:100%;') +
       'background:' + bg + ';border-radius:8px;border:1px solid #cbd5e1;overflow:hidden;">' +
       '<defs><pattern id="' + svgId + '-grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="' + grid + '" stroke-width="1"/></pattern><clipPath id="' + svgId + '-clip"><rect x="0" y="0" width="' + svgW + '" height="' + svgH + '"/></clipPath></defs>' +
