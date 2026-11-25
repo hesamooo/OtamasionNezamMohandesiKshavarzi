@@ -4567,7 +4567,7 @@ function buildPrintedCroquisMap(m, svgW, svgH, mode) {
       var cy = sumCy / lyr.points.length;
 
       // چندضلعی با داخل شفاف تا بافت زمین روی گوگل‌ارث ۱۰۰٪ دیده شود
-      vectorShapes += '<polygon points="' + polyPts.join(" ") + '" fill="' + layerColor + '" fill-opacity="' + fillOp + '" stroke="#ffffff" stroke-width="' + (printLineWidth * (isPrimaryParcel ? 1.8 : 1.4)).toFixed(2) + '" stroke-linejoin="round"/>;'
+      vectorShapes += '<polygon points="' + polyPts.join(" ") + '" fill="' + layerColor + '" fill-opacity="' + fillOp + '" stroke="#ffffff" stroke-width="' + (printLineWidth * (isPrimaryParcel ? 1.8 : 1.4)).toFixed(2) + '" stroke-linejoin="round"/>';
       vectorShapes += '<polygon points="' + polyPts.join(" ") + '" fill="none" stroke="' + layerColor + '" stroke-width="' + printLineWidth.toFixed(2) + '" stroke-linejoin="round"/>';
 
       // نمایش طول اضلاع و کد رئوس فقط در بیرون مرز زمین اصلی (یا لایه متمرکز) تا هیچ متنی داخل پولیگون زمین را نپوشاند
@@ -4984,7 +4984,7 @@ function printUtmSketchSheet() {
     '</section>' +
     '<section class="croquis-applicant-survey-declaration" style="direction:rtl;border:0.8px solid #64748b;border-right:2.5px solid #b45309;border-radius:3px;padding:' + (isA5Sheet ? '0.8mm 1.2mm' : '1mm 2mm') + ';background:#fffdf7;line-height:1.42;font-size:' + (isA5Sheet ? '5.8pt' : '6.7pt') + ';text-align:justify;">' +
       '<div style="font-weight:900;color:#7c2d12;text-align:center;font-size:' + (isA5Sheet ? '6.3pt' : '7.2pt') + ';margin-bottom:.5mm;">اقرار و تأیید متقاضی درباره محدوده و نقاط نقشه</div>' +
-      'اینجانب متقاضی/نماینده قانونی، تأیید می‌کنم محل زمین، حدود مورد درخواست، محل رئوس و نقاط و مختصات درج‌شده در این کروکی را در محل معرفی، بازبینی و تأیید کرده‌ام و نقشه بر مبنای اطلاعات و مستندات ارائه‌شده و نقاط معرفی یا تأییدشده تهیه شده است. مسئولیت صحت اسناد و اطلاعات ارائه‌شده، انطباق محدوده معرفی‌شده با درخواست و مدارک، اعلام حقوق اشخاص ثالث، رفع تعارضات و اخذ مجوزها و رضایت‌های قانونی لازم بر عهده اینجانب است. متعهد می‌شوم مغایرت ناشی از اطلاعات یا محل‌های معرفی/تأییدشده از سوی خود را اعلام و اصلاح کنم و خساراتی را که طبق قانون قابل انتساب به اطلاعات نادرست یا کتمان‌شده از سوی اینجانب باشد جبران نمایم.' +
+      'اینجانب متقاضی/نماینده قانونی، تأیید می‌کنم محل زمین، حدود مورد درخواست، محل رئوس و نقاط و مختصات درج‌شده در این کروکی را در محل معرفی، بازبینی و تأیید کرده‌ام و نقشه بر مبنای اطلاعات و مستندات ارائه‌شده و نقاط معرفی یا تأییدشده تهیه شده است. مسئولیت صحت اسناد و اطلاعات ارائه‌شده، معرفی و تأیید محل هر نقطه و تطبیق نقاط با محدوده مورد درخواست، اعلام حقوق اشخاص ثالث، رفع تعارضات و اخذ مجوزها و رضایت‌های قانونی لازم بر عهده اینجانب است. متعهد می‌شوم مغایرت ناشی از اطلاعات یا محل‌های معرفی/تأییدشده از سوی خود را اعلام و اصلاح کنم و خساراتی را که طبق قانون قابل انتساب به اطلاعات نادرست یا کتمان‌شده از سوی اینجانب باشد جبران نمایم.' +
       '<br>این نقشه صرفاً خروجی فنی مبتنی بر داده‌ها و مدارک ارائه‌شده/تأییدشده برای بررسی درخواست است و به‌تنهایی سند مالکیت یا حدنگار، تحدید حدود ثبتی، گواهی عدم تعارض یا مجوز ساخت و بهره‌برداری محسوب نمی‌شود. این اقرار، مسئولیت‌های قانونی و حرفه‌ای اشخاص تهیه‌کننده را در حدود تقصیر، تخلف یا تکالیف آمره قانونی که قابل اسقاط نیست، ساقط یا منتقل نمی‌کند.' +
       '<div style="display:flex;justify-content:space-between;align-items:center;gap:4mm;border-top:0.5px dotted #a16207;margin-top:.7mm;padding-top:.7mm;font-weight:800;">' +
         '<span>نام و نام خانوادگی متقاضی: ' + safeHtmlText(c.name || '................................') + '</span>' +
