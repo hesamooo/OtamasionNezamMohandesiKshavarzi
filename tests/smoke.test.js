@@ -22,7 +22,7 @@ test('package and TypeScript configuration are valid JSON', () => {
 });
 
 test('main JavaScript modules have valid syntax', () => {
-  for (const file of ['nezam-core.js', 'nezam-customizer.js', 'nezam-ai-assistant.js', 'nezam-operations.js', 'nezam-agent-engine.js']) {
+  for (const file of ['nezam-core.js', 'nezam-customizer.js', 'nezam-croquis-enhancements.js', 'nezam-ai-assistant.js', 'nezam-operations.js', 'nezam-agent-engine.js']) {
     assert.doesNotThrow(() => new Function(read(file)), file);
   }
 });
@@ -733,4 +733,76 @@ test('parcel containment treats a point on the boundary as inside', () => {
   assert.equal(isInside({ x: 10, y: 0 }, parcel), true, 'boundary point should be included');
   assert.equal(isInside({ x: 10, y: 10 }, parcel), true, 'interior point should be included');
   assert.equal(isInside({ x: 20.1, y: 10 }, parcel), false, 'a point clearly outside must remain outside');
+});
+
+
+test('croquis exact polygon generator closes and preserves user-entered side lengths', () => {
+  const source = read('nezam-croquis-enhancements.js');
+  const helperStart = source.indexOf('  function cross2(');
+  const generatorStart = source.indexOf('  window.buildExactUtmPolygonFromSides = function');
+  const generatorEnd = source.indexOf('\n  };', generatorStart) + 5;
+  assert.ok(helperStart >= 0 && generatorStart > helperStart && generatorEnd > 5);
+  const code = source.slice(helperStart, generatorEnd);
+  const build = new Function('window', code + '\nreturn window.buildExactUtmPolygonFromSides;')({});
+  const result = build(500000, 3200000, [
+    { length: 45, azimuth: 90 },
+    { length: 24.444444444, azimuth: 180 },
+    { length: 45, azimuth: 270 },
+    { length: 24.444444444, azimuth: 0 }
+  ], '39R', 0);
+  assert.equal(result.sideCount, 4);
+  assert.ok(Math.abs(result.area - 1100) < 0.1, 'rectangle area must be approximately 1100 m²');
+  assert.ok(result.closureError <= 0.15, 'polygon must close within the documented 15 cm tolerance');
+  const measured = result.points.map((point, index) => {
+    const next = result.points[(index + 1) % result.points.length];
+    return Math.hypot(next.x - point.x, next.y - point.y);
+  });
+  assert.ok(Math.abs(measured[0] - 45) < 0.02);
+  assert.ok(Math.abs(measured[1] - (1100 / 45)) < 0.02);
+  assert.throws(() => build(500000, 3200000, [
+    { length: 45, azimuth: 90 }, { length: 25, azimuth: 180 }, { length: 45, azimuth: 270 }
+  ], '39R', 0), /پلیگون بسته نیست/);
+});
+
+test('moving a croquis polygon translates every UTM vertex without changing its shape', () => {
+  const source = read('nezam-croquis-enhancements.js');
+  const start = source.indexOf('  window.translateUtmPolygon = function');
+  const end = source.indexOf('\n  };', start) + 5;
+  assert.ok(start >= 0 && end > 5);
+  const translate = new Function('window', source.slice(start, end) + '\nreturn window.translateUtmPolygon;')({});
+  const original = [
+    { x: 100, y: 200, label: 'P1' },
+    { x: 145, y: 200, label: 'P2' },
+    { x: 145, y: 225, label: 'P3' },
+    { x: 100, y: 225, label: 'P4' }
+  ];
+  const moved = translate(original, 12.34, -56.78);
+  assert.equal(moved.length, 4);
+  assert.equal(moved[0].x, 112.34);
+  assert.equal(moved[0].y, 143.22);
+  for (let i = 0; i < original.length; i++) {
+    const next = (i + 1) % original.length;
+    const before = Math.hypot(original[next].x - original[i].x, original[next].y - original[i].y);
+    const after = Math.hypot(moved[next].x - moved[i].x, moved[next].y - moved[i].y);
+    assert.ok(Math.abs(before - after) < 0.02, 'side length must remain unchanged after translation');
+  }
+  assert.equal(original[0].x, 100, 'original point objects must remain unchanged');
+});
+
+test('croquis clearance, move, and landscape print controls are wired without changing storage setup', () => {
+  const html = read('index.html');
+  const module = read('nezam-croquis-enhancements.js');
+  assert.ok(html.includes('id="crq-clearances-list"'));
+  assert.ok(html.includes('id="crq-clearance-distance"'));
+  assert.ok(html.includes('id="crq-exact-poly-sides"'));
+  assert.ok(html.includes('id="crq-map-move-polygon-btn"'));
+  assert.ok(html.includes('nezam-croquis-enhancements.js?v=20261125-croquis-tools-r1'));
+  assert.ok(module.includes('map.clearances'));
+  assert.ok(module.includes('croquis-clearances-print'));
+  assert.ok(module.includes('@page croquisMapLandscape { size: A4 landscape; margin: 0; }'));
+  assert.ok(module.includes('window.translateUtmPolygon'));
+  assert.ok(module.includes('window.toggleCroquisWholePolygonMove'));
+  // The enhancement module does not redefine or migrate the office database keys.
+  assert.ok(!module.includes('localStorage.setItem'));
+  assert.ok(!module.includes('indexedDB'));
 });
