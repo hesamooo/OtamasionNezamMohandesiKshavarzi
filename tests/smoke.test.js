@@ -856,6 +856,15 @@ test('moving a croquis polygon translates every UTM vertex without changing its 
 });
 
 
+
+test('CAD script tags are independently closed and offline toolbar module is actually loaded', () => {
+  const html = read('index.html');
+  assert.ok(html.includes('<script src="./nezam-cad-file-io.js?v=20261125-cad-io-r2"></script>'));
+  assert.ok(html.includes('<script src="./nezam-cad-offline-tools.js?v=20261125-offline-tools-r2"></script>'));
+  assert.ok(!html.includes('cad-io-r2\\n  <script'));
+  assert.ok(!html.includes('offline-tools-r1"></script>"></script>'));
+});
+
 test('offline CAD view exposes equivalents of online map tools and UTM interactions', () => {
   const html = read('index.html');
   const cad = read('nezam-cad-view-tools.js');
