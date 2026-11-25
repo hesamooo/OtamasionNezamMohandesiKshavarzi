@@ -1201,6 +1201,109 @@ test('DXF export and import module passes ASCII UTM round-trip for supported ent
   assert.equal(parsed.features[2].geomType,'POINT');
 });
 
+
+test('DXF export writes model-space layers, valid handles, UTM extents and an opening view', () => {
+  const apiWindow = {};
+  new Function('window', read('nezam-cad-file-io.js'))(apiWindow);
+  const map = { utmZone: '39R', layers: [
+    { name: 'زمین اصلی', color: '#15803d', geomType: 'POLYGON', points: [
+      {x:714800.12,y:3203100.34,z:0},{x:714850.12,y:3203100.34,z:0},
+      {x:714850.12,y:3203150.34,z:0},{x:714800.12,y:3203150.34,z:0}
+    ]},
+    { name: 'مسیر سه‌بعدی', color: '#2563eb', visible: true, geomType: 'LINE', points: [
+      {x:714700,y:3203000,z:2},{x:714900,y:3203200,z:3}
+    ]},
+    { name: 'چاه', color: '#dc2626', visible: true, geomType: 'POINT', points: [
+      {x:714777.5,y:3203333.25,z:4}
+    ]},
+    { name: 'مخفی', color: '#777777', visible: false, geomType: 'POINT', points: [{x:1,y:2,z:0}]}
+  ]};
+  const dxf = apiWindow.buildCroquisDXFText(map);
+  const parsed = apiWindow.parseCroquisDXFText(dxf);
+  assert.ok(dxf.includes('BLOCK_RECORD'));
+  assert.ok(dxf.includes('*Model_Space'));
+  assert.ok(dxf.includes('$HANDSEED'));
+  assert.ok(dxf.includes('$EXTMIN'));
+  assert.ok(dxf.includes('$EXTMAX'));
+  assert.ok(dxf.includes('$VIEWCTR'));
+  assert.ok(dxf.includes('$VIEWSIZE'));
+  assert.equal(parsed.features.length, 3);
+  assert.deepEqual(parsed.features.map(x => x.geomType), ['POLYGON','LINE','POINT']);
+  assert.deepEqual(parsed.features.map(x => x.points.length), [4,2,1]);
+  assert.equal(parsed.features[1].points[1].z, 3);
+  const handles = Array.from(dxf.matchAll(/\n5\r\n([0-9A-F]+)\r\n/g), x => parseInt(x[1],16));
+  const handseedMatch = dxf.match(/\n\$HANDSEED\r\n5\r\n([0-9A-F]+)\r\n/);
+  assert.ok(handles.length > 0);
+  assert.ok(handseedMatch);
+  assert.ok(parseInt(handseedMatch[1],16) > Math.max(...handles));
+});
+
+test('DXF export refuses invalid visible geometry rather than silently writing incomplete coordinates', () => {
+  const apiWindow = {};
+  new Function('window', read('nezam-cad-file-io.js'))(apiWindow);
+  assert.throws(() => apiWindow.buildCroquisDXFText({ layers: [
+    {name:'خراب', visible:true, geomType:'POLYGON', points:[
+      {x:714800,y:3203100},{x:'مختصات نامعتبر',y:3203150},{x:714850,y:3203200}
+    ]}
+  ]}), /مختصات X\/Y\/Z/);
+  assert.throws(() => apiWindow.buildCroquisDXFText({ layers: [
+    {name:'پنهان', visible:false, geomType:'POINT', points:[{x:1,y:2}]}
+  ]}), /هیچ نقطه معتبر/);
+});
+
+test('AutoCAD LISP export creates visible WCS entities, preserves layers and runs zoom extents', () => {
+  const source = read('nezam-customizer.js');
+  const start = source.indexOf('window.buildCaseAutoCADLispText = function (map) {');
+  const end = source.indexOf('function downloadCaseAutoCAD()', start);
+  assert.ok(start >= 0 && end > start);
+  const apiWindow = {};
+  new Function('window', source.slice(start, end))(apiWindow);
+  const map = { utmZone:'39R', layers: [
+    {name:'زمین',color:'#15803d',geomType:'POLYGON',points:[
+      {x:714800.12,y:3203100.34,z:0},{x:714850.12,y:3203100.34,z:0},
+      {x:714850.12,y:3203150.34,z:0},{x:714800.12,y:3203150.34,z:0}
+    ]},
+    {name:'مسیر',color:'#2563eb',geomType:'LINE',points:[
+      {x:714700,y:3203000,z:2},{x:714900,y:3203200,z:3}
+    ]},
+    {name:'چاه',color:'#dc2626',geomType:'POINT',points:[{x:714777.5,y:3203333.25,z:4}]},
+    {name:'مخفی',visible:false,geomType:'POINT',points:[{x:1,y:2,z:0}]}
+  ]};
+  const result = apiWindow.buildCaseAutoCADLispText(map);
+  const lisp = result.text;
+  assert.equal(result.entityCount,3);
+  assert.equal(result.layerCount,3);
+  assert.equal(result.vertexCount,7);
+  assert.ok(lisp.includes('(defun c:DRAW636'));
+  assert.ok(lisp.includes('(setvar "TILEMODE" 1)'));
+  assert.ok(lisp.includes('(entmake (list (cons 0 "LWPOLYLINE")'));
+  assert.ok(lisp.includes('"AcDb3dPolyline"'));
+  assert.ok(lisp.includes('(cons 0 "POINT")'));
+  assert.ok(lisp.includes('(command "_.ZOOM" "_E")'));
+  assert.ok(lisp.includes('(list 714800.1200 3203100.3400)'));
+  assert.ok(!lisp.includes('N636_004'));
+  let depth=0, quoted=false, escaped=false, comment=false;
+  for (const ch of lisp) {
+    if (comment) { if (ch === '\n') comment=false; continue; }
+    if (quoted) {
+      if (escaped) { escaped=false; continue; }
+      if (ch === '\\') { escaped=true; continue; }
+      if (ch === '"') quoted=false;
+      continue;
+    }
+    if (ch === ';') { comment=true; continue; }
+    if (ch === '"') { quoted=true; continue; }
+    if (ch === '(') depth++;
+    if (ch === ')') depth--;
+    assert.ok(depth >= 0, 'AutoLISP parenthesis closed too early');
+  }
+  assert.equal(depth,0,'AutoLISP parentheses must be balanced');
+  assert.equal(quoted,false,'AutoLISP strings must be closed');
+  assert.throws(() => apiWindow.buildCaseAutoCADLispText({layers:[
+    {name:'مخفی',visible:false,geomType:'POINT',points:[{x:1,y:2}]}
+  ]}), /هیچ مختصات معتبری/);
+});
+
 test('DXF import detects common units and approximates ARC as an open line', () => {
   const apiWindow={};
   new Function('window',read('nezam-cad-file-io.js'))(apiWindow);
