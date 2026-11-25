@@ -730,8 +730,15 @@
     var id="LYR-CAD-PLACE-"+Date.now();while((map.layers||[]).some(function(l){return l&&String(l.id)===id;}))id+="-1";
     built.points.forEach(function(point,index){if(typeof ensurePointEnriched==="function")ensurePointEnriched(point,zoneOf(map),index);});
     var layer={id:id,name:name,category:category,geomType:"POLYGON",color:color,fillColor:color,fillOpacity:.22,strokeWidth:2.5,visible:true,order:(map.layers||[]).length+1,desc:"جانمایی هندسی ایجادشده از نمای آفلاین؛ کنترل‌شده داخل محدوده زمین اصلی.",points:built.points};
+    var previousActiveLayerId=typeof activeCroquisLayerId!=="undefined"?activeCroquisLayerId:null;
     map.layers.push(layer);if(typeof activeCroquisLayerId!=="undefined")activeCroquisLayerId=id;
-    if(typeof saveAllDB==="function")saveAllDB();
+    if(!commit(layer)){
+      map.layers=map.layers.filter(function(existing){return existing!==layer;});
+      if(typeof activeCroquisLayerId!=="undefined")activeCroquisLayerId=previousActiveLayerId;
+      status("ذخیره لایه جانمایی تأیید نشد؛ سازه جدید به نقشه اضافه نشد.",true);
+      render();
+      return false;
+    }
     if(typeof renderCroquisLayersList==="function")renderCroquisLayersList();
     if(typeof loadActiveLayerIntoEditor==="function")loadActiveLayerIntoEditor();
     render();status("سازه «"+name+"» به‌صورت لایه مستقل ثبت شد؛ مساحت "+fa(built.area.toFixed(2))+" مترمربع. زمین اصلی تغییر نکرد.");
