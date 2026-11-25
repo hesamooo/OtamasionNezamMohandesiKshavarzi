@@ -5250,6 +5250,7 @@ window.buildCaseAutoCADLispText = function (map) {
     "  (setq oldEcho (getvar \"CMDECHO\"))",
     "  (setq oldOs (getvar \"OSMODE\"))",
     "  (setq oldLayer (getvar \"CLAYER\"))",
+    "  (setvar \"TILEMODE\" 1)",
     "  (setvar \"CMDECHO\" 0)",
     "  (setvar \"OSMODE\" 0)",
     "  (setvar \"PDMODE\" 35)",
