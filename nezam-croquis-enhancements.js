@@ -439,7 +439,351 @@
     });
   };
 
-  /* ---------- 3) Move the selected polygon as a rigid UTM object ---------- */
+
+  /* ---------- 3) Precision shape placement and rigid polygon rotation ---------- */
+  window.rotateUtmPolygon = function (points, clockwiseDegrees) {
+    if (!Array.isArray(points) || points.length < 3) throw new Error("برای چرخش، چندضلعی باید حداقل سه رأس داشته باشد.");
+    var degrees = Number(clockwiseDegrees);
+    if (!Number.isFinite(degrees)) throw new Error("زاویه چرخش معتبر نیست.");
+    var twiceArea = 0, cxSum = 0, cySum = 0;
+    var originX = Number(points[0].x), originY = Number(points[0].y);
+    for (var i = 0; i < points.length; i++) {
+      var j = (i + 1) % points.length;
+      var xi = Number(points[i].x) - originX, yi = Number(points[i].y) - originY;
+      var xj = Number(points[j].x) - originX, yj = Number(points[j].y) - originY;
+      if (![xi, yi, xj, yj].every(Number.isFinite)) throw new Error("مختصات یکی از رأس‌ها معتبر نیست.");
+      var cross = xi * yj - xj * yi;
+      twiceArea += cross;
+      cxSum += (xi + xj) * cross;
+      cySum += (yi + yj) * cross;
+    }
+    var cx, cy;
+    if (Math.abs(twiceArea) > 1e-8) {
+      cx = originX + cxSum / (3 * twiceArea);
+      cy = originY + cySum / (3 * twiceArea);
+    } else {
+      cx = points.reduce(function (sum, point) { return sum + Number(point.x); }, 0) / points.length;
+      cy = points.reduce(function (sum, point) { return sum + Number(point.y); }, 0) / points.length;
+    }
+    var radians = ((degrees % 360) * Math.PI) / 180;
+    var cos = Math.cos(radians), sin = Math.sin(radians);
+    return points.map(function (point) {
+      var dx = Number(point.x) - cx, dy = Number(point.y) - cy;
+      var copy = Object.assign({}, point);
+      // Positive angle is clockwise in the UTM east/north coordinate frame.
+      copy.x = roundCm(cx + dx * cos + dy * sin);
+      copy.y = roundCm(cy - dx * sin + dy * cos);
+      return copy;
+    });
+  };
+
+  function placementStats(points) {
+    var area2 = 0, perimeter = 0;
+    var originX = Number(points[0].x), originY = Number(points[0].y);
+    for (var i = 0; i < points.length; i++) {
+      var j = (i + 1) % points.length;
+      var ax = Number(points[i].x) - originX, ay = Number(points[i].y) - originY;
+      var bx = Number(points[j].x) - originX, by = Number(points[j].y) - originY;
+      area2 += ax * by - bx * ay;
+      perimeter += Math.hypot(bx - ax, by - ay);
+    }
+    return { area: Math.abs(area2) / 2, perimeter: perimeter };
+  }
+
+  window.buildCroquisPlacementShapePoints = function (shapeType, anchorX, anchorY, options, zone, elevation) {
+    var type = String(shapeType || "").toUpperCase();
+    var x = Number(anchorX), y = Number(anchorY), opts = options || {};
+    var elev = Number.isFinite(Number(elevation)) ? Number(elevation) : 0;
+    var useZone = zone || "39R";
+    if (!Number.isFinite(x) || !Number.isFinite(y)) throw new Error("مختصات محل استقرار شکل (X و Y) را وارد کنید.");
+    function point(px, py, index) {
+      return { x: roundCm(px), y: roundCm(py), elev: elev, zone: useZone, label: "P" + (index + 1) };
+    }
+    var points = [];
+    if (type === "RECTANGLE" || type === "SQUARE") {
+      var length = Number(type === "SQUARE" ? opts.side : opts.length);
+      var width = Number(type === "SQUARE" ? opts.side : opts.width);
+      var azimuth = Number(opts.azimuth == null ? 0 : opts.azimuth);
+      if (!Number.isFinite(length) || length <= 0 || length > 10000) throw new Error("طول شکل باید عددی بزرگ‌تر از صفر و حداکثر ۱۰٬۰۰۰ متر باشد.");
+      if (!Number.isFinite(width) || width <= 0 || width > 10000) throw new Error("عرض شکل باید عددی بزرگ‌تر از صفر و حداکثر ۱۰٬۰۰۰ متر باشد.");
+      if (!Number.isFinite(azimuth)) throw new Error("آزیموت ضلع اصلی معتبر نیست.");
+      var theta = ((azimuth % 360) + 360) % 360 * Math.PI / 180;
+      var ux = Math.sin(theta), uy = Math.cos(theta);
+      var vx = Math.cos(theta), vy = -Math.sin(theta);
+      [[-1,-1],[1,-1],[1,1],[-1,1]].forEach(function (signs, index) {
+        points.push(point(
+          x + signs[0] * ux * length / 2 + signs[1] * vx * width / 2,
+          y + signs[0] * uy * length / 2 + signs[1] * vy * width / 2,
+          index
+        ));
+      });
+    } else if (type === "CIRCLE") {
+      var radius = Number(opts.radius);
+      var segments = Math.round(Number(opts.segments) || 48);
+      if (!Number.isFinite(radius) || radius <= 0 || radius > 5000) throw new Error("شعاع دایره باید بزرگ‌تر از صفر و حداکثر ۵٬۰۰۰ متر باشد.");
+      if (!Number.isFinite(segments) || segments < 16 || segments > 128) throw new Error("تعداد اضلاع تقریبی دایره باید بین ۱۶ تا ۱۲۸ باشد.");
+      for (var ci = 0; ci < segments; ci++) {
+        var angle = 2 * Math.PI * ci / segments;
+        points.push(point(x + radius * Math.sin(angle), y + radius * Math.cos(angle), ci));
+      }
+    } else if (type === "CUSTOM") {
+      if (!Array.isArray(opts.sides) || opts.sides.length < 3 || opts.sides.length > 100) {
+        throw new Error("برای شکل چندوجهی، حداقل ۳ و حداکثر ۱۰۰ ضلع وارد کنید.");
+      }
+      if (typeof window.buildExactUtmPolygonFromSides !== "function") throw new Error("موتور ساخت چندضلعی دقیق در دسترس نیست.");
+      points = window.buildExactUtmPolygonFromSides(x, y, opts.sides, useZone, elev).points;
+    } else {
+      throw new Error("نوع شکل انتخاب‌شده پشتیبانی نمی‌شود.");
+    }
+    if (!isSimpleUtmPolygon(points)) throw new Error("شکل ایجادشده معتبر نیست یا اضلاع آن یکدیگر را قطع می‌کنند.");
+    var stats = placementStats(points);
+    if (!Number.isFinite(stats.area) || stats.area < 0.01) throw new Error("مساحت شکل صفر یا نامعتبر است.");
+    return { points: points, sideCount: points.length, area: stats.area, perimeter: stats.perimeter, closureError: 0 };
+  };
+
+  function placementPointInPolygon(point, polygon) {
+    var x = Number(point.x), y = Number(point.y), inside = false;
+    for (var i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+      var ax = Number(polygon[j].x), ay = Number(polygon[j].y);
+      var bx = Number(polygon[i].x), by = Number(polygon[i].y);
+      var dx = bx - ax, dy = by - ay, length2 = dx * dx + dy * dy;
+      if (length2 > 0) {
+        var t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / length2));
+        if (Math.hypot(x - (ax + t * dx), y - (ay + t * dy)) <= 0.02) return true;
+      }
+      if (((ay > y) !== (by > y)) && (x < (bx - ax) * (y - ay) / ((by - ay) || 0.0000001) + ax)) inside = !inside;
+    }
+    return inside;
+  }
+
+  window.isCroquisPlacementShapeInsideParcel = function (shapePoints, parcelPoints) {
+    if (!Array.isArray(shapePoints) || shapePoints.length < 3 ||
+        !Array.isArray(parcelPoints) || parcelPoints.length < 3) return false;
+    for (var i = 0; i < shapePoints.length; i++) {
+      var current = shapePoints[i], next = shapePoints[(i + 1) % shapePoints.length];
+      var dx = Number(next.x) - Number(current.x), dy = Number(next.y) - Number(current.y);
+      var length = Math.hypot(dx, dy);
+      if (!placementPointInPolygon(current, parcelPoints)) return false;
+      var steps = Math.max(1, Math.min(400, Math.ceil(length)));
+      for (var sample = 1; sample < steps; sample++) {
+        var ratio = sample / steps;
+        if (!placementPointInPolygon({
+          x: Number(current.x) + dx * ratio,
+          y: Number(current.y) + dy * ratio
+        }, parcelPoints)) return false;
+      }
+    }
+    return true;
+  };
+
+  function croquisPlacementStatus(message, isError) {
+    var box = document.getElementById("crq-placement-shape-status");
+    if (box) {
+      box.textContent = message;
+      box.className = "small mt-1 " + (isError ? "text-danger fw-bold" : "text-success fw-bold");
+    }
+    if (typeof croquisMapSetToolStatus === "function") croquisMapSetToolStatus(message, !!isError);
+  }
+
+  window.updateCroquisPlacementShapeUI = function () {
+    var select = document.getElementById("crq-placement-shape-type");
+    if (!select) return;
+    var type = String(select.value || "RECTANGLE").toUpperCase();
+    ["rectangle", "square", "circle", "custom"].forEach(function (key) {
+      var block = document.getElementById("crq-placement-" + key + "-fields");
+      if (block) block.style.display = type === key.toUpperCase() ? "block" : "none";
+    });
+    var anchorLabel = document.getElementById("crq-placement-anchor-label");
+    if (anchorLabel) anchorLabel.textContent = type === "CUSTOM" ? "نقطه شروع رأس اول (UTM)" : "مرکز شکل (UTM)";
+  };
+
+  window.pickCroquisPlacementAnchor = function () {
+    if (typeof croquisOnlineDrawMode !== "undefined" && croquisOnlineDrawMode) {
+      croquisPlacementStatus("ابتدا ترسیم فعلی را تمام یا لغو کنید.", true);
+      return false;
+    }
+    if (typeof croquisViewMode !== "undefined" && croquisViewMode !== "MAP" &&
+        typeof switchCroquisViewMode === "function") switchCroquisViewMode("MAP");
+    function bindPick() {
+      var map = window.leafletMapObj;
+      if (!map || typeof map.on !== "function") {
+        croquisPlacementStatus("نقشه آنلاین آماده نیست؛ حالت نقشه را باز کنید و دوباره تلاش کنید.", true);
+        return;
+      }
+      if (window.__croquisPlacementPickHandler) map.off("click", window.__croquisPlacementPickHandler);
+      var handler = function (event) {
+        map.off("click", handler);
+        window.__croquisPlacementPickHandler = null;
+        var active = activeMap();
+        if (!active || !event || !event.latlng) return;
+        var zone = parseInt(active.utmZone, 10) || 39;
+        var utm = latLngToUtmWGS84(event.latlng.lat, event.latlng.lng, zone);
+        var xInput = document.getElementById("crq-place-anchor-x");
+        var yInput = document.getElementById("crq-place-anchor-y");
+        if (xInput) xInput.value = roundCm(utm.x).toFixed(2);
+        if (yInput) yInput.value = roundCm(utm.y).toFixed(2);
+        croquisPlacementStatus("نقطه استقرار ثبت شد: X=" + displayNumber(utm.x, 2) + " | Y=" + displayNumber(utm.y, 2), false);
+      };
+      window.__croquisPlacementPickHandler = handler;
+      map.on("click", handler);
+      croquisPlacementStatus("روی نقشه کلیک کنید تا مرکز شکل یا رأس اول آن انتخاب شود.", false);
+    }
+    if (window.leafletMapObj) bindPick();
+    else window.setTimeout(bindPick, 250);
+    return true;
+  };
+
+  window.createCroquisPlacementShape = function () {
+    var map = activeMap();
+    if (!map) {
+      croquisPlacementStatus("ابتدا پرونده و نقشه کروکی را باز کنید.", true);
+      return false;
+    }
+    if (typeof croquisOnlineDrawMode !== "undefined" && croquisOnlineDrawMode) {
+      croquisPlacementStatus("ابتدا ترسیم فعلی را تمام یا لغو کنید.", true);
+      return false;
+    }
+    var mainParcel = (map.layers || []).find(function (layer) {
+      return layer && layer.category === "MAIN_PARCEL" && layer.geomType === "POLYGON" &&
+        Array.isArray(layer.points) && layer.points.length >= 3;
+    });
+    if (!mainParcel) {
+      croquisPlacementStatus("برای کنترل جانمایی، ابتدا محدوده اصلی زمین را به‌صورت چندضلعی ثبت کنید.", true);
+      return false;
+    }
+    var shapeType = String((document.getElementById("crq-placement-shape-type") || {}).value || "RECTANGLE").toUpperCase();
+    var anchorX = localizedNumber((document.getElementById("crq-place-anchor-x") || {}).value);
+    var anchorY = localizedNumber((document.getElementById("crq-place-anchor-y") || {}).value);
+    var elevation = localizedNumber((document.getElementById("crq-place-elevation") || {}).value || "0");
+    var zone = map.utmZone || "39R";
+    var options = {};
+    if (shapeType === "RECTANGLE") {
+      options.length = localizedNumber((document.getElementById("crq-place-length") || {}).value);
+      options.width = localizedNumber((document.getElementById("crq-place-width") || {}).value);
+      options.azimuth = localizedNumber((document.getElementById("crq-place-azimuth") || {}).value || "0");
+    } else if (shapeType === "SQUARE") {
+      options.side = localizedNumber((document.getElementById("crq-place-side") || {}).value);
+      options.azimuth = localizedNumber((document.getElementById("crq-place-azimuth-square") || {}).value || "0");
+    } else if (shapeType === "CIRCLE") {
+      options.radius = localizedNumber((document.getElementById("crq-place-radius") || {}).value);
+      options.segments = localizedNumber((document.getElementById("crq-place-circle-segments") || {}).value || "48");
+    } else if (shapeType === "CUSTOM") {
+      var raw = String((document.getElementById("crq-place-custom-sides") || {}).value || "");
+      var lines = raw.split(/\r?\n/).map(function (line) { return line.trim(); }).filter(Boolean);
+      options.sides = [];
+      for (var lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+        var parts = lines[lineIndex].split(/[,،;\s]+/).filter(Boolean);
+        if (parts.length !== 2) {
+          croquisPlacementStatus("سطر " + (lineIndex + 1) + " باید به‌شکل «طول ضلع، آزیموت» باشد.", true);
+          return false;
+        }
+        options.sides.push({ length: localizedNumber(parts[0]), azimuth: localizedNumber(parts[1]) });
+      }
+    }
+    var result;
+    try {
+      result = window.buildCroquisPlacementShapePoints(shapeType, anchorX, anchorY, options, zone, elevation);
+    } catch (error) {
+      croquisPlacementStatus(error && error.message ? error.message : "ورودی هندسی معتبر نیست.", true);
+      return false;
+    }
+    if (!window.isCroquisPlacementShapeInsideParcel(result.points, mainParcel.points)) {
+      croquisPlacementStatus("جانمایی خارج از محدوده زمین اصلی است یا بخشی از مرز شکل از زمین خارج می‌شود. محل یا ابعاد را اصلاح کنید.", true);
+      return false;
+    }
+    var category = String((document.getElementById("crq-place-category") || {}).value || "FACILITY");
+    if (["FACILITY", "PROJECT_AREA", "GREENHOUSE"].indexOf(category) === -1) category = "FACILITY";
+    var defaultName = shapeType === "CIRCLE" ? "جانمایی دایره‌ای" :
+      (shapeType === "SQUARE" ? "جانمایی مربع" : (shapeType === "RECTANGLE" ? "جانمایی مستطیل" : "جانمایی چندضلعی"));
+    var name = String((document.getElementById("crq-place-name") || {}).value || "").trim() || defaultName;
+    var color = String((document.getElementById("crq-place-color") || {}).value || "#b45309");
+    if (!/^#[0-9a-f]{6}$/i.test(color)) color = "#b45309";
+    var id = "LYR-PLACE-" + Date.now();
+    while ((map.layers || []).some(function (layer) { return layer && String(layer.id) === id; })) id += "-1";
+    var newLayer = {
+      id: id, name: name, category: category, geomType: "POLYGON",
+      color: color, fillColor: color, fillOpacity: 0.22, strokeWidth: 2.5,
+      visible: true, order: (map.layers || []).length + 1,
+      desc: "جانمایی هندسی مستقل؛ داخل محدوده اصلی زمین کنترل شده است.",
+      points: result.points
+    };
+    newLayer.points.forEach(function (point, index) {
+      if (typeof ensurePointEnriched === "function") ensurePointEnriched(point, zone, index);
+    });
+    if (!Array.isArray(map.layers)) map.layers = [];
+    map.layers.push(newLayer);
+    activeCroquisLayerId = newLayer.id;
+    if (typeof saveAllDB === "function") saveAllDB();
+    if (typeof renderCroquisLayersList === "function") renderCroquisLayersList();
+    if (typeof loadActiveLayerIntoEditor === "function") loadActiveLayerIntoEditor();
+    if (typeof renderCroquisVisualCanvas === "function") renderCroquisVisualCanvas();
+    if (typeof croquisViewMode !== "undefined" && croquisViewMode === "MAP" &&
+        typeof renderCroquisLeafletMap === "function") renderCroquisLeafletMap({ preserveView: true });
+    croquisPlacementStatus("✅ «" + name + "» به‌صورت لایه مستقل ثبت شد | " +
+      displayNumber(result.area, 2) + " مترمربع | " + result.sideCount + " رأس. مرز زمین اصلی تغییر نکرد.", false);
+    return true;
+  };
+
+  window.rotateCroquisActivePolygon = function (clockwiseDegrees) {
+    var map = activeMap(), layer = activeLayer(), degrees = Number(clockwiseDegrees);
+    if (!map || !layer || layer.geomType !== "POLYGON" ||
+        !Array.isArray(layer.points) || layer.points.length < 3) {
+      croquisPlacementStatus("ابتدا یک لایه چندضلعی را از فهرست لایه‌ها انتخاب کنید.", true);
+      return false;
+    }
+    if (!Number.isFinite(degrees) || Math.abs(degrees) < 0.0001 || Math.abs(degrees) > 3600) {
+      croquisPlacementStatus("زاویه چرخش باید عددی غیرصفر و حداکثر ۳۶۰۰ درجه باشد.", true);
+      return false;
+    }
+    if (layer.category === "MAIN_PARCEL" &&
+        !confirm("لایه انتخاب‌شده محدوده اصلی زمین است. چرخش، مختصات مرز اصلی را تغییر می‌دهد. ادامه می‌دهید؟")) return false;
+    var rotated;
+    try {
+      rotated = window.rotateUtmPolygon(layer.points, degrees);
+    } catch (error) {
+      croquisPlacementStatus(error && error.message ? error.message : "چرخش چندضلعی انجام نشد.", true);
+      return false;
+    }
+    if (layer.category !== "MAIN_PARCEL") {
+      var mainParcel = (map.layers || []).find(function (candidate) {
+        return candidate && candidate.category === "MAIN_PARCEL" && candidate.geomType === "POLYGON" &&
+          Array.isArray(candidate.points) && candidate.points.length >= 3;
+      });
+      if (mainParcel && !window.isCroquisPlacementShapeInsideParcel(rotated, mainParcel.points)) {
+        croquisPlacementStatus("چرخش باعث خروج چندضلعی از محدوده اصلی زمین می‌شود؛ زاویه کمتر یا جهت دیگری انتخاب کنید.", true);
+        return false;
+      }
+    }
+    layer.points = rotated;
+    layer.points.forEach(function (point, index) {
+      if (typeof ensurePointEnriched === "function") ensurePointEnriched(point, map.utmZone || "39R", index);
+    });
+    if (typeof saveActiveLayerStyleAndMeta === "function") saveActiveLayerStyleAndMeta();
+    else if (typeof saveAllDB === "function") saveAllDB();
+    if (typeof renderCroquisLayersList === "function") renderCroquisLayersList();
+    if (typeof renderCroquisLeafletMap === "function" &&
+        typeof croquisViewMode !== "undefined" && croquisViewMode === "MAP") {
+      renderCroquisLeafletMap({ preserveView: true });
+    }
+    croquisPlacementStatus("✅ چندضلعی «" + String(layer.name || "") + "» به‌اندازه " +
+      displayNumber(Math.abs(degrees), 2) + " درجه " + (degrees > 0 ? "ساعت‌گرد" : "پادساعت‌گرد") +
+      " حول مرکز هندسی چرخانده و ذخیره شد.", false);
+    return true;
+  };
+
+  window.rotateCroquisActivePolygonFromInput = function () {
+    var input = document.getElementById("crq-map-rotate-degrees");
+    return window.rotateCroquisActivePolygon(localizedNumber(input && input.value));
+  };
+
+  window.setCroquisPlacementCategory = function () {
+    var category = (document.getElementById("crq-place-category") || {}).value;
+    var colors = { FACILITY: "#b45309", PROJECT_AREA: "#1d4ed8", GREENHOUSE: "#059669" };
+    var input = document.getElementById("crq-place-color");
+    if (input && colors[category]) input.value = colors[category];
+  };
+
+  /* ---------- 4) Move the selected polygon as a rigid UTM object ---------- */
   function findRenderedPolygonForLayer(layer, map) {
     if (!window.L || !window.leafletLayerGroupObj || !layer || !Array.isArray(layer.points)) return null;
     var candidates = window.leafletLayerGroupObj.getLayers ? window.leafletLayerGroupObj.getLayers() : [];
@@ -751,6 +1095,7 @@
     installStableAreaCalculator();
     ensureLandscapeStyles();
     window.renderCroquisClearances();
+    if (typeof window.updateCroquisPlacementShapeUI === "function") window.updateCroquisPlacementShapeUI();
     bindWholeMoveHandlers();
   }
 
