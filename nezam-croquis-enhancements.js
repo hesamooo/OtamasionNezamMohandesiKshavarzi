@@ -28,6 +28,40 @@
   function roundCm(value) {
     return Math.round(Number(value) * 100) / 100;
   }
+
+  window.computeStableUtmPolygonGeometry = function (points) {
+    if (!Array.isArray(points) || points.length < 3) return { area: 0, ha: 0, perim: 0, sides: [] };
+    var originX = Number(points[0].x), originY = Number(points[0].y);
+    if (!Number.isFinite(originX) || !Number.isFinite(originY)) return null;
+    var twiceArea = 0, perimeter = 0, sides = [];
+    for (var i = 0; i < points.length; i++) {
+      var j = (i + 1) % points.length;
+      var ax = Number(points[i].x), ay = Number(points[i].y);
+      var bx = Number(points[j].x), by = Number(points[j].y);
+      if (![ax, ay, bx, by].every(Number.isFinite)) return null;
+      twiceArea += (ax - originX) * (by - originY) - (bx - originX) * (ay - originY);
+      var length = Math.hypot(bx - ax, by - ay);
+      perimeter += length;
+      sides.push({ from: i + 1, to: j + 1, len: length });
+    }
+    var area = Math.abs(twiceArea) / 2;
+    return { area: area, ha: area / 10000, perim: perimeter, sides: sides };
+  };
+
+  function installStableAreaCalculator() {
+    var original = window.computeUtmGeometry;
+    if (typeof original !== "function" || original.__stableUtmAreaWrapped) return;
+    var wrapped = function (points, geomType) {
+      if ((geomType || "POLYGON") === "POLYGON" && Array.isArray(points) && points.length >= 3) {
+        var stable = window.computeStableUtmPolygonGeometry(points);
+        if (stable) return stable;
+      }
+      return original.apply(this, arguments);
+    };
+    wrapped.__stableUtmAreaWrapped = true;
+    window.computeUtmGeometry = wrapped;
+  }
+
   function displayNumber(value, decimals) {
     var n = Number(value);
     if (!Number.isFinite(n)) return "—";
@@ -613,6 +647,7 @@
     installWorkspaceHook();
     installPrintHooks();
     installLeafletRenderHook();
+    installStableAreaCalculator();
     ensureLandscapeStyles();
     window.renderCroquisClearances();
     bindWholeMoveHandlers();
