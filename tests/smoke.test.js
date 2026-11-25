@@ -897,3 +897,44 @@ test('CAD map exposes prevailing wind controls and stores wind settings per map'
   assert.ok(source.includes('window.describeCroquisPrevailingWind'));
   assert.ok(source.includes('prevailingWindHud'));
 });
+
+
+test('first croquis map sheet prints main-land and project UTM vertices in a dedicated side panel', () => {
+  const source = read('nezam-croquis-enhancements.js');
+  const start = source.indexOf('  function getUtmCoordinateLayers(map)');
+  const end = source.indexOf('  function decorateCroquisPrintPage()', start);
+  assert.ok(start >= 0 && end > start, 'UTM table builder functions must exist');
+  const helpers = source.slice(start, end);
+  const html = (value) => String(value == null ? '' : value);
+  const ensurePointEnriched = (point) => point;
+  const code = 'function html(v){return String(v == null ? "" : v);}' +
+    'function ensurePointEnriched(p){return p;}' + helpers +
+    '\nreturn {getUtmCoordinateLayers:getUtmCoordinateLayers,buildUtmPointsPrintMarkup:buildUtmPointsPrintMarkup};';
+  const api = new Function(code)();
+  const map = {
+    utmZone: '39R',
+    layers: [
+      { id: 'main', name: 'زمین اصلی', category: 'MAIN_PARCEL', geomType: 'POLYGON', visible: true,
+        points: [
+          {label:'P1',x:714800.12,y:3203100.34,zone:'39R'},
+          {label:'P2',x:714850.56,y:3203100.78,zone:'39R'},
+          {label:'P3',x:714850.90,y:3203150.12,zone:'39R'}
+        ] },
+      { id: 'project', name: 'محل اجرای طرح', category: 'PROJECT_AREA', geomType: 'POLYGON', visible: true,
+        points: [
+          {label:'K1',x:714810.11,y:3203110.22,zone:'39R'},
+          {label:'K2',x:714830.33,y:3203110.44,zone:'39R'},
+          {label:'K3',x:714830.55,y:3203130.66,zone:'39R'}
+        ] }
+    ]
+  };
+  const markup = api.buildUtmPointsPrintMarkup(map);
+  assert.ok(markup.includes('مختصات UTM نقاط'));
+  assert.ok(markup.includes('زمین اصلی'));
+  assert.ok(markup.includes('محل اجرای طرح'));
+  assert.ok(markup.includes('714800.12'));
+  assert.ok(markup.includes('3203130.66'));
+  assert.ok(markup.includes('زون 39R'));
+  assert.ok(source.includes('croquis-map-side-info'));
+  assert.ok(source.includes('aria-label="مختصات UTM نقاط زمین اصلی و محل اجرای طرح"'));
+});
