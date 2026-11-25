@@ -744,6 +744,16 @@
       croquisPlacementStatus(error && error.message ? error.message : "چرخش چندضلعی انجام نشد.", true);
       return false;
     }
+    if (layer.category !== "MAIN_PARCEL") {
+      var mainParcel = (map.layers || []).find(function (candidate) {
+        return candidate && candidate.category === "MAIN_PARCEL" && candidate.geomType === "POLYGON" &&
+          Array.isArray(candidate.points) && candidate.points.length >= 3;
+      });
+      if (mainParcel && !window.isCroquisPlacementShapeInsideParcel(rotated, mainParcel.points)) {
+        croquisPlacementStatus("چرخش باعث خروج چندضلعی از محدوده اصلی زمین می‌شود؛ زاویه کمتر یا جهت دیگری انتخاب کنید.", true);
+        return false;
+      }
+    }
     layer.points = rotated;
     layer.points.forEach(function (point, index) {
       if (typeof ensurePointEnriched === "function") ensurePointEnriched(point, map.utmZone || "39R", index);
