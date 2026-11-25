@@ -736,7 +736,70 @@ test('parcel containment treats a point on the boundary as inside', () => {
 });
 
 
-test('croquis exact polygon generator closes and preserves user-entered side lengths', () => {
+
+test('croquis placement shapes create correct rectangle, square and polygonal circle geometry', () => {
+  const source = read('nezam-croquis-enhancements.js');
+  const start = source.indexOf('  window.rotateUtmPolygon = function');
+  const end = source.indexOf('  function placementPointInPolygon', start);
+  assert.ok(start >= 0 && end > start);
+  const helpers = source.slice(start, end);
+  const code = [
+    'function roundCm(value) { return Math.round(Number(value) * 100) / 100; }',
+    'function isSimpleUtmPolygon(points) { return Array.isArray(points) && points.length >= 3; }',
+    helpers,
+    'return { rotate: window.rotateUtmPolygon, build: window.buildCroquisPlacementShapePoints };'
+  ].join('\\n');
+  const api = new Function('window', code)({});
+  const rect = api.build('RECTANGLE', 500000, 3200000, { length: 20, width: 10, azimuth: 0 }, '39R', 0);
+  assert.equal(rect.sideCount, 4);
+  assert.ok(Math.abs(rect.area - 200) < 0.1);
+  assert.ok(Math.abs(rect.perimeter - 60) < 0.1);
+  const square = api.build('SQUARE', 500000, 3200000, { side: 12, azimuth: 45 }, '39R', 0);
+  assert.ok(Math.abs(square.area - 144) < 0.1);
+  const circle = api.build('CIRCLE', 500000, 3200000, { radius: 5, segments: 48 }, '39R', 0);
+  assert.equal(circle.sideCount, 48);
+  assert.ok(Math.abs(circle.area - Math.PI * 25) < 0.5);
+});
+
+test('croquis polygon rotation is clockwise around its geometric centroid and preserves side lengths', () => {
+  const source = read('nezam-croquis-enhancements.js');
+  const start = source.indexOf('  window.rotateUtmPolygon = function');
+  const end = source.indexOf('  function placementStats', start);
+  assert.ok(start >= 0 && end > start);
+  const rotate = new Function(
+    'window',
+    'function roundCm(value) { return Math.round(Number(value) * 100) / 100; }\\n' +
+    source.slice(start, end) + '\\nreturn window.rotateUtmPolygon;'
+  )({});
+  const original = [
+    { x: 0, y: 0, label: 'P1' }, { x: 20, y: 0, label: 'P2' },
+    { x: 20, y: 10, label: 'P3' }, { x: 0, y: 10, label: 'P4' }
+  ];
+  const rotated = rotate(original, 90);
+  assert.equal(rotated.length, 4);
+  assert.deepEqual(rotated.map(p => [p.x, p.y]), [[5,15],[5,-5],[15,-5],[15,15]]);
+  for (let i=0;i<original.length;i++) {
+    const j=(i+1)%original.length;
+    assert.ok(Math.abs(Math.hypot(rotated[j].x-rotated[i].x,rotated[j].y-rotated[i].y) -
+      Math.hypot(original[j].x-original[i].x,original[j].y-original[i].y)) < 0.02);
+  }
+  assert.equal(rotated[0].label,'P1');
+});
+
+test('croquis placement geometry is rejected when any edge leaves the main parcel', () => {
+  const source = read('nezam-croquis-enhancements.js');
+  const start = source.indexOf('  function placementPointInPolygon');
+  const end = source.indexOf('  function croquisPlacementStatus', start);
+  assert.ok(start >= 0 && end > start);
+  const helpers = source.slice(start, end);
+  const api = new Function('window', helpers + '\\nreturn window.isCroquisPlacementShapeInsideParcel;')({});
+  const parcel = [{x:0,y:0},{x:30,y:0},{x:30,y:20},{x:0,y:20}];
+  const inside = [{x:5,y:5},{x:15,y:5},{x:15,y:15},{x:5,y:15}];
+  const outside = [{x:5,y:5},{x:35,y:5},{x:35,y:15},{x:5,y:15}];
+  assert.equal(api(inside,parcel),true);
+  assert.equal(api(outside,parcel),false);
+});
+\ntest('croquis exact polygon generator closes and preserves user-entered side lengths', () => {
   const source = read('nezam-croquis-enhancements.js');
   const helperStart = source.indexOf('  function cross2(');
   const generatorStart = source.indexOf('  window.buildExactUtmPolygonFromSides = function');
