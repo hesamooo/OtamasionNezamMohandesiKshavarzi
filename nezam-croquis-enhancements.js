@@ -1,0 +1,593 @@
+/* Nezam 636 — Croquis workflow enhancements (additive, no storage/config migration) */
+(function () {
+  "use strict";
+
+  var wholeMoveEnabled = false;
+  var wholeMoveState = null;
+  var wholeMoveMapBound = false;
+
+  function activeMap() {
+    return typeof getActiveCroquisMap === "function" ? getActiveCroquisMap() : null;
+  }
+  function activeLayer() {
+    return typeof getActiveCroquisLayer === "function" ? getActiveCroquisLayer() : null;
+  }
+  function html(value) {
+    return typeof safeHtmlText === "function"
+      ? safeHtmlText(String(value == null ? "" : value))
+      : String(value == null ? "" : value).replace(/[&<>"']/g, function (c) {
+          return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c];
+        });
+  }
+  function localizedNumber(value) {
+    var raw = String(value == null ? "" : value);
+    if (typeof toEn === "function") raw = toEn(raw);
+    return Number(raw);
+  }
+  function roundCm(value) {
+    return Math.round(Number(value) * 100) / 100;
+  }
+  function displayNumber(value, decimals) {
+    var n = Number(value);
+    if (!Number.isFinite(n)) return "—";
+    var s = n.toFixed(decimals == null ? 1 : decimals);
+    return typeof toFa === "function" ? toFa(s) : s;
+  }
+  function getMapClearances(map) {
+    if (!map) return [];
+    if (!Array.isArray(map.clearances)) map.clearances = [];
+    return map.clearances;
+  }
+
+  /* ---------- 1) Adjacent-distance / clearance register ---------- */
+  function clearanceTitle(item) {
+    var type = String(item.kind || "عارضه مجاور");
+    var name = String(item.name || "").trim();
+    return type + (name ? " — " + name : "");
+  }
+
+  window.renderCroquisClearances = function () {
+    var map = activeMap();
+    var holder = document.getElementById("crq-clearances-list");
+    if (!holder || !map) return;
+    var list = getMapClearances(map);
+    if (!list.length) {
+      holder.innerHTML = '<div class="small text-muted py-2">هنوز فاصله‌ای ثبت نشده است. مواردی مانند روستا، رودخانه، خطوط گاز، جاده و واحدهای تولیدی مجاور را اضافه کنید.</div>';
+      return;
+    }
+    holder.innerHTML = list.map(function (item) {
+      var id = html(item.id || "");
+      var direction = item.direction ? " | جهت: " + html(item.direction) : "";
+      var note = item.note ? '<div class="small text-muted">' + html(item.note) + '</div>' : "";
+      return '<div class="d-flex justify-content-between align-items-center gap-2 border rounded bg-white p-2 mb-1">' +
+        '<div class="min-w-0"><b class="small">' + html(clearanceTitle(item)) + '</b>' +
+        '<div class="small text-success fw-bold">' + displayNumber(item.distance, 1) + ' متر' + direction + '</div>' + note + '</div>' +
+        '<button type="button" class="btn btn-sm btn-outline-danger py-0 px-2 flex-shrink-0" title="حذف فاصله" onclick="removeCroquisClearance(\'' + id + '\')">حذف</button>' +
+        '</div>';
+    }).join("");
+  };
+
+  window.addCroquisClearance = function () {
+    var map = activeMap();
+    if (!map) {
+      alert("ابتدا پرونده و نقشه کروکی را انتخاب کنید.");
+      return false;
+    }
+    var kindEl = document.getElementById("crq-clearance-kind");
+    var nameEl = document.getElementById("crq-clearance-name");
+    var distanceEl = document.getElementById("crq-clearance-distance");
+    var directionEl = document.getElementById("crq-clearance-direction");
+    var noteEl = document.getElementById("crq-clearance-note");
+    var kind = kindEl ? kindEl.value : "سایر عوارض";
+    var name = nameEl ? nameEl.value.trim() : "";
+    var distance = localizedNumber(distanceEl && distanceEl.value);
+    var direction = directionEl ? directionEl.value : "";
+    var note = noteEl ? noteEl.value.trim() : "";
+
+    if (!Number.isFinite(distance) || distance < 0 || distance > 1000000) {
+      alert("فاصله را به متر و به‌صورت عدد معتبر وارد کنید.");
+      return false;
+    }
+    if (!name && kind === "سایر عوارض") {
+      alert("برای عارضه سفارشی، نام عارضه را وارد کنید.");
+      return false;
+    }
+    var list = getMapClearances(map);
+    list.push({
+      id: "CLR-" + Date.now() + "-" + (list.length + 1),
+      kind: kind,
+      name: name,
+      distance: Math.round(distance * 100) / 100,
+      direction: direction,
+      note: note,
+      createdAt: new Date().toISOString()
+    });
+    if (nameEl) nameEl.value = "";
+    if (distanceEl) distanceEl.value = "";
+    if (noteEl) noteEl.value = "";
+    if (typeof saveAllDB === "function") saveAllDB();
+    window.renderCroquisClearances();
+    if (typeof showToastMsg === "function") showToastMsg("فاصله حریم در مشخصات همین نقشه ذخیره شد.");
+    return true;
+  };
+
+  window.removeCroquisClearance = function (id) {
+    var map = activeMap();
+    if (!map) return;
+    map.clearances = getMapClearances(map).filter(function (item) {
+      return String(item.id) !== String(id);
+    });
+    if (typeof saveAllDB === "function") saveAllDB();
+    window.renderCroquisClearances();
+  };
+
+  function buildClearancePrintMarkup(map) {
+    var list = getMapClearances(map);
+    if (!list.length) return "";
+    var rows = list.map(function (item) {
+      return '<div class="croquis-clearance-print-item"><b>' + html(clearanceTitle(item)) +
+        '</b><span>' + displayNumber(item.distance, 1) + ' متر</span>' +
+        (item.direction ? '<small>جهت: ' + html(item.direction) + '</small>' : "") +
+        (item.note ? '<small>' + html(item.note) + '</small>' : "") +
+        '</div>';
+    }).join("");
+    return '<section class="croquis-clearances-print" aria-label="فواصل و حرایم پیرامونی">' +
+      '<div class="croquis-clearances-print-title">فواصل و حرایم پیرامونی اعلام‌شده</div>' +
+      '<div class="croquis-clearances-print-grid">' + rows + '</div>' +
+      '<div class="croquis-clearances-print-note">فواصل فوق بر اساس اطلاعات ثبت‌شده در پرونده درج شده‌اند و در صورت نیاز باید با برداشت و استعلام مرجع ذی‌صلاح تطبیق داده شوند.</div>' +
+      '</section>';
+  }
+
+  function decorateCroquisPrintPage() {
+    var stage = document.getElementById("a4-preview-stage");
+    if (!stage) return;
+    var pages = stage.querySelectorAll(".a4-page");
+    if (!pages.length) return;
+    var page = pages[0];
+    page.classList.add("croquis-map-landscape");
+    page.setAttribute("data-page-kind", "croquis-map-landscape");
+    page.setAttribute("data-paper-size", "A4");
+
+    var map = activeMap();
+    var holder = page.querySelector("#printed-croquis-map-holder");
+    if (holder && !page.querySelector(".croquis-clearances-print")) {
+      var markup = buildClearancePrintMarkup(map);
+      if (markup) holder.insertAdjacentHTML("afterend", markup);
+    }
+    ensureLandscapeStyles();
+  }
+
+  /* ---------- 2) Exact polygon from side lengths + azimuths ---------- */
+  function cross2(a, b, c) {
+    return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+  }
+  function between(v, a, b, tolerance) {
+    var t = tolerance || 0;
+    return v >= Math.min(a, b) - t && v <= Math.max(a, b) + t;
+  }
+  function segmentsTouchOrCross(a, b, c, d) {
+    var eps = 1e-8;
+    var abC = cross2(a, b, c), abD = cross2(a, b, d);
+    var cdA = cross2(c, d, a), cdB = cross2(c, d, b);
+    if (((abC > eps && abD < -eps) || (abC < -eps && abD > eps)) &&
+        ((cdA > eps && cdB < -eps) || (cdA < -eps && cdB > eps))) return true;
+    if (Math.abs(abC) <= eps && between(c.x, a.x, b.x, eps) && between(c.y, a.y, b.y, eps)) return true;
+    if (Math.abs(abD) <= eps && between(d.x, a.x, b.x, eps) && between(d.y, a.y, b.y, eps)) return true;
+    if (Math.abs(cdA) <= eps && between(a.x, c.x, d.x, eps) && between(a.y, c.y, d.y, eps)) return true;
+    if (Math.abs(cdB) <= eps && between(b.x, c.x, d.x, eps) && between(b.y, c.y, d.y, eps)) return true;
+    return false;
+  }
+  function isSimpleUtmPolygon(points) {
+    var n = points.length;
+    for (var i = 0; i < n; i++) {
+      var i2 = (i + 1) % n;
+      for (var j = i + 1; j < n; j++) {
+        var j2 = (j + 1) % n;
+        if (i === j || i2 === j || j2 === i) continue;
+        if (segmentsTouchOrCross(points[i], points[i2], points[j], points[j2])) return false;
+      }
+    }
+    return true;
+  }
+
+  window.buildExactUtmPolygonFromSides = function (startX, startY, sides, zone, elevation) {
+    var sx = Number(startX), sy = Number(startY);
+    if (!Number.isFinite(sx) || !Number.isFinite(sy)) throw new Error("مختصات شروع X و Y معتبر نیست.");
+    if (!Array.isArray(sides) || sides.length < 3 || sides.length > 100) {
+      throw new Error("برای چندضلعی بین ۳ تا ۱۰۰ ضلع وارد کنید.");
+    }
+    var current = { x: sx, y: sy };
+    var points = [];
+    var perimeter = 0;
+    for (var i = 0; i < sides.length; i++) {
+      var length = Number(sides[i] && sides[i].length);
+      var azimuth = Number(sides[i] && sides[i].azimuth);
+      if (!Number.isFinite(length) || length <= 0 || length > 100000) {
+        throw new Error("طول ضلع " + (i + 1) + " باید عددی بزرگ‌تر از صفر و حداکثر ۱۰۰ کیلومتر باشد.");
+      }
+      if (!Number.isFinite(azimuth)) throw new Error("آزیموت ضلع " + (i + 1) + " معتبر نیست.");
+      azimuth = ((azimuth % 360) + 360) % 360;
+      points.push({
+        x: roundCm(current.x),
+        y: roundCm(current.y),
+        elev: Number.isFinite(Number(elevation)) ? Number(elevation) : 0,
+        zone: zone || "39R",
+        label: "P" + (i + 1)
+      });
+      var radians = azimuth * Math.PI / 180;
+      current = {
+        x: current.x + length * Math.sin(radians),
+        y: current.y + length * Math.cos(radians)
+      };
+      perimeter += length;
+    }
+    var closureError = Math.hypot(current.x - sx, current.y - sy);
+    if (closureError > 0.15) {
+      throw new Error("پلیگون بسته نیست؛ خطای بست " + closureError.toFixed(2) + " متر است. آزیموت یا طول ضلع آخر را اصلاح کنید (حد مجاز ۰٫۱۵ متر).");
+    }
+    if (!isSimpleUtmPolygon(points)) throw new Error("اضلاع چندضلعی همدیگر را قطع می‌کنند؛ ترتیب اضلاع یا آزیموت‌ها را اصلاح کنید.");
+    var twiceArea = 0;
+    for (var p = 0; p < points.length; p++) {
+      var q = (p + 1) % points.length;
+      twiceArea += points[p].x * points[q].y - points[q].x * points[p].y;
+    }
+    var area = Math.abs(twiceArea) / 2;
+    if (!Number.isFinite(area) || area < 0.01) throw new Error("مساحت چندضلعی صفر یا نامعتبر است.");
+    return {
+      points: points,
+      area: area,
+      perimeter: perimeter,
+      closureError: closureError,
+      sideCount: points.length
+    };
+  };
+
+  window.createExactPolygonInActiveLayer = function () {
+    var map = activeMap();
+    var layer = activeLayer();
+    if (!map || !layer) {
+      alert("ابتدا یک نقشه و لایه فعال انتخاب کنید.");
+      return false;
+    }
+    if (layer.category === "MAIN_PARCEL") {
+      alert("برای حفظ مرز زمین اصلی، این ابزار روی لایه زمین اصلی اجرا نمی‌شود. ابتدا لایه محل اجرای طرح یا یک لایه جدید انتخاب کنید.");
+      return false;
+    }
+    var startX = localizedNumber(document.getElementById("crq-poly-start-x") && document.getElementById("crq-poly-start-x").value);
+    var startY = localizedNumber(document.getElementById("crq-poly-start-y") && document.getElementById("crq-poly-start-y").value);
+    var raw = (document.getElementById("crq-exact-poly-sides") || {}).value || "";
+    var lines = raw.split(/\r?\n/).map(function (line) { return line.trim(); }).filter(Boolean);
+    var sides = [];
+    for (var i = 0; i < lines.length; i++) {
+      var parts = lines[i].split(/[,،;\s]+/).filter(Boolean);
+      if (parts.length !== 2) {
+        alert("سطر " + (i + 1) + " باید به شکل «طول ضلع، آزیموت» باشد؛ مانند 45,90.");
+        return false;
+      }
+      sides.push({
+        length: localizedNumber(parts[0]),
+        azimuth: localizedNumber(parts[1])
+      });
+    }
+    var zone = (map.utmZone || "39R");
+    var elev = localizedNumber((document.getElementById("crq-poly-elevation") || {}).value || "0");
+    var result;
+    try {
+      result = window.buildExactUtmPolygonFromSides(startX, startY, sides, zone, elev);
+    } catch (error) {
+      var msg = error && error.message ? error.message : "ورودی چندضلعی معتبر نیست.";
+      var status = document.getElementById("crq-exact-poly-status");
+      if (status) status.textContent = "❌ " + msg;
+      alert(msg);
+      return false;
+    }
+    if (Array.isArray(layer.points) && layer.points.length &&
+        !confirm("لایه فعال دارای رأس است. هندسه فعلی با چندضلعی دقیق جدید جایگزین شود؟")) return false;
+
+    layer.geomType = "POLYGON";
+    layer.points = result.points;
+    if (typeof ensurePointEnriched === "function") {
+      layer.points.forEach(function (point, index) {
+        ensurePointEnriched(point, zone, index);
+      });
+    }
+    if (typeof saveActiveLayerStyleAndMeta === "function") saveActiveLayerStyleAndMeta();
+    else if (typeof saveAllDB === "function") saveAllDB();
+
+    var statusBox = document.getElementById("crq-exact-poly-status");
+    if (statusBox) statusBox.textContent =
+      "✅ چندضلعی ثبت شد | " + result.sideCount + " ضلع | مساحت " +
+      displayNumber(result.area, 2) + " مترمربع | محیط " +
+      displayNumber(result.perimeter, 2) + " متر | خطای بست " +
+      displayNumber(result.closureError, 3) + " متر";
+    if (typeof showToastMsg === "function") showToastMsg("چندضلعی با طول ضلع‌ها و آزیموت‌های واردشده ساخته و در لایه فعال ذخیره شد.");
+    return true;
+  };
+
+  window.translateUtmPolygon = function (points, deltaX, deltaY) {
+    if (!Array.isArray(points)) return [];
+    return points.map(function (point) {
+      var copy = Object.assign({}, point);
+      copy.x = roundCm(Number(point.x) + Number(deltaX));
+      copy.y = roundCm(Number(point.y) + Number(deltaY));
+      return copy;
+    });
+  };
+
+  /* ---------- 3) Move the selected polygon as a rigid UTM object ---------- */
+  function findRenderedPolygonForLayer(layer, map) {
+    if (!window.L || !window.leafletLayerGroupObj || !layer || !Array.isArray(layer.points)) return null;
+    var candidates = window.leafletLayerGroupObj.getLayers ? window.leafletLayerGroupObj.getLayers() : [];
+    for (var i = 0; i < candidates.length; i++) {
+      var candidate = candidates[i];
+      if (!(candidate instanceof window.L.Polygon) || typeof candidate.getLatLngs !== "function") continue;
+      var latlngs = candidate.getLatLngs();
+      if (Array.isArray(latlngs[0])) latlngs = latlngs[0];
+      if (!Array.isArray(latlngs) || latlngs.length !== layer.points.length) continue;
+      var same = true;
+      for (var j = 0; j < latlngs.length; j++) {
+        var point = layer.points[j];
+        if (!Number.isFinite(Number(point.lat)) || !Number.isFinite(Number(point.lng))) {
+          if (typeof ensurePointEnriched === "function") ensurePointEnriched(point, map.utmZone || "39R", j);
+        }
+        if (Math.abs(Number(latlngs[j].lat) - Number(point.lat)) > 0.00002 ||
+            Math.abs(Number(latlngs[j].lng) - Number(point.lng)) > 0.00002) {
+          same = false;
+          break;
+        }
+      }
+      if (same) return candidate;
+    }
+    return null;
+  }
+
+  function stopLeafletEvent(event) {
+    if (window.L && window.L.DomEvent && event && event.originalEvent) {
+      window.L.DomEvent.stop(event.originalEvent);
+    }
+  }
+
+  function wholeMoveMouseDown(event) {
+    if (!wholeMoveEnabled || wholeMoveState || !event || !event.latlng) return;
+    if (typeof croquisOnlineDrawMode !== "undefined" && croquisOnlineDrawMode) return;
+    var map = activeMap();
+    var layer = activeLayer();
+    if (!map || !layer || layer.geomType !== "POLYGON" || !Array.isArray(layer.points) || layer.points.length < 3) {
+      if (typeof croquisMapSetToolStatus === "function") croquisMapSetToolStatus("لایه فعال باید یک چندضلعی با حداقل سه رأس باشد.", true);
+      return;
+    }
+    if (typeof croquisMapVertexEditEnabled !== "undefined" && croquisMapVertexEditEnabled) {
+      if (typeof croquisMapSetToolStatus === "function") croquisMapSetToolStatus("ابتدا ویرایش رأس‌های جداگانه را خاموش کنید؛ سپس جابه‌جایی کل چندضلعی را انجام دهید.", true);
+      return;
+    }
+    var zoneNum = parseInt(map.utmZone, 10) || 39;
+    var clicked = latLngToUtmWGS84(event.latlng.lat, event.latlng.lng, zoneNum);
+    if (typeof isPointInPolygon2D === "function" && !isPointInPolygon2D(clicked, layer.points)) return;
+    var polygon = findRenderedPolygonForLayer(layer, map);
+    if (!polygon) {
+      if (typeof croquisMapSetToolStatus === "function") croquisMapSetToolStatus("چندضلعی لایه فعال روی نقشه پیدا نشد؛ نقشه را یک‌بار بازخوانی کنید.", true);
+      return;
+    }
+    wholeMoveState = {
+      layerId: layer.id,
+      startX: clicked.x,
+      startY: clicked.y,
+      originalPoints: layer.points.map(function (point) { return Object.assign({}, point); }),
+      polygon: polygon,
+      deltaX: 0,
+      deltaY: 0,
+      center: window.leafletMapObj.getCenter(),
+      zoom: window.leafletMapObj.getZoom()
+    };
+    stopLeafletEvent(event);
+    if (typeof croquisMapSetToolStatus === "function") croquisMapSetToolStatus("در حال جابه‌جایی کل چندضلعی؛ ماوس را رها کنید تا مختصات UTM همه رأس‌ها به‌روزرسانی و ذخیره شود.");
+  }
+
+  function wholeMoveMouseMove(event) {
+    if (!wholeMoveEnabled || !wholeMoveState || !event || !event.latlng) return;
+    var map = activeMap();
+    if (!map) return;
+    var zoneNum = parseInt(map.utmZone, 10) || 39;
+    var current = latLngToUtmWGS84(event.latlng.lat, event.latlng.lng, zoneNum);
+    var dx = current.x - wholeMoveState.startX;
+    var dy = current.y - wholeMoveState.startY;
+    wholeMoveState.deltaX = dx;
+    wholeMoveState.deltaY = dy;
+    var moved = window.translateUtmPolygon(wholeMoveState.originalPoints, dx, dy);
+    var latlngs = moved.map(function (point) {
+      var geo = utmToLatLngWGS84(point.x, point.y, zoneNum, map.hemisphere !== "S");
+      return [geo.lat, geo.lng];
+    });
+    wholeMoveState.polygon.setLatLngs(latlngs);
+    if (typeof wholeMoveState.polygon.redraw === "function") wholeMoveState.polygon.redraw();
+    stopLeafletEvent(event);
+  }
+
+  function wholeMoveMouseUp(event) {
+    if (!wholeMoveState) return;
+    var state = wholeMoveState;
+    wholeMoveState = null;
+    var map = activeMap();
+    var layer = activeLayer();
+    if (!map || !layer || String(layer.id) !== String(state.layerId)) {
+      if (state.polygon && typeof state.polygon.setLatLngs === "function") {
+        state.polygon.setLatLngs(state.originalPoints.map(function (point) {
+          var geo = utmToLatLngWGS84(point.x, point.y, parseInt(map && map.utmZone, 10) || 39, true);
+          return [geo.lat, geo.lng];
+        }));
+      }
+      return;
+    }
+    var dx = Number(state.deltaX) || 0;
+    var dy = Number(state.deltaY) || 0;
+    if (Math.hypot(dx, dy) < 0.01) {
+      if (typeof croquisMapSetToolStatus === "function") croquisMapSetToolStatus("جابه‌جایی انجام نشد؛ چندضلعی به محل اولیه بازگشت.");
+      if (window.leafletMapObj) renderCroquisLeafletMap({ preserveView: true, center: state.center, zoom: state.zoom });
+      return;
+    }
+    layer.points = window.translateUtmPolygon(state.originalPoints, dx, dy);
+    layer.points.forEach(function (point, index) {
+      if (typeof ensurePointEnriched === "function") ensurePointEnriched(point, map.utmZone || "39R", index);
+    });
+    if (typeof saveActiveLayerStyleAndMeta === "function") saveActiveLayerStyleAndMeta();
+    else if (typeof saveAllDB === "function") saveAllDB();
+    if (typeof renderCroquisLeafletMap === "function") {
+      renderCroquisLeafletMap({ preserveView: true, center: state.center, zoom: state.zoom });
+    }
+    if (typeof croquisMapSetToolStatus === "function") {
+      croquisMapSetToolStatus("✅ چندضلعی جابه‌جا شد؛ مختصات UTM هر " + layer.points.length + " رأس به‌روزرسانی و ذخیره شد. جابه‌جایی بعدی را می‌توانید انجام دهید.");
+    }
+    stopLeafletEvent(event);
+  }
+
+  function bindWholeMoveHandlers() {
+    var map = window.leafletMapObj;
+    if (!map || wholeMoveMapBound || typeof map.on !== "function") return;
+    map.on("mousedown", wholeMoveMouseDown);
+    map.on("mousemove", wholeMoveMouseMove);
+    map.on("mouseup", wholeMoveMouseUp);
+    wholeMoveMapBound = true;
+    map.__nezamWholePolygonMoveBound = true;
+  }
+
+  window.toggleCroquisWholePolygonMove = function (force) {
+    var layer = activeLayer();
+    if (!layer || layer.geomType !== "POLYGON" || !Array.isArray(layer.points) || layer.points.length < 3) {
+      alert("ابتدا لایه یک چندضلعی را انتخاب کنید.");
+      return false;
+    }
+    if (typeof croquisOnlineDrawMode !== "undefined" && croquisOnlineDrawMode) {
+      alert("ابتدا ترسیم جاری را تمام یا لغو کنید.");
+      return false;
+    }
+    if (typeof croquisViewMode !== "undefined" && croquisViewMode !== "MAP" &&
+        typeof switchCroquisViewMode === "function") {
+      switchCroquisViewMode("MAP");
+    }
+    wholeMoveEnabled = typeof force === "boolean" ? force : !wholeMoveEnabled;
+    bindWholeMoveHandlers();
+    if (window.leafletMapObj && window.leafletMapObj.dragging) {
+      if (wholeMoveEnabled) window.leafletMapObj.dragging.disable();
+      else window.leafletMapObj.dragging.enable();
+    }
+    var button = document.getElementById("crq-map-move-polygon-btn");
+    if (button) {
+      button.className = "btn btn-sm " + (wholeMoveEnabled ? "btn-warning fw-bold" : "btn-outline-warning");
+      button.textContent = wholeMoveEnabled ? "✥ جابه‌جایی کل چندضلعی: روشن" : "✥ جابه‌جایی کل چندضلعی";
+      button.setAttribute("aria-pressed", wholeMoveEnabled ? "true" : "false");
+    }
+    if (typeof croquisMapSetToolStatus === "function") {
+      croquisMapSetToolStatus(wholeMoveEnabled
+        ? "حالت جابه‌جایی فعال است: داخل چندضلعیِ لایه انتخاب‌شده کلیک کنید و بکشید؛ با رها کردن ماوس، تمام نقاط UTM ذخیره می‌شوند."
+        : "حالت جابه‌جایی کل چندضلعی خاموش شد؛ حرکت عادی نقشه فعال است.");
+    }
+    return true;
+  };
+
+  /* ---------- 4) A4 landscape map sheet, with tables kept on page two ---------- */
+  function landscapeCss() {
+    return [
+      "@page croquisMapLandscape { size: A4 landscape; margin: 0; }",
+      ".a4-page.croquis-map-landscape { page: croquisMapLandscape; width:297mm !important; min-width:297mm !important; max-width:297mm !important; height:210mm !important; min-height:210mm !important; max-height:210mm !important; margin:0 auto 8mm !important; }",
+      ".a4-page.croquis-map-landscape .lh-top { padding:2mm 5mm !important; min-height:19mm !important; }",
+      ".a4-page.croquis-map-landscape .lh-body { padding:2mm 5mm !important; min-height:0 !important; overflow:hidden !important; }",
+      ".a4-page.croquis-map-landscape .lh-content-wrap { overflow:visible !important; }",
+      ".a4-page.croquis-map-landscape .sign-area { display:none !important; }",
+      ".a4-page.croquis-map-landscape .lh-foot { padding:1.5mm 5mm !important; font-size:7pt !important; }",
+      ".a4-page.croquis-map-landscape #printed-croquis-map-holder { margin:0 auto 1mm !important; }",
+      ".a4-page.croquis-map-landscape .printed-croquis-satellite-box { border-width:1px !important; border-radius:3px !important; }",
+      ".a4-page.croquis-map-landscape .printed-croquis-satellite-box > svg { width:100% !important; max-width:100% !important; max-height:145mm !important; height:auto !important; }",
+      ".a4-page.croquis-map-landscape .croquis-clearances-print { margin:1mm 0 0 !important; padding:1mm 2mm !important; }",
+      ".a4-page.croquis-map-landscape .croquis-clearances-print-title { font-size:7.8pt !important; margin-bottom:.5mm !important; }",
+      ".a4-page.croquis-map-landscape .croquis-clearance-print-item { padding:.3mm 1.2mm !important; font-size:7pt !important; }",
+      ".a4-page.croquis-map-landscape .croquis-clearances-print-note { font-size:6pt !important; }",
+      ".croquis-clearances-print { border:1px solid #64748b; border-radius:3px; background:#f8fafc; padding:1.5mm 2mm; margin:2mm 0; direction:rtl; page-break-inside:avoid; break-inside:avoid; }",
+      ".croquis-clearances-print-title { font-weight:900; font-size:8.5pt; color:#14532d; margin-bottom:1mm; }",
+      ".croquis-clearances-print-grid { display:flex; flex-wrap:wrap; gap:1mm 2mm; }",
+      ".croquis-clearance-print-item { display:flex; flex-wrap:wrap; align-items:center; gap:1mm 2mm; padding:.7mm 1.5mm; border:1px solid #cbd5e1; border-radius:3px; background:#fff; font-size:7.8pt; }",
+      ".croquis-clearance-print-item span { font-weight:900; color:#166534; }",
+      ".croquis-clearance-print-item small { color:#475569; }",
+      ".croquis-clearances-print-note { margin-top:.8mm; color:#475569; font-size:6.7pt; }",
+      "@media screen { .a4-page.croquis-map-landscape { margin-left:auto !important; margin-right:auto !important; } }",
+      "@media print {",
+      "html, body { width:auto !important; min-width:0 !important; max-width:none !important; }",
+      "#pane-print, .a4-stage-bg, #a4-preview-stage { width:auto !important; min-width:0 !important; max-width:none !important; overflow:visible !important; }",
+      "#a4-preview-stage .a4-page.croquis-map-landscape, .a4-page.croquis-map-landscape, .a4-page.croquis-map-landscape.paper-a5 { page:croquisMapLandscape !important; width:297mm !important; min-width:297mm !important; max-width:297mm !important; height:210mm !important; min-height:210mm !important; max-height:210mm !important; margin:0 !important; page-break-after:always !important; break-after:page !important; }",
+      "#a4-preview-stage .a4-page:not(.croquis-map-landscape) { width:210mm !important; min-width:210mm !important; max-width:210mm !important; height:297mm !important; min-height:297mm !important; max-height:297mm !important; }",
+      ".a4-page.croquis-map-landscape .lh-body { overflow:hidden !important; }",
+      "}"
+    ].join("\n");
+  }
+
+  function ensureLandscapeStyles() {
+    var css = landscapeCss();
+    var style = document.getElementById("nezam-croquis-enhancement-styles");
+    if (!style) {
+      style = document.createElement("style");
+      style.id = "nezam-croquis-enhancement-styles";
+      document.head.appendChild(style);
+    }
+    style.textContent = css;
+    var dynamic = document.getElementById("dynamic-print-page-style");
+    if (dynamic && dynamic.textContent.indexOf("@page croquisMapLandscape") === -1) {
+      dynamic.textContent += "\n" + css;
+    }
+  }
+
+  function installPrintHooks() {
+    if (typeof window.buildPaperExportCss === "function" && !window.buildPaperExportCss.__croquisLandscapeWrapped) {
+      var originalBuildCss = window.buildPaperExportCss;
+      var wrappedBuildCss = function () {
+        return originalBuildCss.apply(this, arguments) + "\n" + landscapeCss();
+      };
+      wrappedBuildCss.__croquisLandscapeWrapped = true;
+      window.buildPaperExportCss = wrappedBuildCss;
+    }
+    if (typeof window.applyDynamicPrintPageSizeCSS === "function" && !window.applyDynamicPrintPageSizeCSS.__croquisLandscapeWrapped) {
+      var originalApplyCss = window.applyDynamicPrintPageSizeCSS;
+      var wrappedApplyCss = function () {
+        var result = originalApplyCss.apply(this, arguments);
+        ensureLandscapeStyles();
+        return result;
+      };
+      wrappedApplyCss.__croquisLandscapeWrapped = true;
+      window.applyDynamicPrintPageSizeCSS = wrappedApplyCss;
+    }
+    if (typeof window.printUtmSketchSheet === "function" && !window.printUtmSketchSheet.__croquisLandscapeWrapped) {
+      var originalPrint = window.printUtmSketchSheet;
+      var wrappedPrint = function () {
+        var result = originalPrint.apply(this, arguments);
+        decorateCroquisPrintPage();
+        return result;
+      };
+      wrappedPrint.__croquisLandscapeWrapped = true;
+      window.printUtmSketchSheet = wrappedPrint;
+    }
+  }
+
+  function installWorkspaceHook() {
+    if (typeof window.initCroquisWorkspaceForActiveCase !== "function" ||
+        window.initCroquisWorkspaceForActiveCase.__croquisClearanceWrapped) return;
+    var originalInit = window.initCroquisWorkspaceForActiveCase;
+    var wrappedInit = function () {
+      var result = originalInit.apply(this, arguments);
+      window.renderCroquisClearances();
+      return result;
+    };
+    wrappedInit.__croquisClearanceWrapped = true;
+    window.initCroquisWorkspaceForActiveCase = wrappedInit;
+  }
+
+  function initialize() {
+    installWorkspaceHook();
+    installPrintHooks();
+    ensureLandscapeStyles();
+    window.renderCroquisClearances();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initialize, { once: true });
+  } else {
+    initialize();
+  }
+})();
