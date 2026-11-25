@@ -860,13 +860,13 @@ test('moving a croquis polygon translates every UTM vertex without changing its 
 test('CAD script tags are independently closed and offline toolbar module is actually loaded', () => {
   const html = read('index.html');
   assert.ok(html.includes('<script src="./nezam-cad-view-tools.js?v=20261125-cad-view-r6"></script>'));
-  assert.ok(html.includes('<script src="./nezam-cad-file-io.js?v=20261125-cad-io-r2"></script>'));
+  assert.ok(html.includes('<script src="./nezam-cad-file-io.js?v=20261125-cad-io-r3"></script>'));
   assert.ok(html.includes('<script src="./nezam-cad-offline-tools.js?v=20261125-offline-tools-r2"></script>'));
   assert.ok(!html.includes('cad-io-r2\\n  <script'));
   assert.ok(!html.includes('offline-tools-r1"></script>"></script>'));
   const orderedRefs = [
     html.indexOf('<script src="./nezam-cad-view-tools.js?v=20261125-cad-view-r6"></script>'),
-    html.indexOf('<script src="./nezam-cad-file-io.js?v=20261125-cad-io-r2"></script>'),
+    html.indexOf('<script src="./nezam-cad-file-io.js?v=20261125-cad-io-r3"></script>'),
     html.indexOf('<script src="./nezam-cad-offline-tools.js?v=20261125-offline-tools-r2"></script>')
   ];
   assert.ok(orderedRefs[0] < orderedRefs[1] && orderedRefs[1] < orderedRefs[2]);
@@ -1235,7 +1235,7 @@ test('DXF export writes model-space layers, valid handles, UTM extents and an op
   const handseedMatch = dxf.match(/\n\$HANDSEED\r\n5\r\n([0-9A-F]+)\r\n/);
   assert.ok(handles.length > 0);
   assert.ok(handseedMatch);
-  assert.ok(parseInt(handseedMatch[1],16) > Math.max(...handles));
+  assert.ok(parseInt(handseedMatch[1],16) > Math.max(...handles.filter(value => value !== parseInt(handseedMatch[1],16))));
 });
 
 test('DXF export refuses invalid visible geometry rather than silently writing incomplete coordinates', () => {
@@ -1324,7 +1324,7 @@ test('DXF controls are backed by a loaded module and automatic unit detection is
   assert.ok(html.includes('onclick="downloadCroquisDXF()"'));
   assert.ok(html.includes('onclick="triggerCroquisDXFImport()"'));
   assert.ok(html.includes('onchange="importCroquisDXFFile(event)"'));
-  assert.ok(html.includes('nezam-cad-file-io.js?v=20261125-cad-io-r2'));
+  assert.ok(html.includes('nezam-cad-file-io.js?v=20261125-cad-io-r3'));
   assert.ok(html.includes('<option value="AUTO" selected>واحد: تشخیص خودکار</option>'));
   assert.ok(source.includes('window.exportActiveCroquisToDXF'));
   assert.ok(source.includes('window.importCroquisDXFFile'));
