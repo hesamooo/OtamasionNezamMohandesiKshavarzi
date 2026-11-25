@@ -4725,44 +4725,60 @@ window.setCroquisPrintFocusLayer = function(layerId) {
   }
 };
 
-/* انتخاب لایه‌های مجاز برای درج در جدول مختصات شیت دوم؛ تنظیم مستقل برای هر نقشه */
+/* انتخاب لایه‌های خروجی چاپی؛ یک انتخاب واحد برای نقشه، راهنمای لایه‌ها و جدول مختصات */
 function getCroquisCoordinatePrintLayerIds(map) {
   if (!map || !Array.isArray(map.layers)) return [];
-  var visibleIds = map.layers.filter(function(layer) {
-    return layer && layer.visible && Array.isArray(layer.points) && layer.points.length > 0;
-  }).map(function(layer) { return String(layer.id || ""); }).filter(Boolean);
-  if (!Array.isArray(map.printCoordinateLayerIds)) {
-    map.printCoordinateLayerIds = visibleIds.slice();
-  }
-  map.printCoordinateLayerIds = map.printCoordinateLayerIds.map(String).filter(function(id) {
-    return visibleIds.indexOf(id) !== -1;
+  var visibleLayers = map.layers.filter(function(layer) {
+    return layer && layer.visible !== false && Array.isArray(layer.points) && layer.points.length > 0;
   });
-  return map.printCoordinateLayerIds;
+  visibleLayers.forEach(function(layer, index) {
+    if (!layer.id) {
+      var safeName = String(layer.name || "layer").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 18) || "layer";
+      layer.id = "LEGACY-" + safeName + "-" + index;
+    }
+  });
+  var visibleIds = visibleLayers.map(function(layer) { return String(layer.id); });
+  if (!Array.isArray(map.printCoordinateLayerIds)) map.printCoordinateLayerIds = visibleIds.slice();
+  map.printCoordinateLayerIds = map.printCoordinateLayerIds.map(String).filter(function(id, index, list) {
+    return visibleIds.indexOf(id) !== -1 && list.indexOf(id) === index;
+  });
+  return map.printCoordinateLayerIds.slice();
 }
-
+function getCroquisPrintSelectedLayers(map) {
+  var selectedIds = getCroquisCoordinatePrintLayerIds(map);
+  return (map && Array.isArray(map.layers) ? map.layers : []).filter(function(layer) {
+    return layer && layer.visible !== false && Array.isArray(layer.points) &&
+      layer.points.length > 0 && selectedIds.indexOf(String(layer.id)) !== -1;
+  });
+}
+window.getCroquisCoordinatePrintLayerIds = getCroquisCoordinatePrintLayerIds;
+window.getCroquisPrintSelectedLayers = getCroquisPrintSelectedLayers;
+function refreshCroquisPrintSelection() {
+  if (typeof currentPreviewMode === "undefined" || currentPreviewMode !== "CROQUIS") return;
+  if (typeof printUtmSketchSheet === "function") printUtmSketchSheet();
+}
 window.setCroquisCoordinatePrintLayer = function(layerId, checked) {
   var map = getActiveCroquisMap();
   if (!map) return false;
   var selected = getCroquisCoordinatePrintLayerIds(map);
   var id = String(layerId || "");
-  if (!id) return false;
+  if (!id || (selected.indexOf(id) === -1 && !(map.layers || []).some(function(layer) {
+    return layer && String(layer.id || "") === id && layer.visible !== false;
+  }))) return false;
   if (checked && selected.indexOf(id) === -1) selected.push(id);
   if (!checked) selected = selected.filter(function(item) { return item !== id; });
-  map.printCoordinateLayerIds = selected;
-  saveAllDB();
-  if (currentPreviewMode === "CROQUIS") printUtmSketchSheet();
+  map.printCoordinateLayerIds = selected.slice();
+  if (typeof saveAllDB === "function") saveAllDB();
+  refreshCroquisPrintSelection();
   return true;
 };
-
 window.setAllCroquisCoordinatePrintLayers = function(checked) {
   var map = getActiveCroquisMap();
   if (!map) return false;
-  var visibleIds = (map.layers || []).filter(function(layer) {
-    return layer && layer.visible && Array.isArray(layer.points) && layer.points.length > 0;
-  }).map(function(layer) { return String(layer.id || ""); }).filter(Boolean);
-  map.printCoordinateLayerIds = checked ? visibleIds : [];
-  saveAllDB();
-  if (currentPreviewMode === "CROQUIS") printUtmSketchSheet();
+  var visibleIds = getCroquisCoordinatePrintLayerIds(map);
+  map.printCoordinateLayerIds = checked ? visibleIds.slice() : [];
+  if (typeof saveAllDB === "function") saveAllDB();
+  refreshCroquisPrintSelection();
   return true;
 };
 
@@ -4797,16 +4813,17 @@ function printUtmSketchSheet() {
   if (allowedZooms.indexOf(String(croquisPrintZoomLevel)) === -1) croquisPrintZoomLevel = "AUTO";
   var allowedMapModes = ["GOOGLE_SAT","GOOGLE_HYBRID","CAD"];
   if (allowedMapModes.indexOf(String(croquisPrintMapMode)) === -1) croquisPrintMapMode = "GOOGLE_SAT";
-  var printedMapMarkup = buildPrintedCroquisMap(m, svgW, svgH, croquisPrintMapMode);
+  var selectedPrintLayers = getCroquisPrintSelectedLayers(m);
+  var printMapSnapshot = Object.assign({}, m, { layers: selectedPrintLayers });
+  var printedMapMarkup = buildPrintedCroquisMap(printMapSnapshot, svgW, svgH, croquisPrintMapMode);
   var activeZoomDisplay = croquisPrintZoomLevel === "AUTO"
     ? ("خودکار (" + toFa(window._lastComputedPrintZoom || 18) + ")")
     : ("زوم " + toFa(croquisPrintZoomLevel));
 
   var legendPills = "";
   var focusLayerOpts = '<option value="AUTO_ALL"' + ((!window.croquisPrintFocusLayerId || window.croquisPrintFocusLayerId === "AUTO_ALL") ? " selected" : "") + '>🎯 همه لایه‌های مرئی</option>';
-  for (var mi = 0; mi < m.layers.length; mi++) {
-    var ly = m.layers[mi] || {};
-    if (!ly.visible) continue;
+  for (var mi = 0; mi < selectedPrintLayers.length; mi++) {
+    var ly = selectedPrintLayers[mi] || {};
     var gL = computeUtmGeometry(ly.points || [], ly.geomType);
     var safeLyName = safeHtmlText(ly.name || "لایه بدون نام");
     var safeLyId = safeHtmlText(ly.id || "");
@@ -4942,11 +4959,8 @@ function printUtmSketchSheet() {
   var coordRows = "";
   var rowCounter = 1;
   var defaultZoneNum = parseInt(m.utmZone, 10) || 39;
-  var selectedCoordinateLayerIds = getCroquisCoordinatePrintLayerIds(m);
-
-  for (var i = 0; i < m.layers.length; i++) {
-    var l = m.layers[i];
-    if (!l.visible) continue;
+  for (var i = 0; i < selectedPrintLayers.length; i++) {
+    var l = selectedPrintLayers[i];
     var g = computeUtmGeometry(l.points, l.geomType);
     var catRole = l.category === "MAIN_PARCEL" ? "محدوده اصلی زمین (عرصه کل)" : "عارضه انتخاب‌شده";
     layersRows += '<tr>' +
@@ -4957,9 +4971,7 @@ function printUtmSketchSheet() {
       '<td>' + toFa(g.perim.toFixed(1)) + ' متر</td>' +
     '</tr>';
 
-    // The area summary remains independent; only checked layer IDs print coordinate rows.
-    if (selectedCoordinateLayerIds.indexOf(String(l.id || "")) === -1) continue;
-
+    // Only selected layers reach the map drawing, layer summary and coordinate rows.
     for (var p = 0; p < l.points.length; p++) {
       var ptObj = ensurePointEnriched(l.points[p], defaultZoneNum, p);
       var sideL = (g.sides && g.sides[p]) ? (toFa(g.sides[p].len.toFixed(1)) + " م") : "---";

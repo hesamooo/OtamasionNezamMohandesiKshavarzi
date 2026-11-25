@@ -22,7 +22,7 @@ test('package and TypeScript configuration are valid JSON', () => {
 });
 
 test('main JavaScript modules have valid syntax', () => {
-  for (const file of ['nezam-core.js', 'nezam-customizer.js', 'nezam-croquis-enhancements.js', 'nezam-croquis-print-declaration.js', 'nezam-cad-view-tools.js', 'nezam-ai-assistant.js', 'nezam-operations.js', 'nezam-agent-engine.js']) {
+  for (const file of ['nezam-core.js', 'nezam-customizer.js', 'nezam-croquis-enhancements.js', 'nezam-croquis-print-declaration.js', 'nezam-cad-view-tools.js', 'nezam-cad-file-io.js', 'nezam-ai-assistant.js', 'nezam-operations.js', 'nezam-agent-engine.js']) {
     assert.doesNotThrow(() => new Function(read(file)), file);
   }
 });
@@ -967,4 +967,96 @@ test('applicant declaration targets only the certification note inside page-two 
   assert.ok(source.includes('contentWrap.querySelectorAll(".l-txt div")'));
   assert.ok(!source.includes('Array.prototype.slice.call(contentWrap.children).find'));
   assert.ok(source.includes('The complete sheet content sits inside .l-txt'));
+});
+
+
+test('print layer selection filters the entire printed map and both summary tables', () => {
+  const source = read('nezam-customizer.js');
+  const start = source.indexOf('function getCroquisCoordinatePrintLayerIds(map)');
+  const end = source.indexOf('\n/* چاپ رسمی کروکی', start);
+  assert.ok(start >= 0 && end > start, 'print layer selection helpers must exist');
+  const helpers = source.slice(start, end);
+  const api = new Function('window', helpers + '\nreturn {getCroquisCoordinatePrintLayerIds,getCroquisPrintSelectedLayers};')({});
+  const map = {layers:[
+    {id:'main',name:'زمین اصلی',visible:true,points:[{x:1,y:1}]},
+    {id:'project',name:'محل اجرای طرح',visible:true,points:[{x:2,y:2}]},
+    {id:'road',name:'راه دسترسی',visible:true,points:[{x:3,y:3}]},
+    {id:'hidden',name:'لایه مخفی',visible:false,points:[{x:4,y:4}]}
+  ],printCoordinateLayerIds:['project']};
+  assert.deepEqual(api.getCroquisCoordinatePrintLayerIds(map),['project']);
+  assert.deepEqual(api.getCroquisPrintSelectedLayers(map).map(layer=>layer.id),['project']);
+  const defaultMap={layers:map.layers.slice(0,3)};
+  assert.deepEqual(api.getCroquisPrintSelectedLayers(defaultMap).map(layer=>layer.id),['main','project','road']);
+  assert.ok(source.includes('buildPrintedCroquisMap(printMapSnapshot'));
+  assert.ok(source.includes('for (var mi = 0; mi < selectedPrintLayers.length; mi++)'));
+  assert.ok(source.includes('for (var i = 0; i < selectedPrintLayers.length; i++)'));
+});
+
+test('croquis coordinate box position supports four map corners', () => {
+  const source=read('nezam-croquis-enhancements.js');
+  const declaration=read('nezam-croquis-print-declaration.js');
+  ['TOP_RIGHT','TOP_LEFT','BOTTOM_RIGHT','BOTTOM_LEFT'].forEach(position=>{
+    assert.ok(source.includes("data-position='"+position+"'"));
+  });
+  assert.ok(source.includes('coordinateBox.setAttribute("data-position", boxPosition)'));
+  assert.ok(declaration.includes('window.setCroquisCoordinateBoxPosition'));
+  assert.ok(declaration.includes('جای کادر مختصات روی نقشه'));
+});
+
+test('DXF export and import module passes ASCII UTM round-trip for supported entities', () => {
+  const source=read('nezam-cad-file-io.js');
+  const apiWindow={};
+  new Function('window',source)(apiWindow);
+  assert.equal(typeof apiWindow.buildCroquisDXFText,'function');
+  assert.equal(typeof apiWindow.parseCroquisDXFText,'function');
+  const map={title:'نقشه آزمایشی',utmZone:'39R',layers:[
+    {name:'زمین اصلی',color:'#ff0000',visible:true,geomType:'POLYGON',points:[
+      {x:714800.12,y:3203100.34,elev:0},{x:714850.12,y:3203100.34,elev:0},
+      {x:714850.12,y:3203150.34,elev:0},{x:714800.12,y:3203150.34,elev:0}]},
+    {name:'راه',color:'#0000ff',visible:true,geomType:'LINE',points:[
+      {x:714700,y:3203000,elev:2},{x:714900,y:3203200,elev:3}]},
+    {name:'نقطه',color:'#00ff00',visible:true,geomType:'POINT',points:[{x:714777.5,y:3203333.25,elev:4}]},
+    {name:'مخفی',color:'#888888',visible:false,geomType:'POINT',points:[{x:1,y:2,elev:0}]}
+  ]};
+  const text=apiWindow.buildCroquisDXFText(map);
+  assert.ok(text.includes('NEZAM636_UTM_ZONE=39R'));
+  assert.ok(text.includes('NEZAM636_COORDINATES=UTM_METERS'));
+  assert.ok(text.includes('$INSUNITS'));
+  assert.ok(text.includes('714800.1200'));
+  const parsed=apiWindow.parseCroquisDXFText(text);
+  assert.equal(parsed.zone,'39R');
+  assert.equal(parsed.unitScale,1);
+  assert.equal(parsed.features.length,3);
+  assert.equal(parsed.features[0].geomType,'POLYGON');
+  assert.equal(parsed.features[0].points.length,4);
+  assert.equal(parsed.features[1].geomType,'LINE');
+  assert.equal(parsed.features[2].geomType,'POINT');
+});
+
+test('DXF import detects common units and approximates ARC as an open line', () => {
+  const apiWindow={};
+  new Function('window',read('nezam-cad-file-io.js'))(apiWindow);
+  const dxf=['0','SECTION','2','HEADER','9','$INSUNITS','70','4','0','ENDSEC',
+    '0','SECTION','2','ENTITIES','0','ARC','8','ARC_LAYER','10','100','20','200',
+    '30','0','40','10','50','0','51','90','0','ENDSEC','0','EOF'].join('\n');
+  const parsed=apiWindow.parseCroquisDXFText(dxf);
+  assert.equal(parsed.unitScale,0.001);
+  assert.equal(parsed.features.length,1);
+  assert.equal(parsed.features[0].geomType,'LINE');
+  assert.equal(parsed.features[0].approximation,'ARC_POLYLINE');
+  assert.ok(parsed.features[0].points.length>=8);
+});
+
+test('DXF controls are backed by a loaded module and automatic unit detection is offered', () => {
+  const html=read('index.html');
+  const source=read('nezam-cad-file-io.js');
+  assert.ok(html.includes('onclick="downloadCroquisDXF()"'));
+  assert.ok(html.includes('onclick="triggerCroquisDXFImport()"'));
+  assert.ok(html.includes('onchange="importCroquisDXFFile(event)"'));
+  assert.ok(html.includes('nezam-cad-file-io.js?v=20261125-cad-io-r2'));
+  assert.ok(html.includes('<option value="AUTO" selected>واحد: تشخیص خودکار</option>'));
+  assert.ok(source.includes('window.exportActiveCroquisToDXF'));
+  assert.ok(source.includes('window.importCroquisDXFFile'));
+  assert.ok(source.includes('window.buildCroquisDXFText'));
+  assert.ok(source.includes('function detectDxfUnitScale'));
 });

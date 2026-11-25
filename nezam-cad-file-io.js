@@ -61,20 +61,12 @@
     return (Number.isFinite(n) ? n : 0).toFixed(4);
   }
 
-  window.exportActiveCroquisToDXF = function () {
-    var map = activeMap();
-    var c = activeCase();
-    if (!map || !Array.isArray(map.layers)) {
-      alert("ابتدا پرونده و نقشه کروکی را انتخاب کنید.");
-      return false;
-    }
-    var layers = map.layers.filter(function (layer) {
+  function buildDXFDocument(map) {
+    if (!map || !Array.isArray(map.layers)) throw new Error("نقشه فعال معتبر نیست.");
+    var layers = map.layers.filter(function(layer) {
       return layer && layer.visible !== false && Array.isArray(layer.points) && layer.points.length > 0;
     });
-    if (!layers.length) {
-      alert("هیچ لایه مرئی برای خروجی DXF وجود ندارد.");
-      return false;
-    }
+    if (!layers.length) throw new Error("هیچ لایه مرئی برای خروجی DXF وجود ندارد.");
     var out = [];
     pair(out,999,"NEZAM636_UTM_ZONE=" + String(map.utmZone || "39R"));
     pair(out,999,"NEZAM636_COORDINATES=UTM_METERS");
@@ -85,57 +77,54 @@
     pair(out,9,"$LUPREC"); pair(out,70,"4");
     pair(out,9,"$MEASUREMENT"); pair(out,70,"1");
     pair(out,0,"ENDSEC");
-
     pair(out,0,"SECTION"); pair(out,2,"TABLES");
     pair(out,0,"TABLE"); pair(out,2,"LAYER"); pair(out,70,layers.length);
-    var names = [];
-    layers.forEach(function (layer,index) {
-      var name = dxfName(layer.name,index+1);
-      names.push(name);
+    var names=[];
+    layers.forEach(function(layer,index) {
+      var name=dxfName(layer.name,index+1); names.push(name);
       pair(out,0,"LAYER"); pair(out,2,name); pair(out,70,"0");
       pair(out,62,aciForColor(layer.color)); pair(out,6,"CONTINUOUS");
     });
     pair(out,0,"ENDTAB"); pair(out,0,"ENDSEC");
-
     pair(out,0,"SECTION"); pair(out,2,"ENTITIES");
-    var count = 0;
-    layers.forEach(function (layer,index) {
-      var pts = layer.points.filter(function (p) {
-        return p && Number.isFinite(Number(p.x)) && Number.isFinite(Number(p.y));
-      });
-      if (!pts.length) return;
-      var name = names[index];
-      if (layer.geomType === "POINT" || pts.length === 1) {
-        pts.forEach(function (p) {
-          pair(out,0,"POINT"); pair(out,8,name);
-          pair(out,10,dxfNum(p.x)); pair(out,20,dxfNum(p.y)); pair(out,30,dxfNum(p.elev !== undefined ? p.elev : p.z));
-          count++;
+    var entityCount=0, vertexCount=0;
+    layers.forEach(function(layer,index) {
+      var pts=layer.points.filter(function(p){return p&&Number.isFinite(Number(p.x))&&Number.isFinite(Number(p.y));});
+      if(!pts.length)return;
+      var name=names[index];
+      if(layer.geomType==="POINT"||pts.length===1){
+        pts.forEach(function(p){
+          pair(out,0,"POINT"); pair(out,8,name); pair(out,10,dxfNum(p.x)); pair(out,20,dxfNum(p.y));
+          pair(out,30,dxfNum(p.elev!==undefined?p.elev:p.z)); entityCount++; vertexCount++;
         });
-      } else {
-        var closed = layer.geomType === "POLYGON" && pts.length >= 3;
-        pair(out,0,"POLYLINE"); pair(out,8,name); pair(out,66,"1"); pair(out,70,closed ? "1" : "0");
+      }else{
+        var closed=layer.geomType==="POLYGON"&&pts.length>=3;
+        pair(out,0,"POLYLINE"); pair(out,8,name); pair(out,66,"1"); pair(out,70,closed?"1":"0");
         pair(out,10,"0"); pair(out,20,"0"); pair(out,30,"0");
-        pts.forEach(function (p) {
+        pts.forEach(function(p){
           pair(out,0,"VERTEX"); pair(out,8,name); pair(out,70,"0");
-          pair(out,10,dxfNum(p.x)); pair(out,20,dxfNum(p.y)); pair(out,30,dxfNum(p.elev !== undefined ? p.elev : p.z));
+          pair(out,10,dxfNum(p.x)); pair(out,20,dxfNum(p.y)); pair(out,30,dxfNum(p.elev!==undefined?p.elev:p.z)); vertexCount++;
         });
-        pair(out,0,"SEQEND"); pair(out,8,name);
-        count++;
+        pair(out,0,"SEQEND"); pair(out,8,name); entityCount++;
       }
     });
     pair(out,0,"ENDSEC"); pair(out,0,"EOF");
-
-    var blob = new Blob([out.join("\r\n") + "\r\n"], {type:"application/dxf;charset=utf-8"});
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement("a");
-    a.href = url;
-    a.download = "Nezam636_" + safeFilePart(c && c.name) + "_" + safeFilePart(map.title) + ".dxf";
+    return {text:out.join("\r\n")+"\r\n",entityCount:entityCount,layerCount:layers.length,vertexCount:vertexCount,zone:String(map.utmZone||"39R")};
+  }
+  window.buildCroquisDXFText = function(map){return buildDXFDocument(map).text;};
+  window.exportActiveCroquisToDXF = function() {
+    var map=activeMap(), c=activeCase();
+    if(!map){alert("ابتدا پرونده و نقشه کروکی را انتخاب کنید.");return false;}
+    var documentData;
+    try{documentData=buildDXFDocument(map);}catch(error){alert(error&&error.message?error.message:"ساخت فایل DXF ناموفق بود.");return false;}
+    var blob=new Blob([documentData.text],{type:"application/dxf;charset=utf-8"});
+    var url=URL.createObjectURL(blob), a=document.createElement("a");
+    a.href=url; a.download="Nezam636_"+safeFilePart(c&&c.name)+"_"+safeFilePart(map.title)+".dxf";
     document.body.appendChild(a); a.click(); a.remove();
-    window.setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
-    if (typeof showToastMsg === "function") showToastMsg("خروجی DXF با مختصات UTM و واحد متر آماده شد (" + count + " عارضه).");
+    window.setTimeout(function(){URL.revokeObjectURL(url);},2000);
+    if(typeof showToastMsg==="function")showToastMsg("خروجی DXF با مختصات UTM، واحد متر و "+documentData.entityCount+" عارضه آماده شد.");
     return true;
   };
-
   function parsePairs(text) {
     var lines = String(text || "").replace(/\r/g,"").split("\n");
     if (lines.length < 4) throw new Error("فایل انتخاب‌شده DXF متنی معتبر نیست.");
@@ -220,6 +209,19 @@
       if(Number.isFinite(point.x)&&Number.isFinite(point.y))
         return {consumed:0,feature:{layerName:layerName,points:[point],geomType:"POINT"}};
     }
+    if(record.type==="ARC"){
+      var arcX=numeric(valueOf(values,10,NaN)),arcY=numeric(valueOf(values,20,NaN)),arcZ=numeric(valueOf(values,30,0));
+      var arcR=numeric(valueOf(values,40,NaN)),startA=numeric(valueOf(values,50,0)),endA=numeric(valueOf(values,51,360));
+      if([arcX,arcY,arcR,startA,endA].every(Number.isFinite)&&arcR>0){
+        var sweep=((endA-startA)%360+360)%360;if(sweep<0.001)sweep=360;
+        var segments=Math.max(8,Math.min(180,Math.ceil(sweep/7.5))), arcPoints=[];
+        for(var ai=0;ai<=segments;ai++){
+          var angle=(startA+sweep*ai/segments)*Math.PI/180;
+          arcPoints.push({x:arcX+arcR*Math.cos(angle),y:arcY+arcR*Math.sin(angle),z:arcZ});
+        }
+        return {consumed:0,feature:{layerName:layerName,points:arcPoints,geomType:"LINE",approximation:"ARC_POLYLINE"}};
+      }
+    }
     if (record.type === "CIRCLE") {
       var cx=numeric(valueOf(values,10,NaN)),cy=numeric(valueOf(values,20,NaN));
       var cz=numeric(valueOf(values,30,0)),radius=numeric(valueOf(values,40,NaN));
@@ -231,9 +233,26 @@
     }
     return {consumed:0,feature:null};
   }
+  function detectDxfUnitScale(pairs,text) {
+    if(/NEZAM636_COORDINATES\s*=\s*UTM_METERS/i.test(String(text||"")))return 1;
+    var insUnits=null;
+    for(var i=0;i<pairs.length;i++){
+      if(pairs[i].code===9&&String(pairs[i].value).toUpperCase()==="$INSUNITS"){
+        for(var j=i+1;j<pairs.length&&pairs[j].code!==9&&pairs[j].code!==0;j++){
+          if(pairs[j].code===70){insUnits=parseInt(pairs[j].value,10);break;}
+        }
+        break;
+      }
+    }
+    var scales={1:0.0254,2:0.3048,3:1609.344,4:0.001,5:0.01,6:1,7:1000,10:0.9144,21:1200/3937,22:0.0254,23:0.9144,24:1609.347218694};
+    return Object.prototype.hasOwnProperty.call(scales,insUnits)?scales[insUnits]:null;
+  }
   function parseDXF(text) {
-    var pairs=parsePairs(text);
-    var zoneMatch=String(text).match(/NEZAM636_UTM_ZONE\s*=\s*([0-9]{1,2}[C-HJ-NP-X])/i);
+    var sourceText=String(text||"");
+    if(sourceText.length>MAX_FILE_BYTES)throw new Error("حجم متن DXF بیش از ۲۰ مگابایت است.");
+    var pairs=parsePairs(sourceText);
+    var zoneMatch=sourceText.match(/NEZAM636_UTM_ZONE\s*=\s*([0-9]{1,2}[C-HJ-NP-X])/i);
+    var unitScale=detectDxfUnitScale(pairs,sourceText);
     var records=entityRecords(pairs), features=[], unsupported=0, total=0;
     if(records.length>MAX_ENTITIES) throw new Error("تعداد عوارض فایل از سقف مجاز بیشتر است.");
     for(var i=0;i<records.length;i++){
@@ -248,7 +267,7 @@
       } else unsupported++;
     }
     if(!features.length) throw new Error("هیچ عارضه قابل‌واردکردن (POLYLINE، LINE، POINT یا CIRCLE) پیدا نشد.");
-    return {features:features,unsupported:unsupported,zone:zoneMatch?zoneMatch[1].toUpperCase():null};
+    return {features:features,unsupported:unsupported,zone:zoneMatch?zoneMatch[1].toUpperCase():null,unitScale:unitScale};
   }
 
   window.parseCroquisDXFText = parseDXF;
@@ -261,13 +280,16 @@
     var map=activeMap();
     if(!map){alert("ابتدا پرونده و نقشه مقصد را انتخاب کنید.");input.value="";return false;}
     var unitInput=document.getElementById("crq-dxf-import-units");
-    var factor=numeric(unitInput?unitInput.value:"1");
-    if(!Number.isFinite(factor)||factor<=0){alert("واحد مختصات DXF معتبر نیست.");input.value="";return false;}
+    var chosenUnit=unitInput?String(unitInput.value||"AUTO"):"AUTO";
+    var factor=chosenUnit==="AUTO"?null:numeric(chosenUnit);
+    if(chosenUnit!=="AUTO"&&(!Number.isFinite(factor)||factor<=0)){alert("واحد مختصات DXF معتبر نیست.");input.value="";return false;}
     var reader=new FileReader();
     reader.onload=function(e){
       try{
         var parsed=parseDXF(e.target.result||"");
         var zone=String(map.utmZone||"39R").toUpperCase();
+        if(factor===null)factor=parsed.unitScale;
+        if(!Number.isFinite(factor)||factor<=0)throw new Error("واحد فایل از سرآیند DXF قابل تشخیص نیست. واحد را از فهرست کنار دکمه ورود به‌صورت دستی انتخاب کنید.");
         if(parsed.zone&&parsed.zone!==zone){
           if(!confirm("زون فایل («"+parsed.zone+"») با زون نقشه فعال («"+zone+"») متفاوت است. مختصات بدون تبدیل وارد شود؟")) return;
         }else if(!parsed.zone){
@@ -296,7 +318,7 @@
             strokeWidth:2,
             visible:true,
             order:map.layers.length+1,
-            desc:feature.approximation==="CIRCLE_48"?"دایره DXF با ۴۸ رأس تقریبی وارد شده است.":"واردشده از فایل DXF؛ مختصات بر اساس واحد انتخاب‌شده تفسیر شده است.",
+            desc:feature.approximation==="CIRCLE_48"?"دایره DXF با ۴۸ رأس تقریبی وارد شده است.":(feature.approximation==="ARC_POLYLINE"?"قوس DXF به چندخطی با نقاط نمونه‌برداری‌شده تبدیل شده است.":"واردشده از فایل DXF؛ مختصات بر اساس واحد تشخیص‌داده‌شده/انتخاب‌شده تفسیر شده است."),
             points:points,
             sourceFormat:"DXF",
             sourceLayer:baseName

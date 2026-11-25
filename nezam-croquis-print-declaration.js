@@ -43,7 +43,7 @@
     title.className = "d-flex flex-wrap justify-content-between align-items-center gap-2 mb-1";
     var heading = document.createElement("b");
     heading.className = "text-primary";
-    heading.textContent = "📍 انتخاب لایه‌های جدول مختصات شیت دوم";
+    heading.textContent = "📍 انتخاب لایه‌ها برای خروجی چاپی نقشه";
     title.appendChild(heading);
     var allLabel = document.createElement("label");
     allLabel.className = "small d-inline-flex align-items-center gap-1 mb-0";
@@ -65,8 +65,29 @@
 
     var note = document.createElement("div");
     note.className = "small text-muted mb-1";
-    note.textContent = "فقط نقاط لایه‌های انتخاب‌شده در جدول مختصات چاپ می‌شوند؛ جدول مساحت لایه‌های مرئی مستقل باقی می‌ماند. در صورت زیاد بودن نقاط، جدول به برگه‌های ادامه تقسیم می‌شود.";
+    note.textContent = "فقط لایه‌های تیک‌خورده در نقشه صفحه اول، راهنمای لایه‌ها، جدول تفکیک و جدول مختصات چاپ می‌شوند. لایه‌های انتخاب‌نشده از خروجی حذف می‌شوند؛ نقاط زیاد به برگه‌های ادامه منتقل خواهند شد.";
     panel.appendChild(note);
+
+    var positionRow = document.createElement("div");
+    positionRow.className = "d-flex flex-wrap align-items-center gap-2 mb-2";
+    var positionLabel = document.createElement("label");
+    positionLabel.className = "small fw-bold";
+    positionLabel.textContent = "جای کادر مختصات روی نقشه:";
+    var positionSelect = document.createElement("select");
+    positionSelect.className = "form-select form-select-sm";
+    positionSelect.style.width = "auto";
+    positionSelect.style.minWidth = "150px";
+    positionSelect.setAttribute("aria-label", "جای کادر مختصات روی نقشه چاپی");
+    [["TOP_RIGHT","بالا سمت راست"],["TOP_LEFT","بالا سمت چپ"],["BOTTOM_RIGHT","پایین سمت راست"],["BOTTOM_LEFT","پایین سمت چپ"]].forEach(function(item) {
+      var option = document.createElement("option");
+      option.value = item[0]; option.textContent = item[1]; positionSelect.appendChild(option);
+    });
+    positionSelect.value = ["TOP_RIGHT","TOP_LEFT","BOTTOM_RIGHT","BOTTOM_LEFT"].indexOf(map.printCoordinateBoxPosition) !== -1
+      ? map.printCoordinateBoxPosition : "TOP_RIGHT";
+    positionSelect.addEventListener("change", function() {
+      if (typeof window.setCroquisCoordinateBoxPosition === "function") window.setCroquisCoordinateBoxPosition(positionSelect.value);
+    });
+    positionRow.appendChild(positionLabel); positionRow.appendChild(positionSelect); panel.appendChild(positionRow);
 
     var options = document.createElement("div");
     options.className = "d-flex flex-wrap gap-1";
@@ -101,6 +122,17 @@
     panel.appendChild(options);
     toolbar.appendChild(panel);
   }
+
+  window.setCroquisCoordinateBoxPosition = function(position) {
+    var map = getMap();
+    var allowed = ["TOP_RIGHT","TOP_LEFT","BOTTOM_RIGHT","BOTTOM_LEFT"];
+    if (!map || allowed.indexOf(String(position)) === -1) return false;
+    map.printCoordinateBoxPosition = String(position);
+    if (typeof saveAllDB === "function") saveAllDB();
+    if (typeof currentPreviewMode !== "undefined" && currentPreviewMode === "CROQUIS" &&
+        typeof window.printUtmSketchSheet === "function") window.printUtmSketchSheet();
+    return true;
+  };
 
   function legalDeclaration() {
     var c = typeof getActiveCase === "function" ? getActiveCase() : null;
