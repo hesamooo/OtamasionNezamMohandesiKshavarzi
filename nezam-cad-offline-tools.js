@@ -480,10 +480,32 @@
     return true;
   };
 
+  function simplePolygon(points) {
+    if (!Array.isArray(points) || points.length < 3) return false;
+    function orient(a,b,c) {
+      return (Number(b.x)-Number(a.x))*(Number(c.y)-Number(a.y)) -
+        (Number(b.y)-Number(a.y))*(Number(c.x)-Number(a.x));
+    }
+    function intersects(a,b,c,d) {
+      var o1=orient(a,b,c),o2=orient(a,b,d),o3=orient(c,d,a),o4=orient(c,d,b);
+      return ((o1>1e-8&&o2< -1e-8)||(o1< -1e-8&&o2>1e-8)) &&
+        ((o3>1e-8&&o4< -1e-8)||(o3< -1e-8&&o4>1e-8));
+    }
+    for(var i=0;i<points.length;i++){
+      var i2=(i+1)%points.length;
+      for(var j=i+1;j<points.length;j++){
+        var j2=(j+1)%points.length;
+        if(i===j||i2===j||j2===i)continue;
+        if(intersects(points[i],points[i2],points[j],points[j2]))return false;
+      }
+    }
+    return true;
+  }
+
   window.finishCroquisCadOfflineDrawing = function () {
     var mode = state.mode;
     if (mode === "POINT") {
-      state.mode="";state.draft=[];setModeButtons();render();status("ثبت نقطه متوقف شد.");return true;
+      state.mode="";state.targetLayerId=null;state.pointReplace=false;state.draft=[];setModeButtons();render();status("ثبت نقطه متوقف شد.");return true;
     }
     if (mode!=="LINE"&&mode!=="POLYGON") { status("ترسیم مسیر یا محدوده فعالی وجود ندارد.",true);return false; }
     var needed=mode==="POLYGON"?3:2;
@@ -491,7 +513,7 @@
     if(points.length<needed){status("برای ثبت این عارضه حداقل "+needed+" رأس لازم است.",true);return false;}
     var unique={};points.forEach(function(p){unique[Number(p.x).toFixed(2)+"_"+Number(p.y).toFixed(2)]=true;});
     if(Object.keys(unique).length<needed){status("تعداد رأس‌های یکتا کافی نیست؛ نقاط تکراری را اصلاح کنید.",true);return false;}
-    if(mode==="POLYGON"&&typeof isSimpleUtmPolygon==="function"&&!isSimpleUtmPolygon(points)){status("چندضلعی معتبر نیست یا اضلاع آن یکدیگر را قطع می‌کنند.",true);return false;}
+    if(mode==="POLYGON"&&!simplePolygon(points)){status("چندضلعی معتبر نیست یا اضلاع آن یکدیگر را قطع می‌کنند.",true);return false;}
     var layer=layerById(activeMap(),state.targetLayerId);
     if(!layer){status("لایه اولیه ترسیم پیدا نشد؛ ترسیم را لغو و دوباره شروع کنید.",true);return false;}
     var geom=typeof computeUtmGeometry==="function"?computeUtmGeometry(points,mode):{area:0,perim:0};
@@ -631,7 +653,7 @@
     var preview=state.dragPreview;state.dragPreview=null;
     var map=activeMap(),layer=layerById(map,drag.layerId);
     if(!preview||!layer||!map){drawOverlay();return;}
-    if(drag.kind==="MOVE"&&layer.category!=="MAIN_PARCEL"){
+    if(layer.category!=="MAIN_PARCEL"){
       var main=(map.layers||[]).find(function(candidate){return candidate&&candidate.category==="MAIN_PARCEL"&&candidate.geomType==="POLYGON"&&Array.isArray(candidate.points)&&candidate.points.length>=3;});
       if(main&&typeof window.isCroquisPlacementShapeInsideParcel==="function"&&!window.isCroquisPlacementShapeInsideParcel(preview.points,main.points)){
         status("جابه‌جایی باعث خروج چندضلعی از زمین اصلی می‌شود؛ تغییر ذخیره نشد.",true);drawOverlay();return;
@@ -643,11 +665,6 @@
     render();
   }
 
-  window.rotateCroquisCadActivePolygon = function(){
-    var degrees=readNumber("crq-cad-offline-rotate",0);
-    if(typeof window.rotateCroquisActivePolygon!=="function"){status("ابزار چرخش چندضلعی بارگذاری نشده است.",true);return false;}
-    var result=window.rotateCroquisActivePolygon(degrees);if(result)render();return result;
-  };
   window.rotateCroquisCadActivePolygon = function(){
     var input=document.getElementById("crq-cad-offline-rotate");
     var degrees=input?(typeof localizedNumber==="function"?localizedNumber(input.value):Number(input.value)):0;
