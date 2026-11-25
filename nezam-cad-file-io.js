@@ -27,15 +27,8 @@
     return String(value || "Croquis636").replace(/[\\/:*?"<>|]+/g, "_").replace(/\s+/g, "_").slice(0, 60);
   }
   function dxfName(value, index) {
-    var raw = String(value || "").trim() || ("LAYER_" + index);
-    var out = "";
-    for (var i = 0; i < raw.length; i++) {
-      var code = raw.charCodeAt(i);
-      if (code >= 33 && code <= 126 && !/[<>/\\":;?*|=,]/.test(raw.charAt(i))) out += raw.charAt(i);
-      else if (raw.charAt(i) === " ") out += "_";
-      else out += "\\U+" + code.toString(16).toUpperCase().padStart(4, "0");
-    }
-    return ("N636_" + String(index).padStart(3, "0") + "_" + out).slice(0, 240);
+    // R12 layer names are kept short and plain ASCII for broad CAD compatibility.
+    return "N636_" + String(index).padStart(3, "0");
   }
   function aciForColor(hex) {
     var map = {
@@ -71,12 +64,9 @@
 
   function buildDXFDocument(map) {
     if (!map || !Array.isArray(map.layers)) throw new Error("نقشه فعال معتبر نیست.");
-    // Export visible layers without requiring a truthy visibility property on legacy maps.
-    var exportLayers = [];
-    var allPoints = [];
+    var exportLayers = [], allPoints = [];
     map.layers.forEach(function (layer) {
-      if (!layer || layer.visible === false || !Array.isArray(layer.points)) return;
-      if (!layer.points.length) return;
+      if (!layer || layer.visible === false || !Array.isArray(layer.points) || !layer.points.length) return;
       var points = layer.points.map(function (p, pointIndex) {
         if (!p) throw new Error("لایه «" + String(layer.name || "") + "» در رأس " + (pointIndex + 1) + " داده خالی دارد.");
         var x = numeric(p.x), y = numeric(p.y);
@@ -87,182 +77,134 @@
         }
         return { x: x, y: y, z: z };
       });
-      if (!points.length) return;
       var geomType = String(layer.geomType || "").toUpperCase();
       if (geomType === "POLYGON" && points.length > 3) {
         var first = points[0], last = points[points.length - 1];
-        if (Math.abs(first.x - last.x) < 0.0001 &&
-            Math.abs(first.y - last.y) < 0.0001 &&
-            Math.abs(first.z - last.z) < 0.0001) points.pop();
+        if (Math.abs(first.x-last.x)<0.0001 && Math.abs(first.y-last.y)<0.0001 && Math.abs(first.z-last.z)<0.0001) points.pop();
       }
-      if (!points.length) return;
       if (geomType !== "POINT" && points.length === 1) geomType = "POINT";
       else if (geomType !== "POINT" && geomType !== "POLYGON") geomType = "LINE";
       exportLayers.push({
-        source: layer,
         name: dxfName(layer.name, exportLayers.length + 1),
         color: aciForColor(layer.color),
         geomType: geomType,
-        points: points,
-        flat: points.every(function (p) { return Math.abs(p.z - points[0].z) < 0.0001; })
+        points: points
       });
       allPoints = allPoints.concat(points);
     });
     if (!exportLayers.length || !allPoints.length) {
       throw new Error("هیچ نقطه معتبر در لایه‌های مرئی نقشه وجود ندارد. وضعیت نمایش لایه‌ها و مختصات X/Y را بررسی کنید.");
     }
-    var minX = Math.min.apply(null, allPoints.map(function (p) { return p.x; }));
-    var minY = Math.min.apply(null, allPoints.map(function (p) { return p.y; }));
-    var minZ = Math.min.apply(null, allPoints.map(function (p) { return p.z; }));
-    var maxX = Math.max.apply(null, allPoints.map(function (p) { return p.x; }));
-    var maxY = Math.max.apply(null, allPoints.map(function (p) { return p.y; }));
-    var maxZ = Math.max.apply(null, allPoints.map(function (p) { return p.z; }));
+    var minX = Math.min.apply(null, allPoints.map(function(p){return p.x;}));
+    var minY = Math.min.apply(null, allPoints.map(function(p){return p.y;}));
+    var minZ = Math.min.apply(null, allPoints.map(function(p){return p.z;}));
+    var maxX = Math.max.apply(null, allPoints.map(function(p){return p.x;}));
+    var maxY = Math.max.apply(null, allPoints.map(function(p){return p.y;}));
+    var maxZ = Math.max.apply(null, allPoints.map(function(p){return p.z;}));
     var centerX = (minX + maxX) / 2, centerY = (minY + maxY) / 2;
-    var spanX = Math.max(maxX - minX, 1), spanY = Math.max(maxY - minY, 1);
-    var viewHeight = Math.max(spanY, spanX / 1.55, 1) * 1.18;
-    var margin = Math.max(viewHeight * 0.08, 1);
-    var entityCount = 0, vertexCount = 0, out = [], handleNumber = 0x200;
-    var plannedEntityHandles = exportLayers.reduce(function (sum, layer) {
-      if (layer.geomType === "POINT" || layer.points.length === 1) return sum + layer.points.length;
-      return sum + (layer.flat ? 1 : layer.points.length + 2);
-    }, 0);
-    // Tables, block records, block begin/end objects and model-space entities all receive unique handles.
-    var plannedHandles = 2 + (exportLayers.length + 2) + 3 + 4 + plannedEntityHandles;
-    var handSeed = (0x201 + plannedHandles).toString(16).toUpperCase();
-    function nextHandle() { handleNumber++; return handleNumber.toString(16).toUpperCase(); }
-    function tableStart(name, count) {
-      pair(out, 0, "TABLE"); pair(out, 2, name); pair(out, 5, nextHandle());
-      pair(out, 100, "AcDbSymbolTable"); pair(out, 70, count);
+    var spanX = Math.max(maxX-minX,1), spanY = Math.max(maxY-minY,1);
+    var viewHeight = Math.max(spanY,spanX/1.55,1)*1.18;
+    var margin = Math.max(viewHeight*0.08,1);
+    var out=[], entityCount=0, vertexCount=0;
+
+    function tableStart(name,count){
+      pair(out,0,"TABLE");pair(out,2,name);pair(out,70,count);
     }
-    function tableEnd() { pair(out, 0, "ENDTAB"); }
-    function writeBlock(name, blockRecordHandle) {
-      pair(out, 0, "BLOCK"); pair(out, 5, nextHandle()); pair(out, 330, blockRecordHandle);
-      pair(out, 100, "AcDbEntity"); pair(out, 8, "0");
-      pair(out, 100, "AcDbBlockBegin"); pair(out, 2, name); pair(out, 70, "0");
-      pair(out, 10, "0.0"); pair(out, 20, "0.0"); pair(out, 30, "0.0");
-      pair(out, 3, name); pair(out, 1, "");
-      pair(out, 0, "ENDBLK"); pair(out, 5, nextHandle()); pair(out, 330, blockRecordHandle);
-      pair(out, 100, "AcDbEntity"); pair(out, 8, "0"); pair(out, 100, "AcDbBlockEnd");
+    function tableEnd(){pair(out,0,"ENDTAB");}
+    function writeLtype(name,description){
+      pair(out,0,"LTYPE");pair(out,2,name);pair(out,70,0);
+      pair(out,3,description);pair(out,72,65);pair(out,73,0);pair(out,40,0.0);
     }
-    pair(out, 999, "NEZAM636_UTM_ZONE=" + String(map.utmZone || "39R"));
-    pair(out, 999, "NEZAM636_COORDINATES=UTM_METERS");
-    pair(out, 999, "NEZAM636_LAYER_COUNT=" + exportLayers.length);
-    pair(out, 999, "NEZAM636_ENTITY_COUNT=" + exportLayers.reduce(function (sum, layer) {
-      return sum + (layer.geomType === "POINT" ? layer.points.length : 1);
-    }, 0));
-    pair(out, 0, "SECTION"); pair(out, 2, "HEADER");
-    pair(out, 9, "$ACADVER"); pair(out, 1, "AC1015");
-    pair(out, 9, "$HANDSEED"); pair(out, 5, handSeed);
-    pair(out, 9, "$INSUNITS"); pair(out, 70, "6");
-    pair(out, 9, "$LUNITS"); pair(out, 70, "2");
-    pair(out, 9, "$LUPREC"); pair(out, 70, "4");
-    pair(out, 9, "$MEASUREMENT"); pair(out, 70, "1");
-    pair(out, 9, "$INSBASE"); pair(out, 10, "0.0"); pair(out, 20, "0.0"); pair(out, 30, "0.0");
-    pair(out, 9, "$EXTMIN"); pair(out, 10, dxfNum(minX)); pair(out, 20, dxfNum(minY)); pair(out, 30, dxfNum(minZ));
-    pair(out, 9, "$EXTMAX"); pair(out, 10, dxfNum(maxX)); pair(out, 20, dxfNum(maxY)); pair(out, 30, dxfNum(maxZ));
-    pair(out, 9, "$LIMMIN"); pair(out, 10, dxfNum(minX - margin)); pair(out, 20, dxfNum(minY - margin));
-    pair(out, 9, "$LIMMAX"); pair(out, 10, dxfNum(maxX + margin)); pair(out, 20, dxfNum(maxY + margin));
-    pair(out, 9, "$VIEWCTR"); pair(out, 10, dxfNum(centerX)); pair(out, 20, dxfNum(centerY));
-    pair(out, 9, "$VIEWSIZE"); pair(out, 40, dxfNum(viewHeight));
-    pair(out, 9, "$PDMODE"); pair(out, 70, "35");
-    pair(out, 9, "$PDSIZE"); pair(out, 40, "-2.0");
-    pair(out, 9, "$LTSCALE"); pair(out, 40, "1.0");
-    pair(out, 9, "$CLAYER"); pair(out, 8, "0");
-    pair(out, 0, "ENDSEC");
-
-    pair(out, 0, "SECTION"); pair(out, 2, "TABLES");
-    tableStart("LTYPE", 1);
-    pair(out, 0, "LTYPE"); pair(out, 5, nextHandle());
-    pair(out, 100, "AcDbSymbolTableRecord"); pair(out, 100, "AcDbLinetypeTableRecord");
-    pair(out, 2, "CONTINUOUS"); pair(out, 70, "0"); pair(out, 3, "Solid line");
-    pair(out, 72, "65"); pair(out, 73, "0"); pair(out, 40, "0.0");
-    tableEnd();
-
-    tableStart("LAYER", exportLayers.length + 1);
-    function writeLayer(name, color) {
-      pair(out, 0, "LAYER"); pair(out, 5, nextHandle());
-      pair(out, 100, "AcDbSymbolTableRecord"); pair(out, 100, "AcDbLayerTableRecord");
-      pair(out, 2, name); pair(out, 70, "0"); pair(out, 62, color); pair(out, 6, "CONTINUOUS");
-      pair(out, 370, "-1");
+    function writeLayer(name,color){
+      pair(out,0,"LAYER");pair(out,2,name);pair(out,70,0);pair(out,62,color);pair(out,6,"CONTINUOUS");
     }
-    writeLayer("0", 7);
-    exportLayers.forEach(function (layer) { writeLayer(layer.name, layer.color); });
-    tableEnd();
-
-    tableStart("BLOCK_RECORD", 2);
-    var modelRecordHandle = nextHandle();
-    pair(out, 0, "BLOCK_RECORD"); pair(out, 5, modelRecordHandle);
-    pair(out, 100, "AcDbSymbolTableRecord"); pair(out, 100, "AcDbBlockTableRecord");
-    pair(out, 2, "*Model_Space"); pair(out, 70, "0"); pair(out, 280, "1"); pair(out, 281, "0");
-    var paperRecordHandle = nextHandle();
-    pair(out, 0, "BLOCK_RECORD"); pair(out, 5, paperRecordHandle);
-    pair(out, 100, "AcDbSymbolTableRecord"); pair(out, 100, "AcDbBlockTableRecord");
-    pair(out, 2, "*Paper_Space"); pair(out, 70, "0"); pair(out, 280, "1"); pair(out, 281, "0");
-    tableEnd();
-    pair(out, 0, "ENDSEC");
-
-    pair(out, 0, "SECTION"); pair(out, 2, "BLOCKS");
-    writeBlock("*Model_Space", modelRecordHandle);
-    writeBlock("*Paper_Space", paperRecordHandle);
-    pair(out, 0, "ENDSEC");
-
-    pair(out, 0, "SECTION"); pair(out, 2, "ENTITIES");
-    function writePoint(point, layerName) {
-      pair(out, 0, "POINT"); pair(out, 5, nextHandle()); pair(out, 330, modelRecordHandle);
-      pair(out, 100, "AcDbEntity"); pair(out, 8, layerName);
-      pair(out, 100, "AcDbPoint"); pair(out, 10, dxfNum(point.x));
-      pair(out, 20, dxfNum(point.y)); pair(out, 30, dxfNum(point.z));
-      entityCount++; vertexCount++;
+    function writePoint(point,layerName){
+      pair(out,0,"POINT");pair(out,8,layerName);
+      pair(out,10,dxfNum(point.x));pair(out,20,dxfNum(point.y));pair(out,30,dxfNum(point.z));
+      entityCount++;vertexCount++;
     }
-    function writeFlatPolyline(layer) {
-      var closed = layer.geomType === "POLYGON" && layer.points.length >= 3;
-      pair(out, 0, "LWPOLYLINE"); pair(out, 5, nextHandle()); pair(out, 330, modelRecordHandle);
-      pair(out, 100, "AcDbEntity"); pair(out, 8, layer.name);
-      pair(out, 100, "AcDbPolyline"); pair(out, 90, layer.points.length);
-      pair(out, 70, closed ? "1" : "0"); pair(out, 38, dxfNum(layer.points[0].z));
-      layer.points.forEach(function (point) {
-        pair(out, 10, dxfNum(point.x)); pair(out, 20, dxfNum(point.y)); vertexCount++;
+    function write3DPolyline(layer){
+      var closed=layer.geomType==="POLYGON"&&layer.points.length>=3;
+      pair(out,0,"POLYLINE");pair(out,8,layer.name);pair(out,66,1);
+      pair(out,70,closed?9:8);pair(out,10,0);pair(out,20,0);pair(out,30,0);
+      layer.points.forEach(function(point){
+        pair(out,0,"VERTEX");pair(out,8,layer.name);
+        pair(out,10,dxfNum(point.x));pair(out,20,dxfNum(point.y));pair(out,30,dxfNum(point.z));
+        pair(out,70,32);vertexCount++;
       });
-      pair(out, 210, "0.0"); pair(out, 220, "0.0"); pair(out, 230, "1.0");
+      pair(out,0,"SEQEND");pair(out,8,layer.name);
       entityCount++;
     }
-    function write3DPolyline(layer) {
-      var closed = layer.geomType === "POLYGON" && layer.points.length >= 3;
-      var polylineHandle = nextHandle();
-      pair(out, 0, "POLYLINE"); pair(out, 5, polylineHandle); pair(out, 330, modelRecordHandle);
-      pair(out, 100, "AcDbEntity"); pair(out, 8, layer.name);
-      pair(out, 100, "AcDb3dPolyline"); pair(out, 66, "1"); pair(out, 70, closed ? "9" : "8");
-      pair(out, 10, "0.0"); pair(out, 20, "0.0"); pair(out, 30, "0.0");
-      layer.points.forEach(function (point) {
-        pair(out, 0, "VERTEX"); pair(out, 5, nextHandle()); pair(out, 330, polylineHandle);
-        pair(out, 100, "AcDbEntity"); pair(out, 8, layer.name);
-        pair(out, 100, "AcDbVertex"); pair(out, 100, "AcDb3dPolylineVertex");
-        pair(out, 10, dxfNum(point.x)); pair(out, 20, dxfNum(point.y)); pair(out, 30, dxfNum(point.z));
-        pair(out, 70, "32"); vertexCount++;
-      });
-      pair(out, 0, "SEQEND"); pair(out, 5, nextHandle()); pair(out, 330, polylineHandle);
-      pair(out, 100, "AcDbEntity"); pair(out, 8, layer.name);
-      entityCount++;
-    }
-    exportLayers.forEach(function (layer) {
-      if (layer.geomType === "POINT" || layer.points.length === 1) {
-        layer.points.forEach(function (point) { writePoint(point, layer.name); });
-      } else if (layer.flat) {
-        writeFlatPolyline(layer);
-      } else {
+
+    // R12 is intentionally used: it is the simplest long-supported ASCII DXF format.
+    // The active VPORT centers the drawing on its UTM extents instead of the world origin.
+    pair(out,999,"NEZAM636_UTM_ZONE="+String(map.utmZone||"39R"));
+    pair(out,999,"NEZAM636_COORDINATES=UTM_METERS");
+    pair(out,999,"NEZAM636_LAYER_COUNT="+exportLayers.length);
+    pair(out,999,"NEZAM636_ENTITY_COUNT="+exportLayers.reduce(function(sum,layer){
+      return sum+(layer.geomType==="POINT"?layer.points.length:1);
+    },0));
+    pair(out,0,"SECTION");pair(out,2,"HEADER");
+    pair(out,9,"$ACADVER");pair(out,1,"AC1009");
+    pair(out,9,"$EXTMIN");pair(out,10,dxfNum(minX));pair(out,20,dxfNum(minY));pair(out,30,dxfNum(minZ));
+    pair(out,9,"$EXTMAX");pair(out,10,dxfNum(maxX));pair(out,20,dxfNum(maxY));pair(out,30,dxfNum(maxZ));
+    pair(out,9,"$LIMMIN");pair(out,10,dxfNum(minX-margin));pair(out,20,dxfNum(minY-margin));
+    pair(out,9,"$LIMMAX");pair(out,10,dxfNum(maxX+margin));pair(out,20,dxfNum(maxY+margin));
+    pair(out,9,"$VIEWCTR");pair(out,10,dxfNum(centerX));pair(out,20,dxfNum(centerY));
+    pair(out,9,"$VIEWSIZE");pair(out,40,dxfNum(viewHeight));
+    pair(out,9,"$PDMODE");pair(out,70,35);pair(out,9,"$PDSIZE");pair(out,40,-2.0);
+    pair(out,0,"ENDSEC");
+
+    pair(out,0,"SECTION");pair(out,2,"TABLES");
+    tableStart("VPORT",1);
+    pair(out,0,"VPORT");pair(out,2,"*ACTIVE");pair(out,70,0);
+    pair(out,10,0.0);pair(out,20,0.0);pair(out,11,1.0);pair(out,21,1.0);
+    pair(out,12,dxfNum(centerX));pair(out,22,dxfNum(centerY));
+    pair(out,13,0.0);pair(out,23,0.0);
+    pair(out,14,10.0);pair(out,24,10.0);pair(out,15,10.0);pair(out,25,10.0);
+    pair(out,16,0.0);pair(out,26,0.0);pair(out,36,1.0);
+    pair(out,17,dxfNum(centerX));pair(out,27,dxfNum(centerY));pair(out,37,0.0);
+    pair(out,42,50.0);pair(out,43,0.0);pair(out,44,0.0);pair(out,45,dxfNum(viewHeight));
+    pair(out,50,0.0);pair(out,51,0.0);pair(out,71,0);pair(out,72,100);pair(out,74,3);
+    tableEnd();
+
+    tableStart("LTYPE",3);
+    writeLtype("BYBLOCK","");
+    writeLtype("BYLAYER","");
+    writeLtype("CONTINUOUS","Solid line");
+    tableEnd();
+
+    tableStart("LAYER",exportLayers.length+1);
+    writeLayer("0",7);
+    exportLayers.forEach(function(layer){writeLayer(layer.name,layer.color);});
+    tableEnd();
+    pair(out,0,"ENDSEC");
+
+    pair(out,0,"SECTION");pair(out,2,"BLOCKS");
+    pair(out,0,"BLOCK");pair(out,8,"0");pair(out,2,"$MODEL_SPACE");pair(out,70,0);
+    pair(out,10,0);pair(out,20,0);pair(out,30,0);pair(out,3,"$MODEL_SPACE");pair(out,1,"");
+    pair(out,0,"ENDBLK");pair(out,8,"0");
+    pair(out,0,"BLOCK");pair(out,8,"0");pair(out,2,"$PAPER_SPACE");pair(out,70,0);
+    pair(out,10,0);pair(out,20,0);pair(out,30,0);pair(out,3,"$PAPER_SPACE");pair(out,1,"");
+    pair(out,0,"ENDBLK");pair(out,8,"0");
+    pair(out,0,"ENDSEC");
+
+    pair(out,0,"SECTION");pair(out,2,"ENTITIES");
+    exportLayers.forEach(function(layer){
+      if(layer.geomType==="POINT"||layer.points.length===1){
+        layer.points.forEach(function(point){writePoint(point,layer.name);});
+      }else{
         write3DPolyline(layer);
       }
     });
-    pair(out, 0, "ENDSEC"); pair(out, 0, "EOF");
-    if (!entityCount || !vertexCount) throw new Error("هیچ موجودیت قابل‌نمایش برای نوشتن در فایل DXF ساخته نشد.");
+    pair(out,0,"ENDSEC");pair(out,0,"EOF");
+    if(!entityCount||!vertexCount)throw new Error("هیچ موجودیت قابل‌نمایش برای نوشتن در فایل DXF ساخته نشد.");
     return {
-      text: out.join("\r\n") + "\r\n",
-      entityCount: entityCount,
-      layerCount: exportLayers.length,
-      vertexCount: vertexCount,
-      zone: String(map.utmZone || "39R"),
-      extents: { minX: minX, minY: minY, minZ: minZ, maxX: maxX, maxY: maxY, maxZ: maxZ },
-      view: { centerX: centerX, centerY: centerY, height: viewHeight }
+      text:out.join("\r\n")+"\r\n",
+      entityCount:entityCount,layerCount:exportLayers.length,vertexCount:vertexCount,
+      zone:String(map.utmZone||"39R"),
+      extents:{minX:minX,minY:minY,minZ:minZ,maxX:maxX,maxY:maxY,maxZ:maxZ},
+      view:{centerX:centerX,centerY:centerY,height:viewHeight}
     };
   }
   window.buildCroquisDXFText = function(map){return buildDXFDocument(map).text;};
