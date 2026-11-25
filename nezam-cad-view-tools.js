@@ -303,26 +303,26 @@
     var prevailingWindHud = "";
     if (view.showPrevailingWind) {
       var wind = window.describeCroquisPrevailingWind(view.prevailingWindFromDeg);
-      var windCx = 77, windCy = 59, windLen = 20;
+      var windCx = 56, windCy = 45, windLen = 12;
       var tailX = windCx - wind.dx * windLen;
       var tailY = windCy - wind.dy * windLen;
       var tipX = windCx + wind.dx * windLen;
       var tipY = windCy + wind.dy * windLen;
       var perpX = -wind.dy, perpY = wind.dx;
-      var headBaseX = tipX - wind.dx * 8;
-      var headBaseY = tipY - wind.dy * 8;
+      var headBaseX = tipX - wind.dx * 5;
+      var headBaseY = tipY - wind.dy * 5;
       var arrowHead = tipX.toFixed(1) + "," + tipY.toFixed(1) + " " +
-        (headBaseX + perpX * 4).toFixed(1) + "," + (headBaseY + perpY * 4).toFixed(1) + " " +
-        (headBaseX - perpX * 4).toFixed(1) + "," + (headBaseY - perpY * 4).toFixed(1);
+        (headBaseX + perpX * 2.8).toFixed(1) + "," + (headBaseY + perpY * 2.8).toFixed(1) + " " +
+        (headBaseX - perpX * 2.8).toFixed(1) + "," + (headBaseY - perpY * 2.8).toFixed(1);
       prevailingWindHud =
-        '<g transform="translate(' + (svgW - 166) + ',14)">' +
-          '<rect x="0" y="0" width="152" height="104" rx="8" fill="' + bg + '" fill-opacity="' + (forPrint ? "0.96" : "0.90") + '" stroke="#0ea5e9" stroke-width="1.8"/>' +
-          '<text x="76" y="15" text-anchor="middle" font-size="10" font-weight="900" fill="' + text + '">جهت باد غالب</text>' +
-          '<text x="76" y="30" text-anchor="middle" font-size="10" font-weight="bold" fill="#0ea5e9">از: ' + wind.fromName + '</text>' +
-          '<circle cx="' + windCx + '" cy="' + windCy + '" r="25" fill="none" stroke="' + grid + '" stroke-width="1"/>' +
-          '<line x1="' + tailX.toFixed(1) + '" y1="' + tailY.toFixed(1) + '" x2="' + tipX.toFixed(1) + '" y2="' + tipY.toFixed(1) + '" stroke="#0ea5e9" stroke-width="3.5" stroke-linecap="round"/>' +
+        '<g transform="translate(8,62)">' +
+          '<rect x="0" y="0" width="112" height="74" rx="6" fill="' + bg + '" fill-opacity="' + (forPrint ? "0.97" : "0.92") + '" stroke="#0ea5e9" stroke-width="1.35"/>' +
+          '<text x="56" y="12" text-anchor="middle" font-size="8.5" font-weight="900" fill="' + text + '">جهت باد غالب</text>' +
+          '<text x="56" y="23" text-anchor="middle" font-size="8" font-weight="bold" fill="#0ea5e9">از: ' + wind.fromName + '</text>' +
+          '<circle cx="' + windCx + '" cy="' + windCy + '" r="15" fill="none" stroke="' + grid + '" stroke-width="0.8"/>' +
+          '<line x1="' + tailX.toFixed(1) + '" y1="' + tailY.toFixed(1) + '" x2="' + tipX.toFixed(1) + '" y2="' + tipY.toFixed(1) + '" stroke="#0ea5e9" stroke-width="2.4" stroke-linecap="round"/>' +
           '<polygon points="' + arrowHead + '" fill="#0ea5e9"/>' +
-          '<text x="76" y="96" text-anchor="middle" font-size="9" font-weight="bold" fill="' + text + '">به: ' + wind.toName + ' | ' + fa(wind.fromDeg.toFixed(1)) + '°</text>' +
+          '<text x="56" y="69" text-anchor="middle" font-size="7.7" font-weight="bold" fill="' + text + '">به: ' + wind.toName + ' | ' + fa(wind.fromDeg.toFixed(0)) + '°</text>' +
         '</g>';
     }
 

@@ -856,6 +856,31 @@ test('moving a croquis polygon translates every UTM vertex without changing its 
 });
 
 
+
+test('CAD script tags are independently closed and offline toolbar module is actually loaded', () => {
+  const html = read('index.html');
+  assert.ok(html.includes('<script src="./nezam-cad-view-tools.js?v=20261125-cad-view-r6"></script>'));
+  assert.ok(html.includes('<script src="./nezam-cad-file-io.js?v=20261125-cad-io-r2"></script>'));
+  assert.ok(html.includes('<script src="./nezam-cad-offline-tools.js?v=20261125-offline-tools-r2"></script>'));
+  assert.ok(!html.includes('cad-io-r2\\n  <script'));
+  assert.ok(!html.includes('offline-tools-r1"></script>"></script>'));
+  const orderedRefs = [
+    html.indexOf('<script src="./nezam-cad-view-tools.js?v=20261125-cad-view-r6"></script>'),
+    html.indexOf('<script src="./nezam-cad-file-io.js?v=20261125-cad-io-r2"></script>'),
+    html.indexOf('<script src="./nezam-cad-offline-tools.js?v=20261125-offline-tools-r2"></script>')
+  ];
+  assert.ok(orderedRefs[0] < orderedRefs[1] && orderedRefs[1] < orderedRefs[2]);
+});
+
+test('prevailing wind marker is compact and placed below the north compass', () => {
+  const cad = read('nezam-cad-view-tools.js');
+  assert.ok(cad.includes('translate(8,62)'));
+  assert.ok(cad.includes('width="112" height="74"'));
+  assert.ok(cad.includes('windCx = 56, windCy = 45, windLen = 12'));
+  assert.ok(!cad.includes("translate(' + (svgW - 166)"));
+});
+
+
 test('offline CAD view exposes equivalents of online map tools and UTM interactions', () => {
   const html = read('index.html');
   const cad = read('nezam-cad-view-tools.js');
