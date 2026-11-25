@@ -742,7 +742,7 @@ test('croquis exact polygon generator closes and preserves user-entered side len
   const generatorStart = source.indexOf('  window.buildExactUtmPolygonFromSides = function');
   const generatorEnd = source.indexOf('\n  };', generatorStart) + 5;
   assert.ok(helperStart >= 0 && generatorStart > helperStart && generatorEnd > 5);
-  const code = source.slice(helperStart, generatorEnd);
+  const code = 'function roundCm(value) { return Math.round(Number(value) * 100) / 100; }\n' + source.slice(helperStart, generatorEnd);
   const build = new Function('window', code + '\nreturn window.buildExactUtmPolygonFromSides;')({});
   const result = build(500000, 3200000, [
     { length: 45, azimuth: 90 },
@@ -769,7 +769,7 @@ test('moving a croquis polygon translates every UTM vertex without changing its 
   const start = source.indexOf('  window.translateUtmPolygon = function');
   const end = source.indexOf('\n  };', start) + 5;
   assert.ok(start >= 0 && end > 5);
-  const translate = new Function('window', source.slice(start, end) + '\nreturn window.translateUtmPolygon;')({});
+  const translateCode = 'function roundCm(value) { return Math.round(Number(value) * 100) / 100; }\n' + source.slice(start, end);\n  const translate = new Function('window', translateCode + '\nreturn window.translateUtmPolygon;')({});
   const original = [
     { x: 100, y: 200, label: 'P1' },
     { x: 145, y: 200, label: 'P2' },
