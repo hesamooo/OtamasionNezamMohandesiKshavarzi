@@ -4943,6 +4943,7 @@ function printUtmSketchSheet() {
   var coordRows = "";
   var rowCounter = 1;
   var defaultZoneNum = parseInt(m.utmZone, 10) || 39;
+  var selectedCoordinateLayerIds = getCroquisCoordinatePrintLayerIds(m);
 
   for (var i = 0; i < m.layers.length; i++) {
     var l = m.layers[i];
@@ -4957,11 +4958,14 @@ function printUtmSketchSheet() {
       '<td>' + toFa(g.perim.toFixed(1)) + ' متر</td>' +
     '</tr>';
 
+    // The area summary remains independent; only checked layer IDs print coordinate rows.
+    if (selectedCoordinateLayerIds.indexOf(String(l.id || "")) === -1) continue;
+
     for (var p = 0; p < l.points.length; p++) {
       var ptObj = ensurePointEnriched(l.points[p], defaultZoneNum, p);
       var sideL = (g.sides && g.sides[p]) ? (toFa(g.sides[p].len.toFixed(1)) + " م") : "---";
       var elevTxt = (ptObj.elev !== undefined && ptObj.elev !== "" && Number(ptObj.elev) !== 0) ? (toFa(ptObj.elev) + " م") : "۰";
-      coordRows += '<tr>' +
+      coordRows += '<tr data-layer-id="' + safeHtmlText(String(l.id || "")) + '">' +
         '<td>' + toFa(rowCounter++) + '</td>' +
         '<td><b>' + safeHtmlText(l.name) + '</b></td>' +
         '<td>' + safeHtmlText(ptObj.label || ("P" + (p + 1))) + '</td>' +
@@ -4996,7 +5000,7 @@ function printUtmSketchSheet() {
       '<thead><tr style="background:#eef3ee;"><th>ردیف</th><th>نام زمین / عارضه</th><th>کد نقطه</th><th>X (شرقی)</th><th>Y (شمالی)</th><th>ارتفاع (متر)</th><th>Zone</th><th>طول و عرض (Lat, Lng)</th><th>طول ضلع</th></tr></thead>' +
       '<tbody>' + coordRows + '</tbody>' +
     '</table>' +
-    '<div style="font-size:' + (isA5Sheet ? '7.2pt' : '8.3pt') + ';background:#fffbeb;border:1px solid #fde68a;padding:' + (isA5Sheet ? '1.4mm 2mm' : '2mm 2.5mm') + ';border-radius:4px;line-height:1.65;">' +
+    '<div class="croquis-expert-certificate" style="font-size:' + (isA5Sheet ? '7.2pt' : '8.3pt') + ';background:#fffbeb;border:1px solid #fde68a;padding:' + (isA5Sheet ? '1.4mm 2mm' : '2mm 2.5mm') + ';border-radius:4px;line-height:1.65;">' +
       '<b>گواهی فنی کارشناس:</b> صحت انطباق مختصات فوق با اراضی متقاضی و دستورالعمل‌های فنی نظام مهندسی کشاورزی و منابع طبیعی استان فارس مورد تأیید است.' +
     '</div>';
 

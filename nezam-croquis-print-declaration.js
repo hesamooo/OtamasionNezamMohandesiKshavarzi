@@ -136,13 +136,10 @@
     var table = coordinateTable(page);
     if (!table) return;
     var chosenIds = selectedIds(map);
-    var chosenNames = visibleLayers(map).filter(function (layer) {
-      return chosenIds.indexOf(String(layer.id)) !== -1;
-    }).map(function (layer) { return String(layer.name || "لایه بدون نام"); });
     var allRows = Array.prototype.slice.call(table.querySelectorAll("tbody tr"));
     var rows = allRows.filter(function (row) {
-      var cell = row.cells && row.cells[1];
-      return cell && chosenNames.indexOf((cell.textContent || "").trim()) !== -1;
+      var layerId = row.getAttribute("data-layer-id");
+      return layerId !== null && chosenIds.indexOf(String(layerId)) !== -1;
     });
 
     var isA5 = page.classList.contains("paper-a5");
@@ -156,15 +153,14 @@
     if (contentWrap) {
       // The complete sheet content sits inside .l-txt. Replace only the
       // small certification notice inside it, never the outer content wrapper.
-      var certificate = Array.prototype.slice.call(contentWrap.querySelectorAll(".l-txt div")).find(function (el) {
-        return (el.textContent || "").indexOf("گواهی فنی کارشناس") !== -1;
-      });
+      var certificate = contentWrap.querySelector(".croquis-expert-certificate");
       if (certificate) {
         var holder = document.createElement("div");
         holder.innerHTML = legalHtml;
         certificate.replaceWith(holder.firstElementChild);
       } else if (!contentWrap.querySelector(".croquis-applicant-legal")) {
-        contentWrap.insertAdjacentHTML("beforeend", legalHtml);
+        var coordinateTableElement = coordinateTable(page);
+        if (coordinateTableElement) coordinateTableElement.insertAdjacentHTML("afterend", legalHtml);
       }
     }
 
@@ -215,7 +211,6 @@
     var stage = document.getElementById("a4-preview-stage");
     var map = getMap();
     if (!stage || !map) return;
-    renderSelectionPanel(stage, map);
     var pages = stage.querySelectorAll(".a4-page");
     if (pages.length < 2) return;
     // The core sheet builder already omits page-one notes. Keep the .l-txt

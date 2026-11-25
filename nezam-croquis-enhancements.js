@@ -175,63 +175,60 @@
 
   function getUtmCoordinateLayers(map) {
     var visible = (map && Array.isArray(map.layers) ? map.layers : []).filter(function (layer) {
-      return layer && layer.visible !== false && layer.geomType === "POLYGON" &&
-        Array.isArray(layer.points) && layer.points.length >= 3;
+      return layer && layer.visible && Array.isArray(layer.points) && layer.points.length > 0;
     });
-    var main = visible.filter(function (layer) { return layer.category === "MAIN_PARCEL"; });
-    var project = visible.filter(function (layer) { return layer.category === "PROJECT_AREA"; });
-
-    // Compatibility fallback for older records that predate stable layer categories.
-    if (!main.length && visible.length) main = [visible[0]];
-    if (!project.length && visible.length > 1) {
-      project = visible.filter(function (layer) { return main.indexOf(layer) === -1; }).slice(0, 1);
-    }
-    return [
-      { title: "زمین اصلی", layers: main },
-      { title: "محل اجرای طرح", layers: project }
-    ].filter(function (group) { return group.layers.length > 0; });
+    var selectedIds = typeof getCroquisCoordinatePrintLayerIds === "function"
+      ? getCroquisCoordinatePrintLayerIds(map).map(String)
+      : visible.map(function (layer) { return String(layer.id || ""); });
+    return visible.filter(function (layer) {
+      return selectedIds.indexOf(String(layer.id || "")) !== -1;
+    }).map(function (layer) {
+      var title = layer.category === "MAIN_PARCEL" ? "زمین اصلی" :
+        (layer.category === "PROJECT_AREA" ? "محل اجرای طرح" : (layer.name || "لایه انتخاب‌شده"));
+      return { title: title, layers: [layer] };
+    });
   }
 
   function buildUtmPointsPrintMarkup(map) {
     var groups = getUtmCoordinateLayers(map);
     if (!groups.length) return "";
-    var groupMarkup = groups.map(function (group) {
-      var layersMarkup = group.layers.map(function (layer) {
-        var zone = (map && map.utmZone) || "39R";
-        var pointsMarkup = layer.points.map(function (point, index) {
+    var total = 0;
+    groups.forEach(function (group) {
+      group.layers.forEach(function (layer) { total += layer.points.length; });
+    });
+    var limit = 12;
+    var left = limit;
+    var body = "";
+    groups.forEach(function (group) {
+      if (left <= 0) return;
+      var pointsHtml = "";
+      group.layers.forEach(function (layer) {
+        layer.points.forEach(function (point, index) {
+          if (left <= 0) return;
+          var zone = (map && map.utmZone) || "39R";
           if (typeof ensurePointEnriched === "function") {
             point = ensurePointEnriched(point, zone, index) || point;
           }
           var x = Number(point.x), y = Number(point.y);
-          if (!Number.isFinite(x) || !Number.isFinite(y)) return "";
+          if (!Number.isFinite(x) || !Number.isFinite(y)) return;
           var label = point.label || ("P" + (index + 1));
-          var pointZone = point.zone || zone;
-          return '<div class="croquis-utm-coordinate-point">' +
-            '<b>' + html(label) + '</b>' +
-            '<span class="croquis-utm-coordinate-values" dir="ltr">' +
-              '<span>X: ' + x.toFixed(2) + '</span>' +
-              '<span>Y: ' + y.toFixed(2) + '</span>' +
-            '</span>' +
-            '<small>زون ' + html(pointZone) + '</small>' +
-          '</div>';
-        }).join("");
-        var layerName = layer.name || group.title;
-        return '<div class="croquis-utm-coordinate-layer">' +
-          (group.layers.length > 1 ? '<div class="croquis-utm-coordinate-layer-name">' + html(layerName) + '</div>' : '') +
-          pointsMarkup +
-          '</div>';
-      }).join("");
-      return '<div class="croquis-utm-coordinate-group">' +
-        '<div class="croquis-utm-coordinate-group-title">' + html(group.title) + '</div>' +
-        layersMarkup +
-        '</div>';
-    }).join("");
-    return '<section class="croquis-utm-points-print" aria-label="مختصات UTM نقاط زمین اصلی و محل اجرای طرح">' +
-      '<div class="croquis-utm-points-title">مختصات UTM نقاط</div>' +
-      groupMarkup +
+          pointsHtml += '<div class="croquis-utm-coordinate-point"><b>' + html(label) +
+            '</b><span class="croquis-utm-coordinate-values" dir="ltr">X: ' + x.toFixed(2) +
+            ' | Y: ' + y.toFixed(2) + '</span></div>';
+          left--;
+        });
+      });
+      if (pointsHtml) {
+        body += '<div class="croquis-utm-coordinate-group"><div class="croquis-utm-coordinate-group-title">' +
+          html(group.title) + '</div>' + pointsHtml + '</div>';
+      }
+    });
+    var omitted = Math.max(0, total - limit);
+    return '<section class="croquis-utm-points-print" aria-label="مختصات UTM لایه‌های انتخاب‌شده">' +
+      '<div class="croquis-utm-points-title">مختصات UTM لایه‌های انتخاب‌شده</div>' + body +
+      (omitted ? '<div class="croquis-utm-overlay-more">+' + omitted + ' نقطه دیگر؛ ادامه کامل در شیت دوم</div>' : '') +
       '</section>';
   }
-
   function decorateCroquisPrintPage() {
     var stage = document.getElementById("a4-preview-stage");
     if (!stage) return;
@@ -259,7 +256,17 @@
         sideInfo.setAttribute("aria-label", "اطلاعات تکمیلی نقشه");
         layout.appendChild(sideInfo);
       }
-      sideInfo.innerHTML = buildClearancePrintMarkup(map) + buildUtmPointsPrintMarkup(map);
+      sideInfo.innerHTML = buildClearancePrintMarkup(map);
+      holder.style.position = "relative";
+      var coordinateBox = holder.querySelector(".croquis-utm-floating-box");
+      if (!coordinateBox) {
+        coordinateBox = document.createElement("div");
+        coordinateBox.className = "croquis-utm-floating-box";
+        coordinateBox.setAttribute("aria-label", "کادر مختصات UTM لایه‌های انتخاب‌شده");
+        holder.appendChild(coordinateBox);
+      }
+      coordinateBox.innerHTML = buildUtmPointsPrintMarkup(map);
+      coordinateBox.style.display = coordinateBox.innerHTML ? "block" : "none";
     }
     ensureLandscapeStyles();
   }
@@ -629,6 +636,14 @@
       ".a4-page.croquis-map-landscape .croquis-utm-coordinate-point > b { grid-row:1 / span 2 !important; color:#0f5132 !important; font-size:5.8pt !important; }",
       ".a4-page.croquis-map-landscape .croquis-utm-coordinate-values { display:flex !important; justify-content:space-between !important; gap:.7mm !important; white-space:nowrap !important; font-family:monospace !important; font-size:5.6pt !important; color:#172033 !important; }",
       ".a4-page.croquis-map-landscape .croquis-utm-coordinate-point > small { grid-column:2 !important; font-size:4.9pt !important; color:#64748b !important; line-height:1 !important; }",
+      ".a4-page.croquis-map-landscape .croquis-utm-floating-box { position:absolute !important; z-index:40 !important; top:3mm !important; right:3mm !important; width:66mm !important; max-width:66mm !important; max-height:82mm !important; overflow:hidden !important; box-shadow:0 1mm 3mm rgba(0,0,0,.22) !important; }",
+      ".a4-page.croquis-map-landscape .croquis-utm-floating-box .croquis-utm-points-print { display:block !important; width:100% !important; max-width:100% !important; margin:0 !important; border:1px solid #475569 !important; border-radius:3px !important; background:rgba(255,255,255,.97) !important; padding:1.4mm !important; direction:rtl !important; overflow:hidden !important; }",
+      ".a4-page.croquis-map-landscape .croquis-utm-floating-box .croquis-utm-points-title { font-size:8pt !important; font-weight:900 !important; margin-bottom:.8mm !important; }",
+      ".a4-page.croquis-map-landscape .croquis-utm-floating-box .croquis-utm-coordinate-group { margin-bottom:.5mm !important; }",
+      ".a4-page.croquis-map-landscape .croquis-utm-floating-box .croquis-utm-coordinate-group-title { font-size:6.5pt !important; margin-bottom:.3mm !important; }",
+      ".a4-page.croquis-map-landscape .croquis-utm-floating-box .croquis-utm-coordinate-point { display:grid !important; grid-template-columns:9mm minmax(0,1fr) !important; padding:.25mm .4mm !important; font-size:5.8pt !important; line-height:1.15 !important; }",
+      ".a4-page.croquis-map-landscape .croquis-utm-floating-box .croquis-utm-coordinate-values { display:block !important; white-space:nowrap !important; font-size:5.7pt !important; }",
+      ".a4-page.croquis-map-landscape .croquis-utm-floating-box .croquis-utm-overlay-more { display:block !important; margin-top:.5mm !important; padding-top:.5mm !important; border-top:1px dotted #64748b !important; font-size:6pt !important; font-weight:900 !important; color:#1e40af !important; }",
       ".croquis-clearances-print { border:1px solid #64748b; border-radius:3px; background:#f8fafc; padding:1.5mm 2mm; margin:2mm 0; direction:rtl; page-break-inside:avoid; break-inside:avoid; }",
       ".croquis-clearances-print-title { font-weight:900; font-size:8.5pt; color:#14532d; margin-bottom:1mm; }",
       ".croquis-clearances-print-grid { display:flex; flex-wrap:wrap; gap:1mm 2mm; }",
