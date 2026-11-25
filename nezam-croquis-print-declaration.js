@@ -154,7 +154,9 @@
     var legalHtml = legalDeclaration();
     var contentWrap = page.querySelector(".lh-content-wrap");
     if (contentWrap) {
-      var certificate = Array.prototype.slice.call(contentWrap.children).find(function (el) {
+      // The complete sheet content sits inside .l-txt. Replace only the
+      // small certification notice inside it, never the outer content wrapper.
+      var certificate = Array.prototype.slice.call(contentWrap.querySelectorAll(".l-txt div")).find(function (el) {
         return (el.textContent || "").indexOf("گواهی فنی کارشناس") !== -1;
       });
       if (certificate) {
@@ -216,10 +218,8 @@
     renderSelectionPanel(stage, map);
     var pages = stage.querySelectorAll(".a4-page");
     if (pages.length < 2) return;
-    var page1 = pages[0];
-    Array.prototype.slice.call(page1.querySelectorAll(".lh-content-wrap > div, .l-txt")).forEach(function (el) {
-      if ((el.textContent || "").indexOf("توضیحات کارشناس") !== -1) el.remove();
-    });
+    // The core sheet builder already omits page-one notes. Keep the .l-txt
+    // wrapper intact because it contains the map and layer legend.
     paginateCoordinates(pages[1], map);
   }
 

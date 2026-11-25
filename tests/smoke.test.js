@@ -960,3 +960,11 @@ test('applicant legal declaration replaces the unsupported expert coordinate cer
   assert.ok(source.includes('جبران خسارات قابل انتساب'));
   assert.ok(source.includes('تقصیر، تخلف یا تکالیف آمره قانونی'));
 });
+
+
+test('applicant declaration targets only the certification note inside page-two content', () => {
+  const source = read('nezam-croquis-print-declaration.js');
+  assert.ok(source.includes('contentWrap.querySelectorAll(".l-txt div")'));
+  assert.ok(!source.includes('Array.prototype.slice.call(contentWrap.children).find'));
+  assert.ok(source.includes('The complete sheet content sits inside .l-txt'));
+});
