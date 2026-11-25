@@ -1223,8 +1223,8 @@ test('DXF export writes R12-compatible entities, active UTM viewport and accurat
   assert.ok(dxf.includes('AC1009'));
   assert.ok(dxf.includes('VPORT'));
   assert.ok(dxf.includes('*ACTIVE'));
-  assert.ok(dxf.includes('40\\r\\n'));
-  assert.ok(dxf.includes('41\\r\\n'));
+  assert.ok(dxf.includes('40' + String.fromCharCode(13, 10)));
+  assert.ok(dxf.includes('41' + String.fromCharCode(13, 10)));
   assert.ok(dxf.includes('$EXTMIN'));
   assert.ok(dxf.includes('$EXTMAX'));
   assert.ok(dxf.includes('$VIEWCTR'));
