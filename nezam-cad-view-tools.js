@@ -88,6 +88,22 @@
     return Math.max(0.000001, scale);
   }
 
+  window.calculateCroquisCadScale = function (scaleDenominator, zoomPercent, svgW, svgH, forPrint) {
+    var view = {
+      scaleDenominator: SCALE_OPTIONS.indexOf(String(scaleDenominator)) !== -1 ? String(scaleDenominator) : "AUTO",
+      zoomPercent: Math.min(200, Math.max(50, Number(zoomPercent) || 100))
+    };
+    var pad = 48;
+    var spanX = 100, spanY = 100;
+    var pixelsPerMeter = getScaleForCanvas(view, svgW || 760, svgH || 440, spanX, spanY, pad, !!forPrint);
+    var physicalWidthMm = forPrint ? 270 : 250;
+    var effectiveDenominator = 1000 * ((svgW || 760) - 2 * pad) / (pixelsPerMeter * physicalWidthMm);
+    return {
+      pixelsPerMeter: pixelsPerMeter,
+      effectiveDenominator: effectiveDenominator
+    };
+  };
+
   function buildCadSvg(map, svgW, svgH, forPrint) {
     var view = viewOptions(map);
     var visible = (map.layers || []).filter(function (layer) {
