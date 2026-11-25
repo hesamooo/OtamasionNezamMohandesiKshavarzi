@@ -446,10 +446,11 @@
     var degrees = Number(clockwiseDegrees);
     if (!Number.isFinite(degrees)) throw new Error("زاویه چرخش معتبر نیست.");
     var twiceArea = 0, cxSum = 0, cySum = 0;
+    var originX = Number(points[0].x), originY = Number(points[0].y);
     for (var i = 0; i < points.length; i++) {
       var j = (i + 1) % points.length;
-      var xi = Number(points[i].x), yi = Number(points[i].y);
-      var xj = Number(points[j].x), yj = Number(points[j].y);
+      var xi = Number(points[i].x) - originX, yi = Number(points[i].y) - originY;
+      var xj = Number(points[j].x) - originX, yj = Number(points[j].y) - originY;
       if (![xi, yi, xj, yj].every(Number.isFinite)) throw new Error("مختصات یکی از رأس‌ها معتبر نیست.");
       var cross = xi * yj - xj * yi;
       twiceArea += cross;
@@ -458,8 +459,8 @@
     }
     var cx, cy;
     if (Math.abs(twiceArea) > 1e-8) {
-      cx = cxSum / (3 * twiceArea);
-      cy = cySum / (3 * twiceArea);
+      cx = originX + cxSum / (3 * twiceArea);
+      cy = originY + cySum / (3 * twiceArea);
     } else {
       cx = points.reduce(function (sum, point) { return sum + Number(point.x); }, 0) / points.length;
       cy = points.reduce(function (sum, point) { return sum + Number(point.y); }, 0) / points.length;
