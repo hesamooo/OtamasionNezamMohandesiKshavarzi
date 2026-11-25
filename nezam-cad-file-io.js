@@ -159,7 +159,7 @@
     tableStart("VPORT",1);
     pair(out,0,"VPORT");pair(out,2,"*ACTIVE");pair(out,70,0);
     pair(out,10,0.0);pair(out,20,0.0);pair(out,11,1.0);pair(out,21,1.0);
-    pair(out,12,dxfNum(centerX));pair(out,22,dxfNum(centerY));
+    pair(out,12,0.0);pair(out,22,0.0);
     pair(out,13,0.0);pair(out,23,0.0);
     pair(out,14,10.0);pair(out,24,10.0);pair(out,15,10.0);pair(out,25,10.0);
     pair(out,16,0.0);pair(out,26,0.0);pair(out,36,1.0);
