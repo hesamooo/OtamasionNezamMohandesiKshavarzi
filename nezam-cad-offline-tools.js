@@ -530,6 +530,7 @@
   window.undoCroquisCadOfflineDrawingPoint = function () {
     if(state.draft.length){state.draft.pop();drawOverlay();status("آخرین رأس از ترسیم موقت حذف شد.");return;}
     if(state.mode==="POINT"){
+      if(state.pointReplace){status("هنوز نقطه جدیدی ثبت نشده است؛ نقطه‌های قبلی تا اولین ثبت حفظ می‌شوند.");return;}
       var layer=layerById(activeMap(),state.targetLayerId);
       if(layer&&layer.points.length){var old=layer.points.slice();layer.points.pop();if(!commit(layer))layer.points=old;else status("آخرین نقطه از لایه ترسیم حذف شد.");}
       return;
@@ -666,6 +667,7 @@
   }
 
   window.rotateCroquisCadActivePolygon = function(){
+    if(state.mode){status("ابتدا ترسیم یا ویرایش فعال را لغو کنید؛ سپس چندضلعی را بچرخانید.",true);return false;}
     var input=document.getElementById("crq-cad-offline-rotate");
     var degrees=input?(typeof localizedNumber==="function"?localizedNumber(input.value):Number(input.value)):0;
     if(typeof window.rotateCroquisActivePolygon!=="function"){status("ابزار چرخش چندضلعی بارگذاری نشده است.",true);return false;}
@@ -702,6 +704,7 @@
     state.mode="PICK_PLACEMENT";setModeButtons();status("روی بوم آفلاین کلیک کنید تا مرکز شکل یا رأس اول ثبت شود.");return true;
   };
   window.createCroquisCadOfflineShape = function(){
+    if(state.mode){status("ابتدا ترسیم یا ویرایش نیمه‌کاره را لغو کنید؛ سپس سازه جدید را جانمایی کنید.",true);return false;}
     var map=activeMap();if(!map){status("ابتدا نقشه کروکی را باز کنید.",true);return false;}
     if(typeof croquisOnlineDrawMode!=="undefined"&&croquisOnlineDrawMode){status("ابتدا ترسیم نمای آنلاین را تمام یا لغو کنید.",true);return false;}
     var main=(map.layers||[]).find(function(l){return l&&l.category==="MAIN_PARCEL"&&l.geomType==="POLYGON"&&Array.isArray(l.points)&&l.points.length>=3;});
