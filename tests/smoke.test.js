@@ -855,6 +855,35 @@ test('moving a croquis polygon translates every UTM vertex without changing its 
   assert.equal(original[0].x, 100, 'original point objects must remain unchanged');
 });
 
+
+test('offline CAD view exposes equivalents of online map tools and UTM interactions', () => {
+  const html = read('index.html');
+  const cad = read('nezam-cad-view-tools.js');
+  const tools = read('nezam-cad-offline-tools.js');
+  assert.ok(html.includes('nezam-cad-offline-tools.js?v=20261125-offline-tools-r1'));
+  assert.ok(cad.includes('data-cad-center-x='));
+  assert.ok(cad.includes('data-cad-center-y='));
+  assert.ok(cad.includes('data-cad-scale='));
+  [
+    'setCroquisCadOfflineDrawingMode',
+    'finishCroquisCadOfflineDrawing',
+    'undoCroquisCadOfflineDrawingPoint',
+    'cancelCroquisCadOfflineDrawing',
+    'toggleCroquisCadOfflineVertexEdit',
+    'toggleCroquisCadOfflinePolygonMove',
+    'rotateCroquisCadActivePolygon',
+    'locateCroquisCadOfflineGPS',
+    'copyActiveLayerUTM',
+    'exportCroquisGeoJSON',
+    'clearActiveMapLayerPoints',
+    'createCroquisCadOfflineShape',
+    'screenToUtm',
+    'isCroquisPlacementShapeInsideParcel'
+  ].forEach(name => assert.ok(tools.includes(name), 'missing offline CAD tool: ' + name));
+  assert.ok(tools.includes('crq-cad-offline-toolbar'));
+  assert.ok(tools.includes('crq-cad-offline-more'));
+});
+
 test('croquis clearance, move, and landscape print controls are wired without changing storage setup', () => {
   const html = read('index.html');
   const module = read('nezam-croquis-enhancements.js');
