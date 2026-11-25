@@ -7,6 +7,7 @@
     focusMode: "MAIN",
     scaleDenominator: "AUTO",
     zoomPercent: 100,
+    printLineWidth: 2,
     panX: 0,
     panY: 0,
     showPointLabels: false,
@@ -40,6 +41,7 @@
     if (SCALE_OPTIONS.indexOf(String(map.cadView.scaleDenominator)) === -1) map.cadView.scaleDenominator = "AUTO";
     if (["MAIN", "ACTIVE", "ALL"].indexOf(map.cadView.focusMode) === -1) map.cadView.focusMode = "MAIN";
     map.cadView.zoomPercent = Math.min(500, Math.max(25, Number(map.cadView.zoomPercent) || 100));
+    map.cadView.printLineWidth = Math.min(6, Math.max(0.5, Number(map.cadView.printLineWidth) || 2));
     map.cadView.panX = Math.max(-10000, Math.min(10000, Number(map.cadView.panX) || 0));
     map.cadView.panY = Math.max(-10000, Math.min(10000, Number(map.cadView.panY) || 0));
     var windDeg = Number(map.cadView.prevailingWindFromDeg);
@@ -211,7 +213,9 @@
       var opacity = Number(layer.fillOpacity);
       if (!Number.isFinite(opacity)) opacity = 0.16;
       opacity = Math.max(0.02, Math.min(0.55, opacity));
-      var stroke = Math.max(1, Math.min(5, Number(layer.strokeWidth) || 2));
+      var stroke = forPrint
+        ? Math.max(0.5, Math.min(6, Number(view.printLineWidth) || 2))
+        : Math.max(1, Math.min(5, Number(layer.strokeWidth) || 2));
       var geom = typeof computeUtmGeometry === "function" ? computeUtmGeometry(layer.points, layer.geomType) : { area: 0 };
       var isLabelLayer = String(layer.id) === String(pointLabelLayerId);
 
