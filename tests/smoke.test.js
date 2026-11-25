@@ -1189,7 +1189,7 @@ test('DXF export and import module passes ASCII UTM round-trip for supported ent
   const text=apiWindow.buildCroquisDXFText(map);
   assert.ok(text.includes('NEZAM636_UTM_ZONE=39R'));
   assert.ok(text.includes('NEZAM636_COORDINATES=UTM_METERS'));
-  assert.ok(text.includes('$INSUNITS'));
+  assert.ok(text.includes('AC1009'));
   assert.ok(text.includes('714800.1200'));
   const parsed=apiWindow.parseCroquisDXFText(text);
   assert.equal(parsed.zone,'39R');
@@ -1243,7 +1243,7 @@ test('DXF export writes R12-compatible entities, active UTM viewport and accurat
   assert.equal(Math.max(...allXY.map(p=>p.x)),714900);
   assert.equal(Math.min(...allXY.map(p=>p.y)),3203000);
   assert.equal(Math.max(...allXY.map(p=>p.y)),3203333.25);
-  assert.ok(dxf.includes('45\\r\\n'));
+  assert.ok(dxf.includes('NEZAM636_ENTITY_COUNT=3'));
 });
 
 test('DXF export refuses invalid visible geometry rather than silently writing incomplete coordinates', () => {
