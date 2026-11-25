@@ -2377,6 +2377,37 @@
                   <label class="form-check form-check-inline small m-0"><input id="crq-cad-show-layer-labels" class="form-check-input" type="checkbox" onchange="setCroquisCadViewOption('showLayerLabels',this.checked)" /> نام و مساحت لایه</label>
                   <span class="small text-muted ms-auto">برای جلوگیری از هم‌پوشانی، نوشته‌ها به‌صورت پیش‌فرض خاموش‌اند.</span>
                 </div>
+                <div class="d-flex flex-wrap align-items-center gap-2 mt-2 pt-2 border-top">
+                  <strong class="small text-primary">🌬️ جهت باد غالب:</strong>
+                  <label class="form-check form-check-inline small m-0">
+                    <input id="crq-cad-wind-enabled" class="form-check-input" type="checkbox" onchange="setCroquisCadViewOption('showPrevailingWind',this.checked)" />
+                    نمایش فلش باد روی نقشه
+                  </label>
+                  <select id="crq-cad-wind-preset" class="form-select form-select-sm" style="width:auto;min-width:170px;" onchange="selectCroquisPrevailingWindPreset(this.value)">
+                    <option value="0">شمال (۰°)</option>
+                    <option value="22.5">شمال‌شمال‌شرق (۲۲٫۵°)</option>
+                    <option value="45">شمال‌شرق (۴۵°)</option>
+                    <option value="67.5">شرق‌شمال‌شرق (۶۷٫۵°)</option>
+                    <option value="90">شرق (۹۰°)</option>
+                    <option value="112.5">شرق‌جنوب‌شرق (۱۱۲٫۵°)</option>
+                    <option value="135">جنوب‌شرق (۱۳۵°)</option>
+                    <option value="157.5">جنوب‌جنوب‌شرق (۱۵۷٫۵°)</option>
+                    <option value="180">جنوب (۱۸۰°)</option>
+                    <option value="202.5">جنوب‌جنوب‌غرب (۲۰۲٫۵°)</option>
+                    <option value="225">جنوب‌غرب (۲۲۵°)</option>
+                    <option value="247.5">غرب‌جنوب‌غرب (۲۴۷٫۵°)</option>
+                    <option value="270">غرب (۲۷۰°)</option>
+                    <option value="292.5">غرب‌شمال‌غرب (۲۹۲٫۵°)</option>
+                    <option value="315" selected>شمال‌غرب (۳۱۵°)</option>
+                    <option value="337.5">شمال‌شمال‌غرب (۳۳۷٫۵°)</option>
+                    <option value="CUSTOM">زاویه دلخواه…</option>
+                  </select>
+                  <div class="input-group input-group-sm" style="width:145px;">
+                    <input id="crq-cad-wind-degrees" type="number" class="form-control text-center font-monospace" min="0" max="359.9" step="0.1" value="315" dir="ltr" aria-label="زاویه مبدأ باد بر حسب درجه" onchange="setCroquisCadViewOption('prevailingWindFromDeg',this.value)" />
+                    <span class="input-group-text">درجه</span>
+                  </div>
+                  <small class="text-muted">زاویه از شمال و ساعت‌گرد؛ فلش جهت حرکت باد را نشان می‌دهد (مثلاً از شمال‌غرب به جنوب‌شرق).</small>
+                </div>
               </div>
               <div id="crq-cad-svg-container" data-testid="croquis-svg-canvas" style="height: 430px;"></div>
             </div>
@@ -3225,7 +3256,7 @@
   <script src="./nezam-letter-attachments.js?v=20261104-letter-attachments-r2"></script>
   <script src="./nezam-customizer.js?v=20261125-utm-precision-r1"></script>
   <script src="./nezam-croquis-enhancements.js?v=20261125-croquis-tools-r1"></script>
-  <script src="./nezam-cad-view-tools.js?v=20261125-cad-view-r2"></script>
+  <script src="./nezam-cad-view-tools.js?v=20261125-cad-view-r3"></script>
   <script src="./nezam-ai-assistant.js?v=20261101-security-r3"></script>
 
   <!-- ماژول اصلاح‌شده و دوطرفه اتصال سامانه ۶۳۶ خفر به گوگل درایو (ذخیره و بازخوانی ۱۰۰٪ اطلاعات) -->
