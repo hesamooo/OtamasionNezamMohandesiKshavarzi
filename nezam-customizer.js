@@ -4935,8 +4935,7 @@ function printUtmSketchSheet() {
       '<span><b>موقعیت اراضی:</b> ' + safeHtmlText(c.loc) + '</span>' +
       '<span><b>تاریخ کروکی:</b> ' + safeHtmlText(toFa(m.date || todayShamsi())) + '</span>' +
     '</div>' +
-    '<div id="printed-croquis-map-holder" style="width:100%;text-align:center;margin-bottom:' + (isA5Sheet ? '1.2mm' : '2mm') + ';">' + printedMapMarkup + '</div>' +
-    '<div style="font-size:' + (isA5Sheet ? '7.4pt' : '8.5pt') + ';margin-bottom:1mm;"><b>راهنمای لایه‌ها و عوارض جانمایی‌شده:</b><br>' + legendPills + '</div>';
+    '<div id="printed-croquis-map-holder" style="width:100%;text-align:center;margin-bottom:' + (isA5Sheet ? '1.2mm' : '2mm') + ';">' + printedMapMarkup + '</div>';
 
   // برگه دوم: جداول تفکیک مساحت و مختصات کامل (X, Y, ارتفاع, Zone, Lat/Lng) زمین اصلی و کلیه عوارض
   var layersRows = "";
