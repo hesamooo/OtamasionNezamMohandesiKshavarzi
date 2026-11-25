@@ -847,9 +847,9 @@ test('standard CAD scale remains exact at 1:500, 1:1000 and 1:5000', () => {
   const exportStart = source.indexOf('  window.calculateCroquisCadScale = function');
   const exportEnd = source.indexOf('\n  };', exportStart) + 5;
   assert.ok(start >= 0 && end > 4 && exportStart > end && exportEnd > 5);
-  const code = 'var SCALE_OPTIONS = ["AUTO","500","1000","2000","2500","5000","10000","25000","50000"];\\n' +
-    source.slice(start, end) + '\\n' + source.slice(exportStart, exportEnd);
-  const calculate = new Function('window', code + '\\nreturn window.calculateCroquisCadScale;')({});
+  const code = 'var SCALE_OPTIONS = ["AUTO","500","1000","2000","2500","5000","10000","25000","50000"];\n' +
+    source.slice(start, end) + '\n' + source.slice(exportStart, exportEnd);
+  const calculate = new Function('window', code + '\nreturn window.calculateCroquisCadScale;')({});
   [500, 1000, 5000].forEach((denominator) => {
     const metrics = calculate(String(denominator), 100, 760, 440, false);
     assert.ok(Math.abs(metrics.effectiveDenominator - denominator) < 1e-8,
