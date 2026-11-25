@@ -2152,6 +2152,47 @@
       <!-- بنر هشدار یا تأیید قرارگیری طرح داخلی در داخل محدوده زمین اصلی -->
       <div id="crq-containment-warning-box" style="display:none;"></div>
 
+      <!-- ثبت فواصل و حرایم پیرامونی برای درج روی شیت نقشه -->
+      <div class="card-clean mb-3">
+        <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-2">
+          <strong class="text-primary">📏 فواصل و حرایم پیرامونی (درج در برگه نقشه)</strong>
+          <small class="text-muted">روستا، رودخانه، خطوط گاز، جاده، واحدهای تولیدی و سایر عوارض</small>
+        </div>
+        <div class="row g-2 align-items-end">
+          <div class="col-md-2">
+            <label class="small fw-bold" for="crq-clearance-kind">نوع عارضه:</label>
+            <select id="crq-clearance-kind" class="form-select form-select-sm">
+              <option>نزدیک‌ترین روستا</option><option>رودخانه</option><option>خطوط انتقال گاز</option>
+              <option>جاده اصلی روستا</option><option>واحد تولیدی مجاور</option><option>مرکز شهرستان</option>
+              <option>چاه / منبع آب</option><option>مدرسه / مرکز جمعیتی</option><option>سایر عوارض</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="small fw-bold" for="crq-clearance-name">نام / توضیح عارضه:</label>
+            <input id="crq-clearance-name" class="form-control form-control-sm" placeholder="مثلاً زرجان یا واحد دامداری مجاور" />
+          </div>
+          <div class="col-md-2">
+            <label class="small fw-bold" for="crq-clearance-distance">فاصله (متر):</label>
+            <input id="crq-clearance-distance" type="number" min="0" step="0.01" class="form-control form-control-sm font-monospace" dir="ltr" placeholder="235" />
+          </div>
+          <div class="col-md-2">
+            <label class="small fw-bold" for="crq-clearance-direction">جهت (اختیاری):</label>
+            <select id="crq-clearance-direction" class="form-select form-select-sm">
+              <option value="">ذکر نشود</option><option>شمال</option><option>شمال‌شرق</option><option>شرق</option><option>جنوب‌شرق</option>
+              <option>جنوب</option><option>جنوب‌غرب</option><option>غرب</option><option>شمال‌غرب</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="small fw-bold" for="crq-clearance-note">یادداشت (اختیاری):</label>
+            <div class="input-group input-group-sm">
+              <input id="crq-clearance-note" class="form-control" placeholder="مبنای اندازه‌گیری یا توضیح" />
+              <button type="button" class="btn btn-success fw-bold" onclick="addCroquisClearance()">افزودن</button>
+            </div>
+          </div>
+        </div>
+        <div id="crq-clearances-list" class="mt-2" aria-live="polite"></div>
+      </div>
+
       <div class="row">
         <!-- ستون راست: مدیریت لایه‌های مستقل (صفحه ۵ راهنمای PDF - آیتم ۲) -->
         <div class="col-md-4 mb-3">
@@ -2320,6 +2361,7 @@
                     <button type="button" class="btn btn-sm btn-outline-warning" onclick="undoMapDrawingPoint()">↶ بازگشت آخرین رأس</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" onclick="cancelMapDrawing()">لغو ترسیم</button>
                     <button type="button" id="crq-map-edit-vertices-btn" class="btn btn-sm btn-outline-dark" onclick="setCroquisMapVertexEdit()">✥ ویرایش رأس‌ها: خاموش</button>
+                    <button type="button" id="crq-map-move-polygon-btn" class="btn btn-sm btn-outline-warning" aria-pressed="false" onclick="toggleCroquisWholePolygonMove()">✥ جابه‌جایی کل چندضلعی</button>
                     <button type="button" class="btn btn-sm btn-outline-info" onclick="locateOnCroquisMap()">◎ موقعیت‌یابی GPS</button>
                     <button type="button" class="btn btn-sm btn-outline-primary" onclick="copyActiveLayerUTM()">کپی مختصات UTM</button>
                     <button type="button" class="btn btn-sm btn-outline-success" onclick="exportCroquisGeoJSON()">خروجی GeoJSON</button>
@@ -2410,6 +2452,21 @@
                 <label class="small fw-bold" id="lbl-edit-lyr-bulk-utm" for="edit-lyr-bulk-utm">ورود دسته‌ای نقاط لایه (چپ‌به‌راست: X,Y,Z,Zone):</label>
                 <textarea id="edit-lyr-bulk-utm" dir="ltr" style="direction:ltr;text-align:left;" class="form-control form-control-sm font-monospace mb-2" rows="4" placeholder="702150,3208450,1285,39&#10;702550,3208450,1285,39"></textarea>
                 <button type="button" class="btn btn-sm btn-primary w-100 mb-2 fw-bold" onclick="applyBulkUtmToActiveLayer()">📥 ثبت و ترسیم نقاط دسته‌ای در لایه</button>
+
+                <!-- ساخت چندضلعی دقیق با طول و آزیموت تک‌تک اضلاع -->
+                <div class="p-2 rounded bg-white border border-success mb-2">
+                  <strong class="small d-block mb-1 text-success">📐 ساخت چندضلعی با اضلاع دقیق و دلخواه</strong>
+                  <div class="small text-muted mb-2">مختصات شروع را وارد کنید؛ سپس برای هر ضلع یک سطر با قالب «طول متر، آزیموت درجه» بنویسید. آزیموت از شمال و در جهت ساعت‌گرد است: ۰ شمال، ۹۰ شرق، ۱۸۰ جنوب، ۲۷۰ غرب. ضلع آخر نیز باید شکل را ببندد.</div>
+                  <div class="row g-1 mb-1">
+                    <div class="col-5"><label class="small" for="crq-poly-start-x">نقطه شروع X (شرقی)</label><input id="crq-poly-start-x" type="number" step="0.01" class="form-control form-control-sm font-monospace" dir="ltr" placeholder="714868.12" /></div>
+                    <div class="col-5"><label class="small" for="crq-poly-start-y">نقطه شروع Y (شمالی)</label><input id="crq-poly-start-y" type="number" step="0.01" class="form-control form-control-sm font-monospace" dir="ltr" placeholder="3203130.13" /></div>
+                    <div class="col-2"><label class="small" for="crq-poly-elevation">ارتفاع Z</label><input id="crq-poly-elevation" type="number" step="0.1" class="form-control form-control-sm font-monospace" dir="ltr" value="0" /></div>
+                  </div>
+                  <label class="small fw-bold" for="crq-exact-poly-sides">طول ضلع، آزیموت (هر ضلع در یک سطر)</label>
+                  <textarea id="crq-exact-poly-sides" class="form-control form-control-sm font-monospace mb-1" rows="4" dir="ltr" style="direction:ltr;text-align:left;" placeholder="45,90&#10;24.4444,180&#10;45,270&#10;24.4444,0"></textarea>
+                  <button type="button" class="btn btn-sm btn-success w-100 fw-bold" onclick="createExactPolygonInActiveLayer()">ساخت و ذخیره چندضلعی دقیق در لایه فعال</button>
+                  <div id="crq-exact-poly-status" class="small mt-1 text-muted" aria-live="polite">این ابزار فقط لایه فعال را تغییر می‌دهد؛ قبل از جایگزینی هندسه قبلی تأیید گرفته می‌شود.</div>
+                </div>
 
                 <!-- ۳. محاسبه‌گر هوشمند فاصله هوایی و اختلاف ارتفاع (صفحه ۵ راهنمای PDF) -->
                 <div class="p-2 rounded bg-light border">
@@ -3115,6 +3172,7 @@
   <script src="./nezam-drive-documents.js?v=20261108-drive-only-r3"></script>
   <script src="./nezam-letter-attachments.js?v=20261104-letter-attachments-r2"></script>
   <script src="./nezam-customizer.js?v=20261125-utm-precision-r1"></script>
+  <script src="./nezam-croquis-enhancements.js?v=20261125-croquis-tools-r1"></script>
   <script src="./nezam-ai-assistant.js?v=20261101-security-r3"></script>
 
   <!-- ماژول اصلاح‌شده و دوطرفه اتصال سامانه ۶۳۶ خفر به گوگل درایو (ذخیره و بازخوانی ۱۰۰٪ اطلاعات) -->
