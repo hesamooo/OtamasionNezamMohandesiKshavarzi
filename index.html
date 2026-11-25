@@ -2458,6 +2458,9 @@
                     <button type="button" class="btn btn-sm btn-outline-secondary" onclick="cancelMapDrawing()">لغو ترسیم</button>
                     <button type="button" id="crq-map-edit-vertices-btn" class="btn btn-sm btn-outline-dark" onclick="setCroquisMapVertexEdit()">✥ ویرایش رأس‌ها: خاموش</button>
                     <button type="button" id="crq-map-move-polygon-btn" class="btn btn-sm btn-outline-warning" aria-pressed="false" onclick="toggleCroquisWholePolygonMove()">✥ جابه‌جایی کل چندضلعی</button>
+                    <label class="small fw-bold mb-0" for="crq-map-rotate-degrees">چرخش ساعت‌گرد (درجه)</label>
+                    <input id="crq-map-rotate-degrees" type="number" class="form-control form-control-sm" style="max-width:90px;" step="0.1" value="15" title="زاویه مثبت: ساعت‌گرد؛ چرخش حول مرکز هندسی چندضلعی" />
+                    <button type="button" id="crq-map-rotate-polygon-btn" class="btn btn-sm btn-outline-primary" onclick="rotateCroquisActivePolygonFromInput()">⟳ چرخاندن چندضلعی فعال</button>
                     <button type="button" class="btn btn-sm btn-outline-info" onclick="locateOnCroquisMap()">◎ موقعیت‌یابی GPS</button>
                     <button type="button" class="btn btn-sm btn-outline-primary" onclick="copyActiveLayerUTM()">کپی مختصات UTM</button>
                     <button type="button" class="btn btn-sm btn-outline-success" onclick="exportCroquisGeoJSON()">خروجی GeoJSON</button>
@@ -2548,6 +2551,59 @@
                 <label class="small fw-bold" id="lbl-edit-lyr-bulk-utm" for="edit-lyr-bulk-utm">ورود دسته‌ای نقاط لایه (چپ‌به‌راست: X,Y,Z,Zone):</label>
                 <textarea id="edit-lyr-bulk-utm" dir="ltr" style="direction:ltr;text-align:left;" class="form-control form-control-sm font-monospace mb-2" rows="4" placeholder="702150,3208450,1285,39&#10;702550,3208450,1285,39"></textarea>
                 <button type="button" class="btn btn-sm btn-primary w-100 mb-2 fw-bold" onclick="applyBulkUtmToActiveLayer()">📥 ثبت و ترسیم نقاط دسته‌ای در لایه</button>
+
+                <!-- جانمایی هندسی سازه‌ها در لایه مستقل و با کنترل کامل داخل زمین اصلی -->
+                <div class="p-2 rounded bg-white border border-primary mb-2" id="crq-placement-shape-panel">
+                  <strong class="small d-block mb-1 text-primary">🏗️ ابزار جانمایی ابنیه و تأسیسات داخل زمین</strong>
+                  <div class="small text-muted mb-2">شکل جدید در یک لایه مستقل ساخته می‌شود؛ محدوده اصلی زمین تغییر نمی‌کند و خروج شکل از مرز زمین کنترل می‌شود.</div>
+                  <label class="small fw-bold" for="crq-placement-shape-type">نوع شکل هندسی</label>
+                  <select id="crq-placement-shape-type" class="form-select form-select-sm mb-2" onchange="updateCroquisPlacementShapeUI()">
+                    <option value="RECTANGLE" selected>مستطیل</option><option value="SQUARE">مربع</option>
+                    <option value="CIRCLE">دایره (تقریب برداری)</option><option value="CUSTOM">چندضلعی با اضلاع و آزیموت دلخواه</option>
+                  </select>
+                  <div class="row g-1 mb-1">
+                    <div class="col-6"><label class="small" id="crq-placement-anchor-label" for="crq-place-anchor-x">مرکز شکل (UTM) - X</label><input id="crq-place-anchor-x" type="number" step="0.01" class="form-control form-control-sm font-monospace" dir="ltr" placeholder="714868.12" /></div>
+                    <div class="col-6"><label class="small" for="crq-place-anchor-y">مختصات Y (شمالی)</label><input id="crq-place-anchor-y" type="number" step="0.01" class="form-control form-control-sm font-monospace" dir="ltr" placeholder="3203130.13" /></div>
+                  </div>
+                  <button type="button" class="btn btn-sm btn-outline-primary w-100 mb-2" onclick="pickCroquisPlacementAnchor()">◎ انتخاب محل شکل با کلیک روی نقشه</button>
+                  <div id="crq-placement-rectangle-fields">
+                    <div class="row g-1">
+                      <div class="col-4"><label class="small" for="crq-place-length">طول (متر)</label><input id="crq-place-length" type="number" min="0.01" step="0.01" class="form-control form-control-sm" value="20" /></div>
+                      <div class="col-4"><label class="small" for="crq-place-width">عرض (متر)</label><input id="crq-place-width" type="number" min="0.01" step="0.01" class="form-control form-control-sm" value="10" /></div>
+                      <div class="col-4"><label class="small" for="crq-place-azimuth">آزیموت (°)</label><input id="crq-place-azimuth" type="number" step="0.1" class="form-control form-control-sm" value="0" /></div>
+                    </div>
+                    <div class="small text-muted mb-1">آزیموت جهت ضلع طولی است: ۰ شمال، ۹۰ شرق، ۱۸۰ جنوب، ۲۷۰ غرب.</div>
+                  </div>
+                  <div id="crq-placement-square-fields" style="display:none;">
+                    <div class="row g-1">
+                      <div class="col-6"><label class="small" for="crq-place-side">طول هر ضلع (متر)</label><input id="crq-place-side" type="number" min="0.01" step="0.01" class="form-control form-control-sm" value="10" /></div>
+                      <div class="col-6"><label class="small" for="crq-place-azimuth-square">آزیموت ضلع (°)</label><input id="crq-place-azimuth-square" type="number" step="0.1" class="form-control form-control-sm" value="0" /></div>
+                    </div>
+                    <div class="small text-muted mb-1">آزیموت از شمال شبکه UTM و ساعت‌گرد محاسبه می‌شود.</div>
+                  </div>
+                  <div id="crq-placement-circle-fields" style="display:none;">
+                    <div class="row g-1">
+                      <div class="col-6"><label class="small" for="crq-place-radius">شعاع (متر)</label><input id="crq-place-radius" type="number" min="0.01" step="0.01" class="form-control form-control-sm" value="5" /></div>
+                      <div class="col-6"><label class="small" for="crq-place-circle-segments">تعداد اضلاع تقریبی</label><input id="crq-place-circle-segments" type="number" min="16" max="128" step="4" class="form-control form-control-sm" value="48" /></div>
+                    </div>
+                    <div class="small text-muted mb-1">دایره به چندضلعی نرم ۱۶ تا ۱۲۸ رأسی تبدیل می‌شود.</div>
+                  </div>
+                  <div id="crq-placement-custom-fields" style="display:none;">
+                    <label class="small fw-bold" for="crq-place-custom-sides">طول ضلع، آزیموت (هر ضلع در یک سطر؛ سطر آخر شکل را می‌بندد)</label>
+                    <textarea id="crq-place-custom-sides" class="form-control form-control-sm font-monospace mb-1" rows="4" dir="ltr" style="direction:ltr;text-align:left;" placeholder="20,90&#10;10,180&#10;20,270&#10;10,0"></textarea>
+                    <div class="small text-muted mb-1">نمونه: طول و آزیموت هر ضلع بر حسب متر و درجه؛ شکل باید با ضلع آخر بسته شود.</div>
+                  </div>
+                  <div class="row g-1 mb-1">
+                    <div class="col-6"><label class="small" for="crq-place-elevation">ارتفاع Z (متر)</label><input id="crq-place-elevation" type="number" step="0.1" class="form-control form-control-sm" value="0" /></div>
+                    <div class="col-6"><label class="small" for="crq-place-category">نوع عارضه</label><select id="crq-place-category" class="form-select form-select-sm" onchange="setCroquisPlacementCategory()"><option value="FACILITY" selected>ابنیه و تأسیسات</option><option value="PROJECT_AREA">محل اجرای طرح</option><option value="GREENHOUSE">گلخانه / سالن</option></select></div>
+                  </div>
+                  <div class="row g-1 mb-1">
+                    <div class="col-8"><label class="small" for="crq-place-name">نام لایه جدید</label><input id="crq-place-name" type="text" class="form-control form-control-sm" placeholder="مثلاً ساختمان نگهبانی" /></div>
+                    <div class="col-4"><label class="small" for="crq-place-color">رنگ</label><input id="crq-place-color" type="color" class="form-control form-control-color form-control-sm w-100" value="#b45309" /></div>
+                  </div>
+                  <button type="button" class="btn btn-sm btn-primary w-100 fw-bold" onclick="createCroquisPlacementShape()">ساخت شکل و افزودن لایه جانمایی</button>
+                  <div id="crq-placement-shape-status" class="small mt-1 text-muted" aria-live="polite">مختصات UTM مرکز شکل را وارد کنید یا محل آن را روی نقشه انتخاب کنید.</div>
+                </div>
 
                 <!-- ساخت چندضلعی دقیق با طول و آزیموت تک‌تک اضلاع -->
                 <div class="p-2 rounded bg-white border border-success mb-2">
@@ -3268,7 +3324,7 @@
   <script src="./nezam-drive-documents.js?v=20261108-drive-only-r3"></script>
   <script src="./nezam-letter-attachments.js?v=20261104-letter-attachments-r2"></script>
   <script src="./nezam-customizer.js?v=20261125-print-selection-r2"></script>
-  <script src="./nezam-croquis-enhancements.js?v=20261125-coordinate-box-position-r1"></script>
+  <script src="./nezam-croquis-enhancements.js?v=20261125-placement-rotation-r1"></script>
   <script src="./nezam-croquis-print-declaration.js?v=20261125-layer-print-selection-r1"></script>
   <script src="./nezam-cad-view-tools.js?v=20261125-cad-view-r5"></script>
   <script src="./nezam-cad-file-io.js?v=20261125-cad-io-r2"></script>
