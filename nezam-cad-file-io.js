@@ -76,14 +76,17 @@
     var allPoints = [];
     map.layers.forEach(function (layer) {
       if (!layer || layer.visible === false || !Array.isArray(layer.points)) return;
-      var points = layer.points.map(function (p) {
-        if (!p) return null;
+      if (!layer.points.length) return;
+      var points = layer.points.map(function (p, pointIndex) {
+        if (!p) throw new Error("لایه «" + String(layer.name || "") + "» در رأس " + (pointIndex + 1) + " داده خالی دارد.");
         var x = numeric(p.x), y = numeric(p.y);
         var zValue = p.elev !== undefined && p.elev !== null && p.elev !== "" ? p.elev : p.z;
         var z = zValue === undefined || zValue === null || zValue === "" ? 0 : numeric(zValue);
-        if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return null;
+        if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) {
+          throw new Error("مختصات X/Y/Z در لایه «" + String(layer.name || "") + "»، رأس " + (pointIndex + 1) + " معتبر نیست؛ خروجی برای جلوگیری از فایل ناقص متوقف شد.");
+        }
         return { x: x, y: y, z: z };
-      }).filter(Boolean);
+      });
       if (!points.length) return;
       var geomType = String(layer.geomType || "").toUpperCase();
       if (geomType === "POLYGON" && points.length > 3) {
@@ -119,6 +122,13 @@
     var viewHeight = Math.max(spanY, spanX / 1.55, 1) * 1.18;
     var margin = Math.max(viewHeight * 0.08, 1);
     var entityCount = 0, vertexCount = 0, out = [], handleNumber = 0x200;
+    var plannedEntityHandles = exportLayers.reduce(function (sum, layer) {
+      if (layer.geomType === "POINT" || layer.points.length === 1) return sum + layer.points.length;
+      return sum + (layer.flat ? 1 : layer.points.length + 2);
+    }, 0);
+    // Tables, block records, block begin/end objects and model-space entities all receive unique handles.
+    var plannedHandles = 2 + (exportLayers.length + 2) + 3 + 4 + plannedEntityHandles;
+    var handSeed = (0x201 + plannedHandles).toString(16).toUpperCase();
     function nextHandle() { handleNumber++; return handleNumber.toString(16).toUpperCase(); }
     function tableStart(name, count) {
       pair(out, 0, "TABLE"); pair(out, 2, name); pair(out, 5, nextHandle());
@@ -142,6 +152,7 @@
     }, 0));
     pair(out, 0, "SECTION"); pair(out, 2, "HEADER");
     pair(out, 9, "$ACADVER"); pair(out, 1, "AC1015");
+    pair(out, 9, "$HANDSEED"); pair(out, 5, handSeed);
     pair(out, 9, "$INSUNITS"); pair(out, 70, "6");
     pair(out, 9, "$LUNITS"); pair(out, 70, "2");
     pair(out, 9, "$LUPREC"); pair(out, 70, "4");
