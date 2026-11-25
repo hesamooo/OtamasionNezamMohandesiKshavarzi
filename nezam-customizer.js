@@ -4143,6 +4143,19 @@ window.setCroquisPrintMapMode = function(mode) {
   if (typeof showToastMsg === "function") showToastMsg("حالت نقشه در چاپ تنظیم شد: " + modeTitle);
 };
 
+window.setCroquisPrintLineWidth = function(value) {
+  var map = typeof getActiveCroquisMap === "function" ? getActiveCroquisMap() : null;
+  if (!map) return false;
+  var width = Number(value);
+  if (!Number.isFinite(width)) width = 2;
+  width = Math.min(6, Math.max(0.5, width));
+  if (!map.cadView || typeof map.cadView !== "object") map.cadView = {};
+  map.cadView.printLineWidth = Math.round(width * 100) / 100;
+  if (typeof saveAllDB === "function") saveAllDB();
+  if (currentPreviewMode === "CROQUIS") printUtmSketchSheet();
+  return true;
+};
+
 window.setCroquisPrintZoom = function(zoomVal) {
   var requestedZoom = String(zoomVal || "AUTO");
   var allowedZooms = ["AUTO", "14", "15", "16", "17", "18", "19", "20", "21"];
@@ -4358,6 +4371,9 @@ function attachPrintedMapCropInteractions() {
 /* تولید نقشه چاپی شیت رسمی با نمایش واقعی ماهواره گوگل‌ارث، قابلیت تنظیم کادر برش (Crop)، و چیدمان مشخصات در بیرون پولیگون (بدون پوشاندن زمین) */
 function buildPrintedCroquisMap(m, svgW, svgH, mode) {
   var selectedMode = mode || croquisPrintMapMode || "GOOGLE_SAT";
+  var printLineWidth = Number(m && m.cadView && m.cadView.printLineWidth);
+  if (!Number.isFinite(printLineWidth)) printLineWidth = 2;
+  printLineWidth = Math.min(6, Math.max(0.5, printLineWidth));
   window._lastPrintSvgW = svgW;
   window._lastPrintSvgH = svgH;
 
@@ -4532,9 +4548,7 @@ function buildPrintedCroquisMap(m, svgW, svgH, mode) {
     if (!lyr.visible || !Array.isArray(lyr.points) || !lyr.points.length) continue;
     var layerColor = safeHexColor(lyr.color, "#15803d");
     var safeLayerName = safeHtmlText(lyr.name || "لایه بدون نام");
-    var layerStrokeWidth = Number(lyr.strokeWidth);
-    if (!Number.isFinite(layerStrokeWidth)) layerStrokeWidth = 2.5;
-    layerStrokeWidth = Math.min(10, Math.max(0.5, layerStrokeWidth));
+    var layerStrokeWidth = printLineWidth;
     var gLyr = computeUtmGeometry(lyr.points, lyr.geomType);
     var isPrimaryParcel = (!primaryLayerId || lyr.id === primaryLayerId);
 
@@ -4553,8 +4567,8 @@ function buildPrintedCroquisMap(m, svgW, svgH, mode) {
       var cy = sumCy / lyr.points.length;
 
       // چندضلعی با داخل شفاف تا بافت زمین روی گوگل‌ارث ۱۰۰٪ دیده شود
-      vectorShapes += '<polygon points="' + polyPts.join(" ") + '" fill="' + layerColor + '" fill-opacity="' + fillOp + '" stroke="#ffffff" stroke-width="' + (isPrimaryParcel ? '4.5' : '3.2') + '" stroke-linejoin="round"/>';
-      vectorShapes += '<polygon points="' + polyPts.join(" ") + '" fill="none" stroke="' + layerColor + '" stroke-width="' + (isPrimaryParcel ? '2.6' : '2.0') + '" stroke-linejoin="round"/>';
+      vectorShapes += '<polygon points="' + polyPts.join(" ") + '" fill="' + layerColor + '" fill-opacity="' + fillOp + '" stroke="#ffffff" stroke-width="' + (printLineWidth * (isPrimaryParcel ? 1.8 : 1.4)).toFixed(2) + '" stroke-linejoin="round"/>;'
+      vectorShapes += '<polygon points="' + polyPts.join(" ") + '" fill="none" stroke="' + layerColor + '" stroke-width="' + printLineWidth.toFixed(2) + '" stroke-linejoin="round"/>';
 
       // نمایش طول اضلاع و کد رئوس فقط در بیرون مرز زمین اصلی (یا لایه متمرکز) تا هیچ متنی داخل پولیگون زمین را نپوشاند
       for (var p2 = 0; p2 < lyr.points.length; p2++) {
@@ -4650,8 +4664,8 @@ function buildPrintedCroquisMap(m, svgW, svgH, mode) {
           vectorShapes += '<text x="' + s3.x + '" y="' + (s3.y - radialDist * 0.6) + '" fill="#ffffff" font-size="9.5" font-weight="bold" text-anchor="middle" style="' + haloStyle + '">' + lLbl + '</text>';
         }
       }
-      vectorShapes += '<polyline points="' + linePts.join(" ") + '" fill="none" stroke="#ffffff" stroke-width="4.2"/>';
-      vectorShapes += '<polyline points="' + linePts.join(" ") + '" fill="none" stroke="' + layerColor + '" stroke-width="2.4" stroke-dasharray="6,3"/>';
+      vectorShapes += '<polyline points="' + linePts.join(" ") + '" fill="none" stroke="#ffffff" stroke-width="' + (printLineWidth * 1.8).toFixed(2) + '"/>';
+      vectorShapes += '<polyline points="' + linePts.join(" ") + '" fill="none" stroke="' + layerColor + '" stroke-width="' + printLineWidth.toFixed(2) + '" stroke-dasharray="6,3"/>';
     } else {
       for (var p4 = 0; p4 < lyr.points.length; p4++) {
         var s4 = toMapScreen(lyr.points[p4]);
@@ -4795,6 +4809,10 @@ function printUtmSketchSheet() {
   }
   var m = getActiveCroquisMap();
   if (!m) return;
+  if (!m.cadView || typeof m.cadView !== "object") m.cadView = {};
+  var activePrintLineWidth = Number(m.cadView.printLineWidth);
+  if (!Number.isFinite(activePrintLineWidth)) activePrintLineWidth = 2;
+  activePrintLineWidth = Math.min(6, Math.max(0.5, activePrintLineWidth));
   currentPreviewMode = "CROQUIS";
   currentPreviewLetterId = null;
   currentPreviewDraft = null;
@@ -4907,6 +4925,11 @@ function printUtmSketchSheet() {
           '<input type="range" id="crq-crop-height-slider" class="form-range" min="' + (isA5 ? 170 : 250) + '" max="' + (isA5 ? 265 : 420) + '" step="10" value="' + svgH + '" onchange="setCroquisCropOption(\'boxHeight\', this.value)" title="تنظیم ارتفاع کادر برش نقشه در شیت چاپی">' +
         '</div>' +
       '</div>' +
+      '<div class="d-flex flex-wrap align-items-center gap-2 mb-2 pt-2 border-top">' +
+        '<label class="fw-bold text-dark text-nowrap" for="crq-print-line-width">🖊️ ضخامت خطوط نقشه هنگام چاپ:</label>' +
+        '<input type="range" id="crq-print-line-width" class="form-range" style="max-width:230px;" min="0.5" max="6" step="0.25" value="' + activePrintLineWidth + '" onchange="setCroquisPrintLineWidth(this.value)" title="ضخامت مرز لایه‌ها و خطوط در خروجی چاپی"/>' +
+        '<span id="crq-print-line-width-value" class="small fw-bold text-primary">' + toFa(activePrintLineWidth.toFixed(2)) + ' واحد ترسیم</span>' +
+      '</div>' +
       '<div class="d-flex justify-content-between align-items-center flex-wrap gap-2">' +
         '<div class="d-flex align-items-center gap-1 flex-wrap">' +
           '<b class="text-secondary ms-1">🏷️ چیدمان مشخصات بیرون زمین:</b>' +
@@ -4952,7 +4975,23 @@ function printUtmSketchSheet() {
       '<span><b>موقعیت اراضی:</b> ' + safeHtmlText(c.loc) + '</span>' +
       '<span><b>تاریخ کروکی:</b> ' + safeHtmlText(toFa(m.date || todayShamsi())) + '</span>' +
     '</div>' +
-    '<div id="printed-croquis-map-holder" style="width:100%;text-align:center;margin-bottom:' + (isA5Sheet ? '1.2mm' : '2mm') + ';">' + printedMapMarkup + '</div>';
+    '<div id="printed-croquis-map-holder" style="width:100%;text-align:center;margin-bottom:' + (isA5Sheet ? '1.0mm' : '1.4mm') + ';">' + printedMapMarkup + '</div>' +
+    '<section class="croquis-sheet1-layer-legend" style="direction:rtl;border:0.7px solid #94a3b8;border-radius:3px;padding:' + (isA5Sheet ? '0.8mm 1.2mm' : '1mm 2mm') + ';margin-bottom:1mm;background:#f8fafc;line-height:1.35;">' +
+      '<div style="font-size:' + (isA5Sheet ? '6.5pt' : '7.5pt') + ';font-weight:900;color:#14532d;margin-bottom:.5mm;">راهنمای رنگ لایه‌ها و مساحت</div>' +
+      '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:' + (isA5Sheet ? '1mm 2mm' : '1.2mm 3mm') + ';">' +
+        (legendPills || '<span style="font-size:6.5pt;color:#64748b;">لایه انتخاب‌شده‌ای برای نمایش وجود ندارد.</span>') +
+      '</div>' +
+    '</section>' +
+    '<section class="croquis-applicant-survey-declaration" style="direction:rtl;border:0.8px solid #64748b;border-right:2.5px solid #b45309;border-radius:3px;padding:' + (isA5Sheet ? '0.8mm 1.2mm' : '1mm 2mm') + ';background:#fffdf7;line-height:1.42;font-size:' + (isA5Sheet ? '5.8pt' : '6.7pt') + ';text-align:justify;">' +
+      '<div style="font-weight:900;color:#7c2d12;text-align:center;font-size:' + (isA5Sheet ? '6.3pt' : '7.2pt') + ';margin-bottom:.5mm;">اقرار و تأیید متقاضی درباره محدوده و نقاط نقشه</div>' +
+      'اینجانب متقاضی/نماینده قانونی، تأیید می‌کنم محل زمین، حدود مورد درخواست، محل رئوس و نقاط و مختصات درج‌شده در این کروکی را در محل معرفی، بازبینی و تأیید کرده‌ام و نقشه بر مبنای اطلاعات و مستندات ارائه‌شده و نقاط معرفی یا تأییدشده تهیه شده است. مسئولیت صحت اسناد و اطلاعات ارائه‌شده، انطباق محدوده معرفی‌شده با درخواست و مدارک، اعلام حقوق اشخاص ثالث، رفع تعارضات و اخذ مجوزها و رضایت‌های قانونی لازم بر عهده اینجانب است. متعهد می‌شوم مغایرت ناشی از اطلاعات یا محل‌های معرفی/تأییدشده از سوی خود را اعلام و اصلاح کنم و خساراتی را که طبق قانون قابل انتساب به اطلاعات نادرست یا کتمان‌شده از سوی اینجانب باشد جبران نمایم.' +
+      '<br>این نقشه صرفاً خروجی فنی مبتنی بر داده‌ها و مدارک ارائه‌شده/تأییدشده برای بررسی درخواست است و به‌تنهایی سند مالکیت یا حدنگار، تحدید حدود ثبتی، گواهی عدم تعارض یا مجوز ساخت و بهره‌برداری محسوب نمی‌شود. این اقرار، مسئولیت‌های قانونی و حرفه‌ای اشخاص تهیه‌کننده را در حدود تقصیر، تخلف یا تکالیف آمره قانونی که قابل اسقاط نیست، ساقط یا منتقل نمی‌کند.' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;gap:4mm;border-top:0.5px dotted #a16207;margin-top:.7mm;padding-top:.7mm;font-weight:800;">' +
+        '<span>نام و نام خانوادگی متقاضی: ' + safeHtmlText(c.name || '................................') + '</span>' +
+        '<span>امضاء و اثر انگشت متقاضی: ............................</span>' +
+        '<span>تاریخ: ........................</span>' +
+      '</div>' +
+    '</section>';
 
   // برگه دوم: جداول تفکیک مساحت و مختصات کامل (X, Y, ارتفاع, Zone, Lat/Lng) زمین اصلی و کلیه عوارض
   var layersRows = "";
