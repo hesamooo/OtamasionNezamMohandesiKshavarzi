@@ -859,3 +859,41 @@ test('standard CAD scale remains exact at 1:500, 1:1000 and 1:5000', () => {
   assert.ok(Math.abs(zoomed.effectiveDenominator - 500) < 1e-8,
     '200% zoom must update the effective drawing ratio');
 });
+
+
+test('prevailing wind direction uses meteorological from-direction and draws flow toward the opposite bearing', () => {
+  const source = read('nezam-cad-view-tools.js');
+  const start = source.indexOf('  var WIND_COMPASS_16 = [');
+  const end = source.indexOf('  function selectedLayers', start);
+  assert.ok(start >= 0 && end > start, 'wind direction helper must exist');
+  const describe = new Function(
+    'window',
+    source.slice(start, end) + '\nreturn window.describeCroquisPrevailingWind;'
+  )({});
+  const northWest = describe(315);
+  assert.equal(northWest.fromName, 'شمال‌غرب');
+  assert.equal(northWest.toName, 'جنوب‌شرق');
+  assert.ok(northWest.dx > 0 && northWest.dy > 0, 'north-west wind must point toward screen south-east');
+  const north = describe(0);
+  assert.equal(north.fromName, 'شمال');
+  assert.equal(north.toName, 'جنوب');
+  const east = describe(90);
+  assert.equal(east.fromName, 'شرق');
+  assert.equal(east.toName, 'غرب');
+  const wrap = describe(359.9);
+  assert.equal(wrap.fromName, 'شمال');
+});
+
+test('CAD map exposes prevailing wind controls and stores wind settings per map', () => {
+  const html = read('index.html');
+  const source = read('nezam-cad-view-tools.js');
+  assert.ok(html.includes('id="crq-cad-wind-enabled"'));
+  assert.ok(html.includes('id="crq-cad-wind-preset"'));
+  assert.ok(html.includes('id="crq-cad-wind-degrees"'));
+  assert.ok(html.includes("selectCroquisPrevailingWindPreset(this.value)"));
+  assert.ok(source.includes('showPrevailingWind: false'));
+  assert.ok(source.includes('prevailingWindFromDeg: 315'));
+  assert.ok(source.includes('جهت باد غالب'));
+  assert.ok(source.includes('window.describeCroquisPrevailingWind'));
+  assert.ok(source.includes('prevailingWindHud'));
+});
