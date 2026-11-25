@@ -22,7 +22,7 @@ test('package and TypeScript configuration are valid JSON', () => {
 });
 
 test('main JavaScript modules have valid syntax', () => {
-  for (const file of ['nezam-core.js', 'nezam-customizer.js', 'nezam-croquis-enhancements.js', 'nezam-cad-view-tools.js', 'nezam-ai-assistant.js', 'nezam-operations.js', 'nezam-agent-engine.js']) {
+  for (const file of ['nezam-core.js', 'nezam-customizer.js', 'nezam-croquis-enhancements.js', 'nezam-croquis-print-declaration.js', 'nezam-cad-view-tools.js', 'nezam-ai-assistant.js', 'nezam-operations.js', 'nezam-agent-engine.js']) {
     assert.doesNotThrow(() => new Function(read(file)), file);
   }
 });
@@ -937,4 +937,26 @@ test('first croquis map sheet prints main-land and project UTM vertices in a ded
   assert.ok(markup.includes('زون 39R'));
   assert.ok(source.includes('croquis-map-side-info'));
   assert.ok(source.includes('aria-label="مختصات UTM نقاط زمین اصلی و محل اجرای طرح"'));
+});
+
+
+test('croquis coordinate print appendix provides layer selection, continuation pages and applicant declaration', () => {
+  const source = read('nezam-croquis-print-declaration.js');
+  const html = read('index.html');
+  assert.ok(html.includes('nezam-croquis-print-declaration.js?v=20261125-print-declaration-r1'));
+  assert.ok(source.includes('croquis-coordinate-print-selection'));
+  assert.ok(source.includes('setCroquisCoordinatePrintLayer'));
+  assert.ok(source.includes('coordinateTable(page)'));
+  assert.ok(source.includes('croquis-coordinate-continuation'));
+  assert.ok(source.includes('اقرار و تعهد متقاضی درباره صحت اطلاعات'));
+  assert.ok(source.includes('موجب اسقاط یا انتقال مسئولیت‌های قانونی و حرفه‌ای'));
+  assert.ok(source.includes('امضاء و اثر انگشت متقاضی'));
+});
+
+test('applicant legal declaration replaces the unsupported expert coordinate certification', () => {
+  const source = read('nezam-croquis-print-declaration.js');
+  assert.ok(source.includes('گواهی فنی کارشناس'));
+  assert.ok(source.includes('به‌تنهایی سند مالکیت یا حدنگار'));
+  assert.ok(source.includes('جبران خسارات قابل انتساب'));
+  assert.ok(source.includes('تقصیر، تخلف یا تکالیف آمره قانونی'));
 });
