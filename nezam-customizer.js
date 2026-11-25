@@ -2929,7 +2929,13 @@ function latLngToUtmWGS84(lat, lon, forcedZone) {
     (15 * eccSquared * eccSquared / 256 + 45 * Math.pow(eccSquared, 3) / 1024) * Math.sin(4 * latRad));
   var x = k0 * N * (A + (1 - T + C) * Math.pow(A, 3) / 6 + (5 - 18 * T + T * T + 72 * C - 58 * eccPrimeSquared) * Math.pow(A, 5) / 120) + 500000.0;
   var y = k0 * (M + N * Math.tan(latRad) * (A * A / 2 + (5 - T + 9 * C + 4 * C * C) * Math.pow(A, 4) / 24));
-  return { x: Math.round(x), y: Math.round(y), zone: zone };
+  // Keep centimetre precision. Integer-metre rounding can shift a vertex by
+  // up to ~0.71 m and create false outside-boundary warnings after KML import.
+  return {
+    x: Math.round(x * 100) / 100,
+    y: Math.round(y * 100) / 100,
+    zone: zone
+  };
 }
 
 /* اعتبارسنجی پیشرفته مختصات UTM و تشخیص نقاط خارج از محدوده زمین اصلی */
@@ -2966,13 +2972,47 @@ function validateUtmLayerPoints(points, geomType, zoneStr) {
   return { valid: errors.length === 0, errors: errors, warnings: warnings };
 }
 
+function isPointOnSegment2D(pt, a, b, toleranceMeters) {
+  var px = Number(pt && pt.x), py = Number(pt && pt.y);
+  var ax = Number(a && a.x), ay = Number(a && a.y);
+  var bx = Number(b && b.x), by = Number(b && b.y);
+  if (![px, py, ax, ay, bx, by].every(Number.isFinite)) return false;
+
+  var dx = bx - ax, dy = by - ay;
+  var lengthSquared = dx * dx + dy * dy;
+  var tolerance = Number.isFinite(toleranceMeters) ? Math.max(0, toleranceMeters) : 0.02;
+  if (lengthSquared < 1e-12) {
+    return Math.hypot(px - ax, py - ay) <= tolerance;
+  }
+
+  var length = Math.sqrt(lengthSquared);
+  var t = ((px - ax) * dx + (py - ay) * dy) / lengthSquared;
+  var tTolerance = tolerance / length;
+  if (t < -tTolerance || t > 1 + tTolerance) return false;
+
+  var clampedT = Math.max(0, Math.min(1, t));
+  var nearestX = ax + clampedT * dx;
+  var nearestY = ay + clampedT * dy;
+  return Math.hypot(px - nearestX, py - nearestY) <= tolerance;
+}
+
 function isPointInPolygon2D(pt, poly) {
-  if (!poly || poly.length < 3) return true;
+  if (!poly || poly.length < 3 || !pt) return false;
+
+  // A point exactly on a parcel edge is inside the parcel, not outside it.
+  // The 2 cm tolerance only absorbs floating-point / projection noise.
+  for (var edge = 0; edge < poly.length; edge++) {
+    var next = (edge + 1) % poly.length;
+    if (isPointOnSegment2D(pt, poly[edge], poly[next], 0.02)) return true;
+  }
+
   var inside = false;
   for (var i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-    var xi = poly[i].x, yi = poly[i].y;
-    var xj = poly[j].x, yj = poly[j].y;
-    var intersect = ((yi > pt.y) !== (yj > pt.y)) && (pt.x < (xj - xi) * (pt.y - yi) / ((yj - yi) || 0.00001) + xi);
+    var xi = Number(poly[i].x), yi = Number(poly[i].y);
+    var xj = Number(poly[j].x), yj = Number(poly[j].y);
+    var px = Number(pt.x), py = Number(pt.y);
+    var intersect = ((yi > py) !== (yj > py)) &&
+      (px < (xj - xi) * (py - yi) / ((yj - yi) || 0.00001) + xi);
     if (intersect) inside = !inside;
   }
   return inside;
