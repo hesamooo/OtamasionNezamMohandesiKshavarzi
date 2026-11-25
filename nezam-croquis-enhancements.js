@@ -503,7 +503,7 @@
     if (type === "RECTANGLE" || type === "SQUARE") {
       var length = Number(type === "SQUARE" ? opts.side : opts.length);
       var width = Number(type === "SQUARE" ? opts.side : opts.width);
-      var azimuth = Number(opts.azimuth || 0);
+      var azimuth = Number(opts.azimuth == null ? 0 : opts.azimuth);
       if (!Number.isFinite(length) || length <= 0 || length > 10000) throw new Error("طول شکل باید عددی بزرگ‌تر از صفر و حداکثر ۱۰٬۰۰۰ متر باشد.");
       if (!Number.isFinite(width) || width <= 0 || width > 10000) throw new Error("عرض شکل باید عددی بزرگ‌تر از صفر و حداکثر ۱۰٬۰۰۰ متر باشد.");
       if (!Number.isFinite(azimuth)) throw new Error("آزیموت ضلع اصلی معتبر نیست.");
@@ -707,6 +707,9 @@
       desc: "جانمایی هندسی مستقل؛ داخل محدوده اصلی زمین کنترل شده است.",
       points: result.points
     };
+    newLayer.points.forEach(function (point, index) {
+      if (typeof ensurePointEnriched === "function") ensurePointEnriched(point, zone, index);
+    });
     if (!Array.isArray(map.layers)) map.layers = [];
     map.layers.push(newLayer);
     activeCroquisLayerId = newLayer.id;
