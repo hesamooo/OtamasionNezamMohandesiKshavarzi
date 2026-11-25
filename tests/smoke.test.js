@@ -1202,7 +1202,7 @@ test('DXF export and import module passes ASCII UTM round-trip for supported ent
 });
 
 
-test('DXF export writes model-space layers, valid handles, UTM extents and an opening view', () => {
+test('DXF export writes R12-compatible entities, active UTM viewport and accurate extents', () => {
   const apiWindow = {};
   new Function('window', read('nezam-cad-file-io.js'))(apiWindow);
   const map = { utmZone: '39R', layers: [
@@ -1220,22 +1220,30 @@ test('DXF export writes model-space layers, valid handles, UTM extents and an op
   ]};
   const dxf = apiWindow.buildCroquisDXFText(map);
   const parsed = apiWindow.parseCroquisDXFText(dxf);
-  assert.ok(dxf.includes('BLOCK_RECORD'));
-  assert.ok(dxf.includes('*Model_Space'));
-  assert.ok(dxf.includes('$HANDSEED'));
+  assert.ok(dxf.includes('AC1009'));
+  assert.ok(dxf.includes('VPORT'));
+  assert.ok(dxf.includes('*ACTIVE'));
   assert.ok(dxf.includes('$EXTMIN'));
   assert.ok(dxf.includes('$EXTMAX'));
   assert.ok(dxf.includes('$VIEWCTR'));
   assert.ok(dxf.includes('$VIEWSIZE'));
+  assert.ok(dxf.includes('NEZAM636_COORDINATES=UTM_METERS'));
+  assert.ok(dxf.includes('N636_001'));
+  assert.ok(dxf.includes('N636_002'));
+  assert.ok(dxf.includes('N636_003'));
+  assert.equal(dxf.includes('N636_004'), false);
+  assert.equal(parsed.zone, '39R');
+  assert.equal(parsed.unitScale, 1);
   assert.equal(parsed.features.length, 3);
   assert.deepEqual(parsed.features.map(x => x.geomType), ['POLYGON','LINE','POINT']);
   assert.deepEqual(parsed.features.map(x => x.points.length), [4,2,1]);
   assert.equal(parsed.features[1].points[1].z, 3);
-  const handles = Array.from(dxf.matchAll(/\n5\r\n([0-9A-F]+)\r\n/g), x => parseInt(x[1],16));
-  const handseedMatch = dxf.match(/\n\$HANDSEED\r\n5\r\n([0-9A-F]+)\r\n/);
-  assert.ok(handles.length > 0);
-  assert.ok(handseedMatch);
-  assert.ok(parseInt(handseedMatch[1],16) > Math.max(...handles.filter(value => value !== parseInt(handseedMatch[1],16))));
+  const allXY = parsed.features.flatMap(x => x.points);
+  assert.equal(Math.min(...allXY.map(p=>p.x)),714700);
+  assert.equal(Math.max(...allXY.map(p=>p.x)),714900);
+  assert.equal(Math.min(...allXY.map(p=>p.y)),3203000);
+  assert.equal(Math.max(...allXY.map(p=>p.y)),3203333.25);
+  assert.ok(dxf.includes('45\\r\\n'));
 });
 
 test('DXF export refuses invalid visible geometry rather than silently writing incomplete coordinates', () => {
