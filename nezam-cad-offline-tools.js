@@ -9,6 +9,8 @@
     pointer: null,
     dragPreview: null,
     gpsPoint: null,
+    targetLayerId: null,
+    pointReplace: false,
     initialized: false
   };
 
@@ -17,6 +19,11 @@
   }
   function activeLayer() {
     return typeof getActiveCroquisLayer === "function" ? getActiveCroquisLayer() : null;
+  }
+  function layerById(map, id) {
+    return map && Array.isArray(map.layers) ? map.layers.find(function (layer) {
+      return layer && String(layer.id) === String(id);
+    }) || null : null;
   }
   function status(message, isError) {
     var box = document.getElementById("crq-cad-offline-status");
@@ -449,17 +456,19 @@
     if (typeof croquisOnlineDrawMode !== "undefined" && croquisOnlineDrawMode) {
       status("ابتدا ترسیم فعال در نمای آنلاین را تمام یا لغو کنید.", true); return false;
     }
+    var replacePointLayer = false;
     if (mode === "POINT") {
       if (layer.points && layer.points.length && layer.geomType !== "POINT") {
-        if (!confirm("لایه فعال از نوع دیگری است. نقاط قبلی پاک و لایه به حالت نقطه‌ای تبدیل شود؟")) return false;
-        layer.points = [];
+        if (!confirm("لایه فعال از نوع دیگری است. با اولین کلیک، نقاط قبلی جایگزین می‌شوند. ادامه می‌دهید؟")) return false;
+        replacePointLayer = true;
       }
-      layer.geomType = "POINT";
     } else if (mode === "LINE" || mode === "POLYGON") {
       if (layer.points && layer.points.length &&
           !confirm("ترسیم جدید پس از ثبت، هندسه فعلی لایه فعال را جایگزین می‌کند. ادامه می‌دهید؟")) return false;
     } else return false;
     state.mode = mode;
+    state.targetLayerId = layer.id;
+    state.pointReplace = replacePointLayer;
     state.draft = [];
     state.pointer = null;
     state.dragPreview = null;
@@ -483,13 +492,14 @@
     var unique={};points.forEach(function(p){unique[Number(p.x).toFixed(2)+"_"+Number(p.y).toFixed(2)]=true;});
     if(Object.keys(unique).length<needed){status("تعداد رأس‌های یکتا کافی نیست؛ نقاط تکراری را اصلاح کنید.",true);return false;}
     if(mode==="POLYGON"&&typeof isSimpleUtmPolygon==="function"&&!isSimpleUtmPolygon(points)){status("چندضلعی معتبر نیست یا اضلاع آن یکدیگر را قطع می‌کنند.",true);return false;}
-    var layer=activeLayer();if(!layer){status("لایه فعالی برای ثبت پیدا نشد.",true);return false;}
+    var layer=layerById(activeMap(),state.targetLayerId);
+    if(!layer){status("لایه اولیه ترسیم پیدا نشد؛ ترسیم را لغو و دوباره شروع کنید.",true);return false;}
     var geom=typeof computeUtmGeometry==="function"?computeUtmGeometry(points,mode):{area:0,perim:0};
     if(mode==="POLYGON"&&(!Number.isFinite(geom.area)||geom.area<=0)){status("مساحت چندضلعی صفر یا نامعتبر است؛ ترتیب نقاط را بررسی کنید.",true);return false;}
     var oldPoints=layer.points,oldType=layer.geomType;
     layer.geomType=mode;layer.points=points;
     if(!commit(layer)){layer.points=oldPoints;layer.geomType=oldType;status("ذخیره لایه تأیید نشد؛ هندسه قبلی بازیابی شد.",true);render();return false;}
-    state.mode="";state.draft=[];state.dragPreview=null;setModeButtons();render();
+    state.mode="";state.targetLayerId=null;state.pointReplace=false;state.draft=[];state.dragPreview=null;setModeButtons();render();
     status("✅ "+(mode==="POLYGON"?"محدوده":"مسیر")+" با "+fa(points.length)+" رأس ذخیره شد؛ "+
       (mode==="POLYGON"?"مساحت: "+fa(Math.round(geom.area))+" مترمربع.":"طول: "+fa(geom.perim.toFixed(1))+" متر."));
     return true;
@@ -498,21 +508,26 @@
   window.undoCroquisCadOfflineDrawingPoint = function () {
     if(state.draft.length){state.draft.pop();drawOverlay();status("آخرین رأس از ترسیم موقت حذف شد.");return;}
     if(state.mode==="POINT"){
-      var layer=activeLayer();if(layer&&layer.points.length){var old=layer.points.slice();layer.points.pop();if(!commit(layer))layer.points=old;else status("آخرین نقطه از لایه فعال حذف شد.");}
+      var layer=layerById(activeMap(),state.targetLayerId);
+      if(layer&&layer.points.length){var old=layer.points.slice();layer.points.pop();if(!commit(layer))layer.points=old;else status("آخرین نقطه از لایه ترسیم حذف شد.");}
       return;
     }
     status("رأس موقتی برای بازگشت وجود ندارد.");
   };
   window.cancelCroquisCadOfflineDrawing = function () {
-    state.mode="";state.draft=[];state.pointer=null;state.dragPreview=null;setModeButtons();render();status("ترسیم موقت لغو شد؛ داده‌های قبلی لایه حفظ شدند.");
+    state.mode="";state.targetLayerId=null;state.pointReplace=false;state.draft=[];state.pointer=null;state.dragPreview=null;setModeButtons();render();status("ترسیم موقت لغو شد؛ داده‌های قبلی لایه حفظ شدند.");
   };
   window.toggleCroquisCadOfflineMoreTools = function (force) {
     var panel=document.getElementById("crq-cad-offline-more");if(!panel)return;
     var open=force===true?true:(force===false?false:panel.style.display==="none");panel.style.display=open?"block":"none";
   };
   window.toggleCroquisCadOfflineVertexEdit = function () {
-    if(state.mode==="VERTEX_EDIT")state.mode="";
-    else{if(state.mode)window.cancelCroquisCadOfflineDrawing();state.mode="VERTEX_EDIT";status("ویرایش رأس‌ها فعال است؛ روی نزدیک‌ترین رأس بکشید.");}
+    if(state.mode==="VERTEX_EDIT"){state.mode="";state.targetLayerId=null;}
+    else{
+      if(state.mode)window.cancelCroquisCadOfflineDrawing();
+      var layer=activeLayer();if(!layer||layer.geomType!=="POLYGON"){status("ابتدا یک لایه چندضلعی را انتخاب کنید.",true);return false;}
+      state.mode="VERTEX_EDIT";state.targetLayerId=layer.id;status("ویرایش رأس‌ها فعال است؛ روی نزدیک‌ترین رأس بکشید.");
+    }
     setModeButtons();return true;
   };
   window.toggleCroquisCadOfflinePolygonMove = function () {
@@ -521,7 +536,7 @@
       if(state.mode)window.cancelCroquisCadOfflineDrawing();
       var layer=activeLayer();
       if(!layer||layer.geomType!=="POLYGON"||!Array.isArray(layer.points)||layer.points.length<3){status("برای جابه‌جایی، ابتدا یک لایه چندضلعی را انتخاب کنید.",true);return false;}
-      state.mode="MOVE_POLYGON";status("حالت جابه‌جایی فعال است؛ داخل چندضلعی کلیک کنید و بکشید.");
+      state.mode="MOVE_POLYGON";state.targetLayerId=layer.id;status("حالت جابه‌جایی فعال است؛ داخل چندضلعی کلیک کنید و بکشید.");
     }
     setModeButtons();return true;
   };
@@ -552,6 +567,7 @@
     if(!svg)return;
     event.preventDefault();event.stopPropagation();if(event.stopImmediatePropagation)event.stopImmediatePropagation();
     var map=activeMap(),layer=activeLayer(),utm=screenToUtm(svg,event.clientX,event.clientY);
+    if(state.targetLayerId)layer=layerById(map,state.targetLayerId)||layer;
     if(!utm)return;
     if(["POINT","LINE","POLYGON","PICK_PLACEMENT"].indexOf(state.mode)>=0){
       if(state.mode==="PICK_PLACEMENT"){
@@ -560,11 +576,18 @@
         state.mode="";setModeButtons();status("مرکز شکل با مختصات UTM ثبت شد.");return;
       }
       if(state.mode==="POINT"){
-        if(!layer)return;
-        var oldType=layer.geomType,oldPoints=layer.points.slice();layer.geomType="POINT";
-        var pt=makePoint(utm.x,utm.y,layer.points.length);layer.points.push(pt);
-        if(!commit(layer)){layer.geomType=oldType;layer.points=oldPoints;status("ذخیره نقطه تأیید نشد.",true);}
-        else status("نقطه "+pt.label+" با مختصات UTM ذخیره شد؛ برای نقطه بعدی کلیک کنید.");
+        var targetLayer=layerById(map,state.targetLayerId)||layer;
+        if(!targetLayer)return;
+        var oldType=targetLayer.geomType,oldPoints=targetLayer.points.slice();
+        targetLayer.geomType="POINT";
+        if(state.pointReplace)targetLayer.points=[];
+        var pt=makePoint(utm.x,utm.y,targetLayer.points.length);targetLayer.points.push(pt);
+        if(!commit(targetLayer)){
+          targetLayer.geomType=oldType;targetLayer.points=oldPoints;status("ذخیره نقطه تأیید نشد؛ لایه به حالت قبلی برگشت.",true);
+        }else{
+          state.pointReplace=false;
+          status("نقطه "+pt.label+" در لایه انتخاب‌شده ذخیره شد؛ برای نقطه بعدی کلیک کنید.");
+        }
       }else{
         state.draft.push(makePoint(utm.x,utm.y,state.draft.length));drawOverlay();
         status("رأس موقت "+fa(state.draft.length)+" ثبت شد؛ پس از اتمام، دکمه ذخیره را بزنید.");
@@ -586,8 +609,8 @@
   }
   function onPointerMove(event){
     var drag=state.pointer;if(!drag||event.pointerId!==drag.pointerId)return;
-    var svg=svgNow(),utm=screenToUtm(svg,event.clientX,event.clientY),map=activeMap(),layer=activeLayer();
-    if(!utm||!map||!layer||String(layer.id)!==String(drag.layerId))return;
+    var svg=svgNow(),utm=screenToUtm(svg,event.clientX,event.clientY),map=activeMap(),layer=layerById(map,drag.layerId);
+    if(!utm||!map||!layer)return;
     if(drag.kind==="VERTEX"){
       var pts=drag.startPoints.map(function(p){return Object.assign({},p);});
       pts[drag.index].x=Math.round(utm.x*100)/100;pts[drag.index].y=Math.round(utm.y*100)/100;
@@ -606,8 +629,8 @@
     var drag=state.pointer;if(!drag||(event&&event.pointerId!==drag.pointerId))return;
     state.pointer=null;
     var preview=state.dragPreview;state.dragPreview=null;
-    var layer=activeLayer(),map=activeMap();
-    if(!preview||!layer||!map||String(layer.id)!==String(drag.layerId)){drawOverlay();return;}
+    var map=activeMap(),layer=layerById(map,drag.layerId);
+    if(!preview||!layer||!map){drawOverlay();return;}
     if(drag.kind==="MOVE"&&layer.category!=="MAIN_PARCEL"){
       var main=(map.layers||[]).find(function(candidate){return candidate&&candidate.category==="MAIN_PARCEL"&&candidate.geomType==="POLYGON"&&Array.isArray(candidate.points)&&candidate.points.length>=3;});
       if(main&&typeof window.isCroquisPlacementShapeInsideParcel==="function"&&!window.isCroquisPlacementShapeInsideParcel(preview.points,main.points)){
