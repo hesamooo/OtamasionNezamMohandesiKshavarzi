@@ -22,7 +22,7 @@ test('package and TypeScript configuration are valid JSON', () => {
 });
 
 test('main JavaScript modules have valid syntax', () => {
-  for (const file of ['nezam-core.js', 'nezam-customizer.js', 'nezam-croquis-enhancements.js', 'nezam-ai-assistant.js', 'nezam-operations.js', 'nezam-agent-engine.js']) {
+  for (const file of ['nezam-core.js', 'nezam-customizer.js', 'nezam-croquis-enhancements.js', 'nezam-cad-view-tools.js', 'nezam-ai-assistant.js', 'nezam-operations.js', 'nezam-agent-engine.js']) {
     assert.doesNotThrow(() => new Function(read(file)), file);
   }
 });
@@ -821,4 +821,41 @@ test('UTM polygon area uses local coordinates for stable high-value Easting and 
   ]);
   assert.ok(Math.abs(geometry.area - 1100) < 1e-7, 'area must remain accurate at real UTM coordinate magnitudes');
   assert.ok(Math.abs(geometry.perim - (90 + 2 * width)) < 1e-7);
+});
+
+
+test('CAD view offers readable focus controls, standard scales and declutter toggles', () => {
+  const html = read('index.html');
+  const source = read('nezam-cad-view-tools.js');
+  assert.ok(html.includes('id="crq-cad-focus"'));
+  assert.ok(html.includes('id="crq-cad-standard-scale"'));
+  assert.ok(html.includes('id="crq-cad-zoom"'));
+  assert.ok(html.includes('id="crq-cad-show-points"'));
+  assert.ok(html.includes('id="crq-cad-show-sides"'));
+  assert.ok(html.includes('id="crq-cad-show-layer-labels"'));
+  assert.ok(source.includes('focusMode: "MAIN"'));
+  assert.ok(source.includes('showPointLabels: false'));
+  assert.ok(source.includes('showSideLengths: false'));
+  assert.ok(source.includes('window.panCroquisCadView'));
+  assert.ok(source.includes('window.resetCroquisCadView'));
+});
+
+test('standard CAD scale remains exact at 1:500, 1:1000 and 1:5000', () => {
+  const source = read('nezam-cad-view-tools.js');
+  const start = source.indexOf('  function getScaleForCanvas(');
+  const end = source.indexOf('\n  }', start) + 4;
+  const exportStart = source.indexOf('  window.calculateCroquisCadScale = function');
+  const exportEnd = source.indexOf('\n  };', exportStart) + 5;
+  assert.ok(start >= 0 && end > 4 && exportStart > end && exportEnd > 5);
+  const code = 'var SCALE_OPTIONS = ["AUTO","500","1000","2000","2500","5000","10000","25000","50000"];\\n' +
+    source.slice(start, end) + '\\n' + source.slice(exportStart, exportEnd);
+  const calculate = new Function('window', code + '\\nreturn window.calculateCroquisCadScale;')({});
+  [500, 1000, 5000].forEach((denominator) => {
+    const metrics = calculate(String(denominator), 100, 760, 440, false);
+    assert.ok(Math.abs(metrics.effectiveDenominator - denominator) < 1e-8,
+      'selected denominator must be preserved exactly');
+  });
+  const zoomed = calculate('1000', 200, 760, 440, false);
+  assert.ok(Math.abs(zoomed.effectiveDenominator - 500) < 1e-8,
+    '200% zoom must update the effective drawing ratio');
 });
