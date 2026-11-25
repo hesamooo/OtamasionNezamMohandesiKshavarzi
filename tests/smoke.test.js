@@ -769,7 +769,7 @@ test('moving a croquis polygon translates every UTM vertex without changing its 
   const start = source.indexOf('  window.translateUtmPolygon = function');
   const end = source.indexOf('\n  };', start) + 5;
   assert.ok(start >= 0 && end > 5);
-  const translateCode = 'function roundCm(value) { return Math.round(Number(value) * 100) / 100; }\n' + source.slice(start, end);\n  const translate = new Function('window', translateCode + '\nreturn window.translateUtmPolygon;')({});
+  const translateCode = 'function roundCm(value) { return Math.round(Number(value) * 100) / 100; }\\n' + source.slice(start, end);\n  const translate = new Function('window', translateCode + '\\nreturn window.translateUtmPolygon;')({});
   const original = [
     { x: 100, y: 200, label: 'P1' },
     { x: 145, y: 200, label: 'P2' },
