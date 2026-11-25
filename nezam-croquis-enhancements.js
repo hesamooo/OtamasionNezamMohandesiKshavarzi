@@ -153,7 +153,13 @@
     var holder = page.querySelector("#printed-croquis-map-holder");
     if (holder && !page.querySelector(".croquis-clearances-print")) {
       var markup = buildClearancePrintMarkup(map);
-      if (markup) holder.insertAdjacentHTML("afterend", markup);
+      if (markup) {
+        var layout = document.createElement("div");
+        layout.className = "croquis-map-clearance-layout";
+        holder.parentNode.insertBefore(layout, holder);
+        layout.appendChild(holder);
+        layout.insertAdjacentHTML("beforeend", markup);
+      }
     }
     ensureLandscapeStyles();
   }
@@ -503,12 +509,15 @@
       ".a4-page.croquis-map-landscape .lh-content-wrap { overflow:visible !important; }",
       ".a4-page.croquis-map-landscape .sign-area { display:none !important; }",
       ".a4-page.croquis-map-landscape .lh-foot { padding:1.5mm 5mm !important; font-size:7pt !important; }",
-      ".a4-page.croquis-map-landscape #printed-croquis-map-holder { margin:0 auto 1mm !important; }",
+      ".a4-page.croquis-map-landscape .croquis-map-clearance-layout { display:flex !important; flex-direction:row !important; align-items:stretch !important; gap:2mm !important; width:100% !important; direction:ltr !important; }",
+      ".a4-page.croquis-map-landscape #printed-croquis-map-holder { flex:1 1 auto !important; min-width:0 !important; margin:0 !important; }",
       ".a4-page.croquis-map-landscape .printed-croquis-satellite-box { border-width:1px !important; border-radius:3px !important; }",
       ".a4-page.croquis-map-landscape .printed-croquis-satellite-box > svg { width:100% !important; max-width:100% !important; max-height:145mm !important; height:auto !important; }",
-      ".a4-page.croquis-map-landscape .croquis-clearances-print { margin:1mm 0 0 !important; padding:1mm 2mm !important; }",
-      ".a4-page.croquis-map-landscape .croquis-clearances-print-title { font-size:7.8pt !important; margin-bottom:.5mm !important; }",
-      ".a4-page.croquis-map-landscape .croquis-clearance-print-item { padding:.3mm 1.2mm !important; font-size:7pt !important; }",
+      ".a4-page.croquis-map-landscape .croquis-clearances-print { flex:0 0 56mm !important; max-width:56mm !important; min-width:56mm !important; margin:0 !important; padding:1.5mm !important; direction:rtl !important; overflow:hidden !important; }",
+      ".a4-page.croquis-map-landscape .croquis-clearances-print-title { font-size:8pt !important; margin-bottom:1mm !important; }",
+      ".a4-page.croquis-map-landscape .croquis-clearances-print-grid { display:flex !important; flex-direction:column !important; align-items:stretch !important; gap:.7mm !important; }",
+      ".a4-page.croquis-map-landscape .croquis-clearance-print-item { display:block !important; padding:.7mm 1mm !important; font-size:7pt !important; line-height:1.35 !important; }",
+      ".a4-page.croquis-map-landscape .croquis-clearance-print-item span { display:block !important; }",
       ".a4-page.croquis-map-landscape .croquis-clearances-print-note { font-size:6pt !important; }",
       ".croquis-clearances-print { border:1px solid #64748b; border-radius:3px; background:#f8fafc; padding:1.5mm 2mm; margin:2mm 0; direction:rtl; page-break-inside:avoid; break-inside:avoid; }",
       ".croquis-clearances-print-title { font-weight:900; font-size:8.5pt; color:#14532d; margin-bottom:1mm; }",
