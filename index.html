@@ -2326,6 +2326,58 @@
 
             <!-- بوم مهندسی آفلاین SVG -->
             <div id="crq-cad-canvas-box">
+              <div id="crq-cad-view-tools" class="card-clean mb-2 p-2" style="background:#f8fafc;border:1px solid #cbd5e1;">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                  <strong class="small text-primary">🎛️ تنظیمات نمایش نقشه مهندسی</strong>
+                  <button type="button" class="btn btn-sm btn-outline-secondary py-0" onclick="resetCroquisCadView()">بازنشانی نما</button>
+                </div>
+                <div class="row g-2 align-items-end">
+                  <div class="col-md-3">
+                    <label class="small fw-bold" for="crq-cad-focus">تمرکز نمایش:</label>
+                    <select id="crq-cad-focus" class="form-select form-select-sm" onchange="setCroquisCadViewOption('focusMode',this.value)">
+                      <option value="MAIN">زمین اصلی</option>
+                      <option value="ACTIVE">لایه فعال</option>
+                      <option value="ALL">همه لایه‌ها</option>
+                    </select>
+                  </div>
+                  <div class="col-md-3">
+                    <label class="small fw-bold" for="crq-cad-standard-scale">مقیاس استاندارد:</label>
+                    <select id="crq-cad-standard-scale" class="form-select form-select-sm" onchange="setCroquisCadViewOption('scaleDenominator',this.value)">
+                      <option value="AUTO">خودکار (برازش محدوده)</option>
+                      <option value="500">۱:۵۰۰</option>
+                      <option value="1000">۱:۱٬۰۰۰</option>
+                      <option value="2000">۱:۲٬۰۰۰</option>
+                      <option value="2500">۱:۲٬۵۰۰</option>
+                      <option value="5000">۱:۵٬۰۰۰</option>
+                      <option value="10000">۱:۱۰٬۰۰۰</option>
+                      <option value="25000">۱:۲۵٬۰۰۰</option>
+                      <option value="50000">۱:۵۰٬۰۰۰</option>
+                    </select>
+                  </div>
+                  <div class="col-md-4">
+                    <label class="small fw-bold d-flex justify-content-between" for="crq-cad-zoom">
+                      <span>بزرگ‌نمایی دید</span><span id="crq-cad-zoom-value" class="text-primary">۱۰۰٪</span>
+                    </label>
+                    <input id="crq-cad-zoom" type="range" class="form-range mb-0" min="50" max="200" step="10" value="100" oninput="setCroquisCadViewOption('zoomPercent',this.value)" />
+                  </div>
+                  <div class="col-md-2">
+                    <label class="small fw-bold d-block">حرکت کادر:</label>
+                    <div class="btn-group btn-group-sm w-100" role="group" aria-label="جابجایی کادر نقشه">
+                      <button type="button" class="btn btn-outline-secondary" title="چپ" onclick="panCroquisCadView('left')">◀</button>
+                      <button type="button" class="btn btn-outline-secondary" title="بالا" onclick="panCroquisCadView('up')">▲</button>
+                      <button type="button" class="btn btn-outline-secondary" title="پایین" onclick="panCroquisCadView('down')">▼</button>
+                      <button type="button" class="btn btn-outline-secondary" title="راست" onclick="panCroquisCadView('right')">▶</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="d-flex flex-wrap align-items-center gap-3 mt-2 pt-2 border-top">
+                  <span class="small fw-bold text-muted">نمایش نوشته‌ها:</span>
+                  <label class="form-check form-check-inline small m-0"><input id="crq-cad-show-points" class="form-check-input" type="checkbox" onchange="setCroquisCadViewOption('showPointLabels',this.checked)" /> کد نقاط</label>
+                  <label class="form-check form-check-inline small m-0"><input id="crq-cad-show-sides" class="form-check-input" type="checkbox" onchange="setCroquisCadViewOption('showSideLengths',this.checked)" /> طول اضلاع</label>
+                  <label class="form-check form-check-inline small m-0"><input id="crq-cad-show-layer-labels" class="form-check-input" type="checkbox" onchange="setCroquisCadViewOption('showLayerLabels',this.checked)" /> نام و مساحت لایه</label>
+                  <span class="small text-muted ms-auto">برای جلوگیری از هم‌پوشانی، نوشته‌ها به‌صورت پیش‌فرض خاموش‌اند.</span>
+                </div>
+              </div>
               <div id="crq-cad-svg-container" data-testid="croquis-svg-canvas" style="height: 430px;"></div>
             </div>
 
@@ -3173,6 +3225,7 @@
   <script src="./nezam-letter-attachments.js?v=20261104-letter-attachments-r2"></script>
   <script src="./nezam-customizer.js?v=20261125-utm-precision-r1"></script>
   <script src="./nezam-croquis-enhancements.js?v=20261125-croquis-tools-r1"></script>
+  <script src="./nezam-cad-view-tools.js?v=20261125-cad-view-r1"></script>
   <script src="./nezam-ai-assistant.js?v=20261101-security-r3"></script>
 
   <!-- ماژول اصلاح‌شده و دوطرفه اتصال سامانه ۶۳۶ خفر به گوگل درایو (ذخیره و بازخوانی ۱۰۰٪ اطلاعات) -->
