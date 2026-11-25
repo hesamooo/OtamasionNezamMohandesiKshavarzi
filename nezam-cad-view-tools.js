@@ -39,9 +39,9 @@
     });
     if (SCALE_OPTIONS.indexOf(String(map.cadView.scaleDenominator)) === -1) map.cadView.scaleDenominator = "AUTO";
     if (["MAIN", "ACTIVE", "ALL"].indexOf(map.cadView.focusMode) === -1) map.cadView.focusMode = "MAIN";
-    map.cadView.zoomPercent = Math.min(200, Math.max(50, Number(map.cadView.zoomPercent) || 100));
-    map.cadView.panX = Math.max(-1000, Math.min(1000, Number(map.cadView.panX) || 0));
-    map.cadView.panY = Math.max(-1000, Math.min(1000, Number(map.cadView.panY) || 0));
+    map.cadView.zoomPercent = Math.min(500, Math.max(25, Number(map.cadView.zoomPercent) || 100));
+    map.cadView.panX = Math.max(-10000, Math.min(10000, Number(map.cadView.panX) || 0));
+    map.cadView.panY = Math.max(-10000, Math.min(10000, Number(map.cadView.panY) || 0));
     var windDeg = Number(map.cadView.prevailingWindFromDeg);
     if (!Number.isFinite(windDeg)) windDeg = 315;
     map.cadView.prevailingWindFromDeg = ((windDeg % 360) + 360) % 360;
@@ -136,7 +136,7 @@
   window.calculateCroquisCadScale = function (scaleDenominator, zoomPercent, svgW, svgH, forPrint) {
     var view = {
       scaleDenominator: SCALE_OPTIONS.indexOf(String(scaleDenominator)) !== -1 ? String(scaleDenominator) : "AUTO",
-      zoomPercent: Math.min(200, Math.max(50, Number(zoomPercent) || 100))
+      zoomPercent: Math.min(500, Math.max(25, Number(zoomPercent) || 100))
     };
     var pad = 48;
     var spanX = 100, spanY = 100;
@@ -322,11 +322,168 @@
         '</g>';
     }
 
-    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + svgW + ' ' + svgH + '" width="100%" height="' + (forPrint ? svgH + "px" : "100%") + '" style="'
-      (forPrint ? 'display:block;width:100%;height:' + svgH + 'px;' : 'display:block;width:100%;height:100%;') +
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + svgW + ' ' + svgH + '" width="100%" height="' + (forPrint ? "auto" : "100%") + '" style="' +
+      (forPrint ? 'display:block;width:100%;height:auto;max-height:none;' : 'display:block;width:100%;height:100%;') +
       'background:' + bg + ';border-radius:8px;border:1px solid #cbd5e1;overflow:hidden;">' +
       '<defs><pattern id="' + svgId + '-grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="' + grid + '" stroke-width="1"/></pattern><clipPath id="' + svgId + '-clip"><rect x="0" y="0" width="' + svgW + '" height="' + svgH + '"/></clipPath></defs>' +
       '<rect width="100%" height="100%" fill="url(#' + svgId + '-grid)"/><g clip-path="url(#' + svgId + '-clip)">' + shapes + hud + prevailingWindHud + '</g></svg>';
+  }
+
+
+  var cadDragState = null;
+  var cadWheelSaveTimer = null;
+
+  function cadSvgMetrics(svg) {
+    if (!svg) return null;
+    var vb = svg.viewBox && svg.viewBox.baseVal;
+    var width = vb && vb.width ? vb.width : Number(svg.getAttribute("width")) || 760;
+    var height = vb && vb.height ? vb.height : Number(svg.getAttribute("height")) || 440;
+    var rect = svg.getBoundingClientRect();
+    if (!rect.width || !rect.height || !width || !height) return null;
+    var scale = Math.min(rect.width / width, rect.height / height);
+    return { width: width, height: height, rect: rect, scale: scale,
+      offsetX: (rect.width - width * scale) / 2, offsetY: (rect.height - height * scale) / 2 };
+  }
+  function cadAnchorFromPointer(metrics, clientX, clientY) {
+    return { x: (clientX - metrics.rect.left - metrics.offsetX) / metrics.scale,
+      y: (clientY - metrics.rect.top - metrics.offsetY) / metrics.scale };
+  }
+  function clampCadPan(view) {
+    view.panX = Math.max(-10000, Math.min(10000, Number(view.panX) || 0));
+    view.panY = Math.max(-10000, Math.min(10000, Number(view.panY) || 0));
+  }
+  function renderCadAfterInteraction() {
+    if (typeof renderCroquisVisualCanvas === "function") renderCroquisVisualCanvas();
+    else refreshControls();
+  }
+  function saveCadViewSoon() {
+    if (cadWheelSaveTimer) window.clearTimeout(cadWheelSaveTimer);
+    cadWheelSaveTimer = window.setTimeout(function () {
+      cadWheelSaveTimer = null;
+      if (typeof saveAllDB === "function") saveAllDB();
+    }, 280);
+  }
+  function applyCadZoom(svg, factor, anchor) {
+    var map = activeMap(), metrics = cadSvgMetrics(svg);
+    if (!map || !metrics || !anchor) return false;
+    var view = viewOptions(map);
+    var oldZoom = Math.max(25, Math.min(500, Number(view.zoomPercent) || 100));
+    var newZoom = Math.max(25, Math.min(500, oldZoom * Number(factor)));
+    if (!Number.isFinite(newZoom) || Math.abs(newZoom - oldZoom) < 0.01) return false;
+    var ratio = newZoom / oldZoom;
+    var oldPanX = Number(view.panX || 0) * metrics.width / 760;
+    var oldPanY = Number(view.panY || 0) * metrics.height / 440;
+    var newPanX = (anchor.x - metrics.width / 2) * (1 - ratio) + oldPanX * ratio;
+    var newPanY = (anchor.y - metrics.height / 2) * (1 - ratio) + oldPanY * ratio;
+    view.zoomPercent = Math.round(newZoom);
+    view.panX = newPanX * 760 / metrics.width;
+    view.panY = newPanY * 440 / metrics.height;
+    clampCadPan(view);
+    renderCadAfterInteraction();
+    saveCadViewSoon();
+    return true;
+  }
+  function zoomCadFromCenter(factor) {
+    var holder = document.getElementById("crq-cad-svg-container");
+    var svg = holder && holder.querySelector('svg[id^="cad-view-"]');
+    var metrics = cadSvgMetrics(svg);
+    if (!metrics) return false;
+    return applyCadZoom(svg, factor, { x: metrics.width / 2, y: metrics.height / 2 });
+  }
+  window.zoomCroquisCadView = function (factor) {
+    var f = Number(factor);
+    if (!Number.isFinite(f) || f <= 0) return false;
+    return zoomCadFromCenter(f);
+  };
+  window.fitCroquisCadView = function () {
+    var map = activeMap();
+    if (!map) return false;
+    var view = viewOptions(map);
+    view.scaleDenominator = "AUTO"; view.zoomPercent = 100; view.panX = 0; view.panY = 0;
+    if (typeof saveAllDB === "function") saveAllDB();
+    renderCadAfterInteraction();
+    return true;
+  }
+  function createCadToolButton(label, title, action) {
+    var button = document.createElement("button");
+    button.type = "button"; button.className = "btn btn-sm btn-outline-primary";
+    button.textContent = label; button.title = title; button.setAttribute("aria-label", title);
+    button.style.cssText = "min-width:38px;min-height:32px;font-weight:800;";
+    button.addEventListener("click", action);
+    return button;
+  }
+  function ensureCadPrecisionToolbar() {
+    var holder = document.getElementById("crq-cad-view-tools");
+    if (!holder || document.getElementById("crq-cad-precision-toolbar")) return;
+    var firstRow = holder.querySelector(".row");
+    var toolbar = document.createElement("div");
+    toolbar.id = "crq-cad-precision-toolbar";
+    toolbar.className = "d-flex flex-wrap align-items-center gap-2 mt-2 pt-2 border-top";
+    toolbar.style.cssText = "direction:rtl;";
+    var title = document.createElement("strong");
+    title.className = "small text-primary"; title.textContent = "کنترل دقیق بوم:";
+    toolbar.appendChild(title);
+    toolbar.appendChild(createCadToolButton("−", "کاهش بزرگ‌نمایی", function () { window.zoomCroquisCadView(1 / 1.2); }));
+    toolbar.appendChild(createCadToolButton("+", "افزایش بزرگ‌نمایی", function () { window.zoomCroquisCadView(1.2); }));
+    toolbar.appendChild(createCadToolButton("برازش خودکار", "قرار دادن نقشه در کادر با مقیاس خودکار", function () { window.fitCroquisCadView(); }));
+    var hint = document.createElement("span");
+    hint.className = "small text-muted";
+    hint.textContent = "چرخ ماوس: زوم روی محل نشانگر | کشیدن با دکمه چپ: جابه‌جایی نقشه";
+    toolbar.appendChild(hint);
+    if (firstRow && firstRow.parentNode) firstRow.insertAdjacentElement("afterend", toolbar);
+    else holder.appendChild(toolbar);
+  }
+  function installCadPointerControls() {
+    var holder = document.getElementById("crq-cad-svg-container");
+    if (!holder || holder.__cadPrecisionControlsBound) return;
+    holder.__cadPrecisionControlsBound = true;
+    holder.style.touchAction = "none"; holder.style.cursor = "grab";
+    holder.addEventListener("wheel", function (event) {
+      var svg = event.target && event.target.closest ? event.target.closest('svg[id^="cad-view-"]') : null;
+      if (!svg || !holder.contains(svg)) return;
+      var metrics = cadSvgMetrics(svg);
+      if (!metrics) return;
+      event.preventDefault();
+      applyCadZoom(svg, event.deltaY < 0 ? 1.12 : (1 / 1.12),
+        cadAnchorFromPointer(metrics, event.clientX, event.clientY));
+    }, { passive: false });
+    holder.addEventListener("pointerdown", function (event) {
+      if (event.button !== 0 || cadDragState) return;
+      var svg = event.target && event.target.closest ? event.target.closest('svg[id^="cad-view-"]') : null;
+      if (!svg || !holder.contains(svg)) return;
+      var metrics = cadSvgMetrics(svg);
+      if (!metrics) return;
+      cadDragState = { svg: svg, pointerId: event.pointerId, width: metrics.width, height: metrics.height,
+        dx: 0, dy: 0, lastX: event.clientX, lastY: event.clientY };
+      if (holder.setPointerCapture && event.pointerId !== undefined) {
+        try { holder.setPointerCapture(event.pointerId); } catch (ignore) {}
+      }
+      holder.style.cursor = "grabbing"; event.preventDefault();
+    });
+    document.addEventListener("pointermove", function (event) {
+      if (!cadDragState || event.pointerId !== cadDragState.pointerId) return;
+      var state = cadDragState;
+      state.dx += event.clientX - state.lastX; state.dy += event.clientY - state.lastY;
+      state.lastX = event.clientX; state.lastY = event.clientY;
+      state.svg.style.transformOrigin = "50% 50%";
+      state.svg.style.transform = "translate(" + state.dx + "px," + state.dy + "px)";
+      event.preventDefault();
+    }, true);
+    function finishCadDrag(event) {
+      if (!cadDragState || (event && event.pointerId !== cadDragState.pointerId)) return;
+      var state = cadDragState; cadDragState = null;
+      var map = activeMap();
+      if (state.svg && state.svg.isConnected) state.svg.style.transform = "";
+      holder.style.cursor = "grab";
+      if (!map || (!state.dx && !state.dy)) return;
+      var view = viewOptions(map);
+      view.panX += state.dx * 760 / state.width; view.panY += state.dy * 440 / state.height;
+      clampCadPan(view);
+      if (typeof saveAllDB === "function") saveAllDB();
+      renderCadAfterInteraction();
+    }
+    document.addEventListener("pointerup", finishCadDrag, true);
+    document.addEventListener("pointercancel", finishCadDrag, true);
   }
 
   function refreshControls() {
@@ -346,7 +503,7 @@
     var windDegrees = document.getElementById("crq-cad-wind-degrees");
     if (focus) focus.value = view.focusMode;
     if (scale) scale.value = String(view.scaleDenominator);
-    if (zoom) zoom.value = String(view.zoomPercent);
+    if (zoom) { zoom.min = "25"; zoom.max = "500"; zoom.step = "5"; zoom.value = String(view.zoomPercent); }
     if (zoomText) zoomText.textContent = fa(view.zoomPercent) + "٪";
     if (pointLabels) pointLabels.checked = !!view.showPointLabels;
     if (sideLabels) sideLabels.checked = !!view.showSideLengths;
@@ -369,9 +526,9 @@
       view.scaleDenominator = SCALE_OPTIONS.indexOf(String(value)) !== -1 ? String(value) : "AUTO";
       view.zoomPercent = 100;
     } else if (key === "zoomPercent") {
-      view.zoomPercent = Math.max(50, Math.min(200, Number(value) || 100));
+      view.zoomPercent = Math.max(25, Math.min(500, Number(value) || 100));
     } else if (["panX", "panY"].indexOf(key) !== -1) {
-      view[key] = Math.max(-1000, Math.min(1000, Number(value) || 0));
+      view[key] = Math.max(-10000, Math.min(10000, Number(value) || 0));
     } else if (["showPointLabels", "showSideLengths", "showLayerLabels", "showPrevailingWind"].indexOf(key) !== -1) {
       view[key] = !!value;
     } else if (key === "prevailingWindFromDeg") {
@@ -405,8 +562,8 @@
     else if (direction === "right") view.panX += step;
     else if (direction === "up") view.panY -= step;
     else if (direction === "down") view.panY += step;
-    view.panX = Math.max(-1000, Math.min(1000, view.panX));
-    view.panY = Math.max(-1000, Math.min(1000, view.panY));
+    view.panX = Math.max(-10000, Math.min(10000, view.panX));
+    view.panY = Math.max(-10000, Math.min(10000, view.panY));
     if (typeof saveAllDB === "function") saveAllDB();
     if (typeof renderCroquisVisualCanvas === "function") renderCroquisVisualCanvas();
     refreshControls();
@@ -447,6 +604,8 @@
   function initialize() {
     installRenderer();
     installCanvasHook();
+    ensureCadPrecisionToolbar();
+    installCadPointerControls();
     refreshControls();
   }
 
