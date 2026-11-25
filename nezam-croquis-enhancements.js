@@ -208,9 +208,10 @@
       }
       if (!Number.isFinite(azimuth)) throw new Error("آزیموت ضلع " + (i + 1) + " معتبر نیست.");
       azimuth = ((azimuth % 360) + 360) % 360;
+      // Keep sub-centimetre values here: side-length input may include millimetres.
       points.push({
-        x: roundCm(current.x),
-        y: roundCm(current.y),
+        x: Math.round(current.x * 10000) / 10000,
+        y: Math.round(current.y * 10000) / 10000,
         elev: Number.isFinite(Number(elevation)) ? Number(elevation) : 0,
         zone: zone || "39R",
         label: "P" + (i + 1)
@@ -227,10 +228,15 @@
       throw new Error("پلیگون بسته نیست؛ خطای بست " + closureError.toFixed(2) + " متر است. آزیموت یا طول ضلع آخر را اصلاح کنید (حد مجاز ۰٫۱۵ متر).");
     }
     if (!isSimpleUtmPolygon(points)) throw new Error("اضلاع چندضلعی همدیگر را قطع می‌کنند؛ ترتیب اضلاع یا آزیموت‌ها را اصلاح کنید.");
+    // Use a local origin for the shoelace calculation to avoid cancellation
+    // when UTM coordinates are large (e.g. X≈700,000 and Y≈3,200,000).
     var twiceArea = 0;
+    var originX = points[0].x, originY = points[0].y;
     for (var p = 0; p < points.length; p++) {
       var q = (p + 1) % points.length;
-      twiceArea += points[p].x * points[q].y - points[q].x * points[p].y;
+      var px = points[p].x - originX, py = points[p].y - originY;
+      var qx = points[q].x - originX, qy = points[q].y - originY;
+      twiceArea += px * qy - qx * py;
     }
     var area = Math.abs(twiceArea) / 2;
     if (!Number.isFinite(area) || area < 0.01) throw new Error("مساحت چندضلعی صفر یا نامعتبر است.");
