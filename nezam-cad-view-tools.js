@@ -322,8 +322,8 @@
         '</g>';
     }
 
-    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + svgW + ' ' + svgH + '" width="100%" height="' + (forPrint ? svgH + "px" : "100%") + '" style="' +
-      (forPrint ? 'display:block;width:100%;height:' + svgH + 'px;' : 'display:block;width:100%;height:100%;') +
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + svgW + ' ' + svgH + '" width="100%" height="' + (forPrint ? "auto" : "100%") + '" style="' +
+      (forPrint ? 'display:block;width:100%;height:auto;max-height:none;' : 'display:block;width:100%;height:100%;') +
       'background:' + bg + ';border-radius:8px;border:1px solid #cbd5e1;overflow:hidden;">' +
       '<defs><pattern id="' + svgId + '-grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="' + grid + '" stroke-width="1"/></pattern><clipPath id="' + svgId + '-clip"><rect x="0" y="0" width="' + svgW + '" height="' + svgH + '"/></clipPath></defs>' +
       '<rect width="100%" height="100%" fill="url(#' + svgId + '-grid)"/><g clip-path="url(#' + svgId + '-clip)">' + shapes + hud + prevailingWindHud + '</g></svg>';
@@ -393,9 +393,7 @@
   window.zoomCroquisCadView = function (factor) {
     var f = Number(factor);
     if (!Number.isFinite(f) || f <= 0) return false;
-    var changed = zoomCadFromCenter(f);
-    if (changed && typeof saveAllDB === "function") saveAllDB();
-    return changed;
+    return zoomCadFromCenter(f);
   };
   window.fitCroquisCadView = function () {
     var map = activeMap();
@@ -457,6 +455,9 @@
       if (!metrics) return;
       cadDragState = { svg: svg, pointerId: event.pointerId, width: metrics.width, height: metrics.height,
         dx: 0, dy: 0, lastX: event.clientX, lastY: event.clientY };
+      if (holder.setPointerCapture && event.pointerId !== undefined) {
+        try { holder.setPointerCapture(event.pointerId); } catch (ignore) {}
+      }
       holder.style.cursor = "grabbing"; event.preventDefault();
     });
     document.addEventListener("pointermove", function (event) {
