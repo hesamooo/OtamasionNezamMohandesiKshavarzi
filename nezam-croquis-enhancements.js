@@ -20,7 +20,8 @@
         });
   }
   function localizedNumber(value) {
-    var raw = String(value == null ? "" : value);
+    var raw = String(value == null ? "" : value).trim();
+    if (!raw) return NaN;
     if (typeof toEn === "function") raw = toEn(raw);
     return Number(raw);
   }
@@ -286,6 +287,8 @@
 
     layer.geomType = "POLYGON";
     layer.points = result.points;
+    var typeEditor = document.getElementById("edit-lyr-type");
+    if (typeEditor) typeEditor.value = "POLYGON";
     if (typeof ensurePointEnriched === "function") {
       layer.points.forEach(function (point, index) {
         ensurePointEnriched(point, zone, index);
@@ -442,12 +445,12 @@
 
   function bindWholeMoveHandlers() {
     var map = window.leafletMapObj;
-    if (!map || wholeMoveMapBound || typeof map.on !== "function") return;
+    if (!map || map.__nezamWholePolygonMoveBound || typeof map.on !== "function") return;
     map.on("mousedown", wholeMoveMouseDown);
     map.on("mousemove", wholeMoveMouseMove);
     map.on("mouseup", wholeMoveMouseUp);
-    wholeMoveMapBound = true;
     map.__nezamWholePolygonMoveBound = true;
+    if (wholeMoveEnabled && map.dragging) map.dragging.disable();
   }
 
   window.toggleCroquisWholePolygonMove = function (force) {
@@ -578,11 +581,26 @@
     window.initCroquisWorkspaceForActiveCase = wrappedInit;
   }
 
+  function installLeafletRenderHook() {
+    if (typeof window.renderCroquisLeafletMap !== "function" ||
+        window.renderCroquisLeafletMap.__croquisWholeMoveWrapped) return;
+    var originalRender = window.renderCroquisLeafletMap;
+    var wrappedRender = function () {
+      var result = originalRender.apply(this, arguments);
+      bindWholeMoveHandlers();
+      return result;
+    };
+    wrappedRender.__croquisWholeMoveWrapped = true;
+    window.renderCroquisLeafletMap = wrappedRender;
+  }
+
   function initialize() {
     installWorkspaceHook();
     installPrintHooks();
+    installLeafletRenderHook();
     ensureLandscapeStyles();
     window.renderCroquisClearances();
+    bindWholeMoveHandlers();
   }
 
   if (document.readyState === "loading") {
