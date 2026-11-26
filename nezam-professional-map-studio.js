@@ -83,8 +83,140 @@
   function exportCSV(){var m=mapNow();if(!m)return;var rows=[["Map","Layer","Type","Point","Easting","Northing","Zone","Area_m2","Perimeter_m"]];(m.layers||[]).forEach(function(l){var g=metric(l);(l.points||[]).forEach(function(p,i){rows.push([m.title,l.name,l.geomType,i+1,p.x,p.y,zoneStr(m),g.area,g.per]);});});blob("\uFEFF"+rows.map(function(r){return r.map(function(v){return '"'+String(v==null?"":v).replace(/"/g,'""')+'"';}).join(",");}).join("\r\n"),"text/csv;charset=utf-8",fileName(m.title)+".csv");}
   function exportKML(){var m=mapNow();if(!m)return;var z=zone(m),o=['<?xml version="1.0" encoding="UTF-8"?>','<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>'+esc(m.title)+'</name>'];(m.layers||[]).forEach(function(l){var p=l.points||[];if(!p.length)return;var cs=p.map(function(q){var v=utmToLatLngWGS84(q.x,q.y,z,true);return v.lng.toFixed(8)+","+v.lat.toFixed(8)+",0";}).join(" ");o.push("<Placemark><name>"+esc(l.name)+"</name>");if(l.geomType==="POLYGON"&&p.length>=3)o.push("<Polygon><outerBoundaryIs><LinearRing><coordinates>"+cs+" "+cs.split(" ")[0]+"</coordinates></LinearRing></outerBoundaryIs></Polygon>");else if(l.geomType==="LINE"&&p.length>=2)o.push("<LineString><coordinates>"+cs+"</coordinates></LineString>");else o.push("<Point><coordinates>"+cs.split(" ")[0]+"</coordinates></Point>");o.push("</Placemark>");});o.push("</Document></kml>");blob(o.join(""),"application/vnd.google-earth.kml+xml",fileName(m.title)+".kml");}
   function exportDXF(){var m=mapNow();if(!m)return;var o="0\r\nSECTION\r\n2\r\nHEADER\r\n9\r\n$INSUNITS\r\n70\r\n6\r\n0\r\nENDSEC\r\n0\r\nSECTION\r\n2\r\nENTITIES\r\n";(m.layers||[]).forEach(function(l){var p=l.points||[],n=String(l.name||"LAYER").replace(/[<>/\\:?*|"]/g,"_").slice(0,31);if(!p.length)return;if(l.geomType==="POINT")p.forEach(function(q){o+="0\r\nPOINT\r\n8\r\n"+n+"\r\n10\r\n"+q.x+"\r\n20\r\n"+q.y+"\r\n30\r\n0\r\n";});else if(l.geomType==="LINE"){for(var i=0;i<p.length-1;i++)o+="0\r\nLINE\r\n8\r\n"+n+"\r\n10\r\n"+p[i].x+"\r\n20\r\n"+p[i].y+"\r\n11\r\n"+p[i+1].x+"\r\n21\r\n"+p[i+1].y+"\r\n";}else{o+="0\r\nLWPOLYLINE\r\n8\r\n"+n+"\r\n90\r\n"+p.length+"\r\n70\r\n"+(l.geomType==="POLYGON"?1:0)+"\r\n";p.forEach(function(q){o+="10\r\n"+q.x+"\r\n20\r\n"+q.y+"\r\n";});}});o+="0\r\nENDSEC\r\n0\r\nEOF\r\n";blob(o,"application/dxf",fileName(m.title)+".dxf");}
-  function importText(file){var r=new FileReader();r.onload=function(){try{var m=mapNow(),text=String(r.result),ext=file.name.split(".").pop().toLowerCase(),newLayers=[];if(ext==="kml"){var d=new DOMParser().parseFromString(text,"application/xml");if(d.querySelector("parsererror"))throw new Error("فایل KML معتبر نیست.");Array.from(d.getElementsByTagNameNS("*","Placemark")).forEach(function(pm){var name=(pm.getElementsByTagNameNS("*","name")[0]||{}).textContent||"عوارض KML",poly=pm.getElementsByTagNameNS("*","Polygon")[0],line=pm.getElementsByTagNameNS("*","LineString")[0],point=pm.getElementsByTagNameNS("*","Point")[0],node=poly?poly.getElementsByTagNameNS("*","coordinates")[0]:line?line.getElementsByTagNameNS("*","coordinates")[0]:point?point.getElementsByTagNameNS("*","coordinates")[0]:null;if(!node)return;var pts=String(node.textContent).trim().split(/\s+/).map(function(cs){var a=cs.split(","),u=latLngToUtmWGS84(num(a[1]),num(a[0]),zone(m));return {x:u.x,y:u.y,zone:zoneStr(m)};});if(poly&&pts.length>1&&Math.hypot(pts[0].x-pts[pts.length-1].x,pts[0].y-pts[pts.length-1].y)<.1)pts.pop();newLayers.push(newLayer(name,poly?"POLYGON":line?"LINE":"POINT","CUSTOM",pts));});}else if(ext==="dxf"){var lines=text.replace(/\r/g,"").split("\n"),pairs=[];for(var i=0;i+1<lines.length;i+=2)pairs.push({c:lines[i].trim(),v:lines[i+1].trim()});var ent=null;function flush(){if(!ent)return;var p=[];if(ent.t==="LWPOLYLINE"){for(var j=0;j<ent.a.length;j++)if(ent.a[j].c==="10"){var yy=ent.a.slice(j+1).find(function(v){return v.c==="20";});if(yy)p.push({x:num(ent.a[j].v),y:num(yy.v)});}if(p.length)newLayers.push(newLayer(ent.n,(Number(ent.flag)&1)?"POLYGON":"LINE","CUSTOM",p));}else if(ent.t==="POINT"){var x=ent.a.find(function(v){return v.c==="10";}),y=ent.a.find(function(v){return v.c==="20";});if(x&&y)newLayers.push(newLayer(ent.n,"POINT","CUSTOM",[{x:num(x.v),y:num(y.v)}]));}else if(ent.t==="LINE"){var val=function(c){var v=ent.a.find(function(q){return q.c===c;});return v?num(v.v):NaN;};if([10,20,11,21].every(function(c){return Number.isFinite(val(String(c)));}))newLayers.push(newLayer(ent.n,"LINE","CUSTOM",[{x:val("10"),y:val("20")},{x:val("11"),y:val("21")} ]));}ent=null;}pairs.forEach(function(p){if(p.c==="0"){flush();if(["LWPOLYLINE","POINT","LINE"].indexOf(p.v)>=0)ent={t:p.v,n:"DXF "+p.v,flag:0,a:[]};}else if(ent){if(p.c==="8")ent.n=p.v;if(p.c==="70")ent.flag=p.v;ent.a.push(p);}});flush();}else throw new Error("فقط KML و DXF پشتیبانی می‌شوند.");if(!newLayers.length)throw new Error("هیچ عارضه پشتیبانی‌شده‌ای در فایل پیدا نشد.");snapshot();m.layers=m.layers.concat(newLayers);S.layerId=newLayers[0].id;saveLocal(fa(newLayers.length,0)+" عارضه وارد نقشه شد.");}catch(e){notify("ورود فایل ناموفق: "+e.message,true);}};r.readAsText(file);}
-  function printMap(){if(S.mode==="MAP")setMode("CAD");drawOffline();window.print();}
+  function coordPair(lon,lat,m,elev){
+    lon=num(lon);lat=num(lat);
+    if(!Number.isFinite(lon)||!Number.isFinite(lat)||Math.abs(lat)>90||Math.abs(lon)>180)return null;
+    var u=latLngToUtmWGS84(lat,lon,zone(m));
+    return {x:u.x,y:u.y,zone:zoneStr(m),elev:num(elev)||0};
+  }
+  function importText(file){
+    if(!file)return;
+    var ext=(file.name.split(".").pop()||"").toLowerCase();
+    if(ext==="dwg"){notify("فایل DWG مستقیم در مرورگر قابل خواندن نیست؛ در AutoCAD از Save As فرمت DXF بگیرید و DXF را وارد کنید.",true);return;}
+    var reader=new FileReader();
+    reader.onload=function(){
+      try{
+        var m=mapNow(),raw=String(reader.result||""),layers=[];
+        function add(name,type,pts){
+          pts=(pts||[]).filter(function(p){return p&&Number.isFinite(p.x)&&Number.isFinite(p.y);});
+          if(!pts.length||(type==="POLYGON"&&pts.length<3)||(type==="LINE"&&pts.length<2))return;
+          layers.push(newLayer(name||("عارضه "+(layers.length+1)),type,"CUSTOM",pts.map(function(p,i){return {x:Number(p.x),y:Number(p.y),zone:zoneStr(m),elev:Number(p.elev)||0,label:p.label||("P"+(i+1))};})));
+        }
+        function fromGeo(g,name){
+          if(!g||!g.type)return;
+          var c=g.coordinates||[],t=g.type;
+          function point(q){return Array.isArray(q)&&q.length>=2?coordPair(q[0],q[1],m,q[2]):null;}
+          if(t==="Point"){var p=point(c);if(p)add(name,"POINT",[p]);}
+          else if(t==="MultiPoint")c.forEach(function(q,i){var p=point(q);if(p)add(name+" "+(i+1),"POINT",[p]);});
+          else if(t==="LineString")add(name,"LINE",c.map(point));
+          else if(t==="MultiLineString")c.forEach(function(q,i){add(name+" "+(i+1),"LINE",q.map(point));});
+          else if(t==="Polygon")add(name,"POLYGON",(c[0]||[]).map(point));
+          else if(t==="MultiPolygon")c.forEach(function(q,i){add(name+" "+(i+1),"POLYGON",(q[0]||[]).map(point));});
+          else if(t==="GeometryCollection")(g.geometries||[]).forEach(function(q,i){fromGeo(q,name+" "+(i+1));});
+        }
+        if(ext==="kml"){
+          var d=new DOMParser().parseFromString(raw,"application/xml");
+          if(d.querySelector("parsererror"))throw new Error("ساختار KML معتبر نیست.");
+          Array.from(d.getElementsByTagNameNS("*","Placemark")).forEach(function(pm){
+            var name=(pm.getElementsByTagNameNS("*","name")[0]||{}).textContent||"عارضه KML";
+            ["Polygon","LineString","Point"].forEach(function(tag){
+              Array.from(pm.getElementsByTagNameNS("*",tag)).forEach(function(g,gi){
+                var node=g.getElementsByTagNameNS("*","coordinates")[0];if(!node)return;
+                var pts=String(node.textContent||"").trim().split(/\s+/).map(function(pair){var v=pair.split(",");return coordPair(v[0],v[1],m,v[2]);});
+                if(tag==="Polygon"&&pts.length>1&&Math.hypot(pts[0].x-pts[pts.length-1].x,pts[0].y-pts[pts.length-1].y)<.1)pts.pop();
+                add(name+(gi?" "+(gi+1):""),tag==="Polygon"?"POLYGON":tag==="LineString"?"LINE":"POINT",tag==="Point"?pts.slice(0,1):pts);
+              });
+            });
+          });
+        }else if(ext==="gpx"){
+          var gd=new DOMParser().parseFromString(raw,"application/xml");
+          if(gd.querySelector("parsererror"))throw new Error("ساختار GPX معتبر نیست.");
+          Array.from(gd.getElementsByTagNameNS("*","wpt")).forEach(function(w,i){var p=coordPair(w.getAttribute("lon"),w.getAttribute("lat"),m,0);if(p)add((w.getElementsByTagNameNS("*","name")[0]||{}).textContent||("نقطه GPX "+(i+1)),"POINT",[p]);});
+          Array.from(gd.getElementsByTagNameNS("*","rte")).forEach(function(r,i){var name=(r.getElementsByTagNameNS("*","name")[0]||{}).textContent||("مسیر GPX "+(i+1));add(name,"LINE",Array.from(r.getElementsByTagNameNS("*","rtept")).map(function(p){return coordPair(p.getAttribute("lon"),p.getAttribute("lat"),m,0);}));});
+          Array.from(gd.getElementsByTagNameNS("*","trk")).forEach(function(tr,i){var name=(tr.getElementsByTagNameNS("*","name")[0]||{}).textContent||("Track GPX "+(i+1));Array.from(tr.getElementsByTagNameNS("*","trkseg")).forEach(function(seg,j){add(name+(j?" "+(j+1):""),"LINE",Array.from(seg.getElementsByTagNameNS("*","trkpt")).map(function(p){return coordPair(p.getAttribute("lon"),p.getAttribute("lat"),m,0);}));});});
+        }else if(ext==="geojson"||ext==="json"){
+          var obj=JSON.parse(raw);
+          if(obj.type==="FeatureCollection")(obj.features||[]).forEach(function(ft,i){fromGeo(ft.geometry,(ft.properties&&(ft.properties.name||ft.properties.title))||("عارضه "+(i+1)));});
+          else if(obj.type==="Feature")fromGeo(obj.geometry,(obj.properties&&(obj.properties.name||obj.properties.title))||"عارضه GeoJSON");
+          else fromGeo(obj,"عارضه GeoJSON");
+        }else if(ext==="csv"||ext==="txt"||ext==="tsv"){
+          var pts=[];
+          raw.replace(/^\uFEFF/,"").split(/\r?\n/).forEach(function(line){
+            var v=line.trim();if(!v)return;var q=v.split(/[;,\t ]+/);if(q.length<2)return;
+            var x=num(q[0]),y=num(q[1]);if(!Number.isFinite(x)||!Number.isFinite(y))return;
+            if(Math.abs(x)<=180&&Math.abs(y)<=90){var p=coordPair(x,y,m,q[2]);if(p)pts.push(p);}
+            else if(x>=100000&&x<=900000&&y>=0&&y<=10000000)pts.push({x:x,y:y,zone:zoneStr(m),elev:num(q[2])||0});
+          });
+          add(file.name.replace(/\.[^.]+$/,""),pts.length>=3?"POLYGON":pts.length>=2?"LINE":"POINT",pts);
+        }else if(ext==="dxf"){
+          var src=raw.replace(/\r/g,"").split("\n"),pairs=[];
+          for(var pi=0;pi+1<src.length;pi+=2)pairs.push({c:src[pi].trim(),v:src[pi+1].trim()});
+          var units=0;
+          for(var ui=0;ui<pairs.length;ui++)if(pairs[ui].c==="9"&&pairs[ui].v==="$INSUNITS"){units=Number(pairs[ui+1]&&pairs[ui+1].v)||0;break;}
+          var factor=units===4?.001:units===5?.01:units===1?.0254:units===2?.3048:units===7?1000:1,ent=null;
+          function flush(){
+            if(!ent)return;var arr=ent.a,pts=[];
+            function val(code){var z=arr.find(function(v){return v.c===String(code);});return z?num(z.v):NaN;}
+            if(ent.t==="LWPOLYLINE"){
+              for(var j=0;j<arr.length;j++)if(arr[j].c==="10"){var yy=arr.slice(j+1).find(function(z){return z.c==="20";});if(yy)pts.push({x:num(arr[j].v)*factor,y:num(yy.v)*factor});}
+              add(ent.n,(Number(ent.flag)&1)?"POLYGON":"LINE",pts);
+            }else if(ent.t==="POINT")add(ent.n,"POINT",[{x:val(10)*factor,y:val(20)*factor}]);
+            else if(ent.t==="LINE")add(ent.n,"LINE",[{x:val(10)*factor,y:val(20)*factor},{x:val(11)*factor,y:val(21)*factor}]);
+            else if(ent.t==="CIRCLE"||ent.t==="ARC"){
+              var cx=val(10)*factor,cy=val(20)*factor,r=val(40)*factor,st=ent.t==="ARC"?val(50):0,en=ent.t==="ARC"?val(51):360;
+              if(Number.isFinite(cx)&&Number.isFinite(cy)&&r>0){var span=en-st;if(span<=0)span+=360;var n=Math.max(16,Math.ceil(span/5));for(var k=0;k<=n;k++){var an=(st+span*k/n)*Math.PI/180;pts.push({x:cx+Math.cos(an)*r,y:cy+Math.sin(an)*r});}add(ent.n,ent.t==="CIRCLE"?"POLYGON":"LINE",pts);}
+            }
+            ent=null;
+          }
+          pairs.forEach(function(q){if(q.c==="0"){flush();if(["LWPOLYLINE","POINT","LINE","CIRCLE","ARC"].indexOf(q.v)>=0)ent={t:q.v,n:"DXF "+q.v,flag:0,a:[]};}else if(ent){if(q.c==="8")ent.n=q.v;if(q.c==="70")ent.flag=q.v;ent.a.push(q);}});
+          flush();
+        }else throw new Error("فرمت مجاز: KML، GPX، DXF، GeoJSON، CSV، TXT و TSV. برای DWG ابتدا به DXF تبدیل کنید.");
+        if(!layers.length)throw new Error("هیچ عارضه قابل ورود یافت نشد؛ ساختار فایل و نوع مختصات را بررسی کنید.");
+        snapshot();m.layers=m.layers.concat(layers);S.layerId=layers[0].id;saveLocal(fa(layers.length,0)+" عارضه از فایل "+ext.toUpperCase()+" وارد شد.");
+      }catch(e){notify("ورود فایل ناموفق: "+e.message,true);}
+    };
+    reader.onerror=function(){notify("خواندن فایل با خطا مواجه شد.",true);};
+    reader.readAsText(file);
+  }
+  function exportGPX(){
+    var m=mapNow();if(!m)return;
+    var out=['<?xml version="1.0" encoding="UTF-8"?>','<gpx version="1.1" creator="Nezam636 Map Studio" xmlns="http://www.topografix.com/GPX/1/1">'];
+    (m.layers||[]).forEach(function(l){var p=l.points||[];if(!p.length)return;
+      if(l.geomType==="POINT")p.forEach(function(q){var v=utmToLatLngWGS84(q.x,q.y,zone(m),true);out.push('<wpt lat="'+v.lat.toFixed(8)+'" lon="'+v.lng.toFixed(8)+'"><name>'+esc(q.label||l.name)+'</name></wpt>');});
+      else{out.push("<trk><name>"+esc(l.name)+"</name><trkseg>");p.forEach(function(q){var v=utmToLatLngWGS84(q.x,q.y,zone(m),true);out.push('<trkpt lat="'+v.lat.toFixed(8)+'" lon="'+v.lng.toFixed(8)+'"></trkpt>');});if(l.geomType==="POLYGON"&&p.length>=3){var first=utmToLatLngWGS84(p[0].x,p[0].y,zone(m),true);out.push('<trkpt lat="'+first.lat.toFixed(8)+'" lon="'+first.lng.toFixed(8)+'"></trkpt>');}out.push("</trkseg></trk>");}
+    });
+    out.push("</gpx>");blob(out.join(""),"application/gpx+xml",fileName(m.title)+".gpx");
+  }
+  function exportGeoJSON(){
+    var m=mapNow();if(!m)return;var features=[];
+    (m.layers||[]).forEach(function(l){var p=l.points||[];if(!p.length)return;var coords=p.map(function(q){var v=utmToLatLngWGS84(q.x,q.y,zone(m),true);return [v.lng,v.lat,q.elev||0];});var geom;
+      if(l.geomType==="POINT")geom={type:"MultiPoint",coordinates:coords};
+      else if(l.geomType==="LINE")geom={type:"LineString",coordinates:coords};
+      else{if(coords.length>=3)coords.push(coords[0]);geom={type:"Polygon",coordinates:[coords]};}
+      features.push({type:"Feature",properties:{name:l.name,category:l.category,geometry:l.geomType},geometry:geom});
+    });
+    blob(JSON.stringify({type:"FeatureCollection",name:m.title,features:features},null,2),"application/geo+json",fileName(m.title)+".geojson");
+  }
+  function prepareSheet(autoPrint){
+    var m=mapNow(),c=caseNow();if(!m||!c)return;if(S.mode==="MAP")setMode("CAD");drawOffline();
+    var svg=document.querySelector("#ms-cad svg"),holder=document.getElementById("ms-sheet-preview");if(!svg||!holder){notify("نقشه برای شیت‌بندی آماده نیست.",true);return;}
+    var size=(document.getElementById("ms-sheet-size")||{}).value||"A4",orient=(document.getElementById("ms-sheet-orientation")||{}).value||"landscape";
+    var title=(document.getElementById("ms-sheet-title")||{}).value.trim()||m.title||"نقشه کروکی زمین";
+    var author=(document.getElementById("ms-sheet-author")||{}).value.trim()||"مرکز خدمات کشاورزی ۶۳۶ خفر";
+    var width=size==="A3"?(orient==="landscape"?"420mm":"297mm"):(orient==="landscape"?"297mm":"210mm");
+    var height=size==="A3"?(orient==="landscape"?"297mm":"420mm"):(orient==="landscape"?"210mm":"297mm");
+    var pageStyle=document.getElementById("ms-dynamic-page-style");
+    if(!pageStyle){pageStyle=document.createElement("style");pageStyle.id="ms-dynamic-page-style";document.head.appendChild(pageStyle);}
+    pageStyle.textContent="@page{size:"+size+" "+orient+";margin:7mm}";
+    var meta='<div class="ms-sheet-meta"><span>متقاضی: <b>'+esc(c.name||"—")+'</b></span><span>کلاسه پرونده: <b>'+esc(c.code||"—")+'</b></span><span>طرح: <b>'+esc(c.project||"—")+'</b></span><span>پلاک: <b>'+esc(c.landParcel||"—")+'</b></span><span>مساحت پرونده: <b>'+esc(c.land||"—")+' مترمربع</b></span><span>زون مختصات: <b>'+esc(zoneStr(m))+'</b></span><span>تاریخ: <b>'+esc(typeof todayShamsi==="function"?todayShamsi():"")+'</b></span><span>تهیه‌کننده: <b>'+esc(author)+'</b></span></div>';
+    var legend=(m.layers||[]).filter(function(l){return l.visible!==false;}).map(function(l){return '<span><i style="background:'+esc(l.color||"#16834a")+'"></i>'+esc(l.name)+'</span>';}).join("");
+    var rows=[];(m.layers||[]).forEach(function(l){(l.points||[]).forEach(function(p,i){if(rows.length<36)rows.push("<tr><td>"+esc(l.name)+"</td><td>"+esc(p.label||("P"+(i+1)))+"</td><td dir=\"ltr\">"+Number(p.x).toFixed(2)+"</td><td dir=\"ltr\">"+Number(p.y).toFixed(2)+"</td></tr>");});});
+    var svgText=new XMLSerializer().serializeToString(svg.cloneNode(true));
+    holder.innerHTML='<div class="ms-sheet-actions"><button type="button" class="ms-sheet-close" data-act="close-sheet">بازگشت به ویرایش</button><button type="button" class="ms-sheet-print" data-act="sheet-print">چاپ شیت / ذخیره PDF</button></div><article class="ms-sheet-page '+(orient==="portrait"?"portrait":"landscape")+'" style="--sheet-width:'+width+';--sheet-height:'+height+'"><header class="ms-sheet-head"><div><h2>'+esc(title)+'</h2><small>سازمان نظام مهندسی کشاورزی و منابع طبیعی · مرکز خدمات ۶۳۶ شهرستان خفر</small></div><div style="text-align:left;font-size:8pt"><b>نقشه فنی UTM</b><br>'+esc(size+" · "+(orient==="landscape"?"افقی":"عمودی"))+'</div></header>'+meta+'<div class="ms-sheet-map">'+svgText+'</div><div class="ms-sheet-bottom"><div><b style="font-size:8pt">راهنمای علائم و لایه‌ها</b><div class="ms-sheet-legend">'+legend+'</div><p style="font-size:7pt;margin-top:3mm">تذکر: مختصات و ابعاد باید با برداشت و مدارک معتبر تطبیق داده شوند.</p></div><div><b style="font-size:8pt">جدول مختصات UTM (حداکثر ۳۶ رأس)</b><table class="ms-sheet-table"><thead><tr><th>لایه</th><th>نقطه</th><th>E (m)</th><th>N (m)</th></tr></thead><tbody>'+rows.join("")+'</tbody></table></div></div><footer class="ms-sheet-foot"><span>مقیاس ترسیم: متناسب با کادر شیت · واحد مختصات: متر</span><span>محل مهر و امضای کارشناس: ____________________</span></footer></article>';
+    holder.style.display="block";S.sheetOpen=true;if(autoPrint)window.setTimeout(function(){window.print();},250);
+  }
+  function closeSheet(){var h=document.getElementById("ms-sheet-preview");if(h)h.style.display="none";S.sheetOpen=false;}
+  function printMap(){prepareSheet(true);}
   function addMap(){if(!needCase())return;var t=prompt("عنوان نقشه جدید:","نقشه مهندسی - "+(caseNow().name||"متقاضی"));if(t===null)return;var m=newMap(t.trim());caseMaps(caseNow()).unshift(m);S.mapId=m.id;S.layerId=m.layers[0].id;S.undo=[];S.redo=[];saveLocal("نقشه جدید به پرونده اضافه شد.");}
   function copyOld(){if(!needCase())return;var old=typeof getActiveCroquisMap==="function"?getActiveCroquisMap():null;if(!old){notify("کروکی قبلی یافت نشد.",true);return;}var c=caseNow(),m=JSON.parse(JSON.stringify(old));m.id=id("MAPSTUDIO");m.title=(m.title||"کروکی قبلی")+" - نسخه استودیو";m.createdAt=Date.now();m.updatedAt=Date.now();caseMaps(c).unshift(m);S.mapId=m.id;S.layerId=(m.layers[0]||{}).id||"";saveLocal("کپی کروکی قبلی ساخته شد؛ نسخه اصلی دست‌نخورده باقی ماند.");}
   function bootUI(){var nav=document.querySelector("nav.app-navbar"),main=document.querySelector("main");if(!nav||!main)return;
