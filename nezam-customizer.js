@@ -2111,7 +2111,7 @@ function buildAllSelectedFeaturesUtmTableHTML(c, utmRaw, isNatRes) {
 }
 
 /* ساخت برگه A4 و A5 سربرگ رسمی مرکز ۶۳۶ با کنترل سرریز متن و تفکیک شیت‌ها */
-function buildSingleA4HTML(rec, bodyTxt, numStr, dateStr, attachStr, utmRaw, isNatRes, isRawHtml, paperSize, includeUtm, sheetTag, utmHtmlOverride) {
+function buildSingleA4HTML(rec, bodyTxt, numStr, dateStr, attachStr, utmRaw, isNatRes, isRawHtml, paperSize, includeUtm, sheetTag, utmHtmlOverride, signatureMode) {
   var pSize = (paperSize || currentPaperSize) === "A5" ? "A5" : "A4";
   var c = getActiveCase();
   var showUtm = includeUtm !== false;
@@ -2144,6 +2144,22 @@ function buildSingleA4HTML(rec, bodyTxt, numStr, dateStr, attachStr, utmRaw, isN
   var safePostal = safeHtmlText(toFa(brandCfg.postalCode));
   var safePhone = safeHtmlText(toFa(brandCfg.phone));
   var safeEmail = safeHtmlText(brandCfg.email);
+  signatureMode = String(signatureMode || "OFFICE").toUpperCase();
+  var officeSignatureHtml = signatureMode === "OFFICE"
+    ? '<div class="sign-area">' +
+        '<div class="sign-box">' +
+          '<div>با تشکر</div>' +
+          '<div>' + safeManagerTitle + '</div>' +
+          '<div>' + safeManagerName + '</div>' +
+          customStampHtml +
+        '</div>' +
+      '</div>'
+    : '';
+  var footerValidityText = signatureMode === "APPLICANT"
+    ? "اعتبار این فرم منوط به تکمیل مشخصات، امضا و اثر انگشت متقاضی است"
+    : (signatureMode === "NONE"
+      ? "این برگه جزء مستندات فنی پرونده متقاضی است"
+      : "این سربرگ صرفاً با اصل مهر و امضاء معتبر خواهد بود");
 
   return '<div class="a4-page' + (pSize === "A5" ? ' paper-a5' : '') + '" data-paper-size="' + pSize + '">' +
     '<div class="lh-top" style="background:' + safeHeaderColor + ';">' +
@@ -2168,17 +2184,10 @@ function buildSingleA4HTML(rec, bodyTxt, numStr, dateStr, attachStr, utmRaw, isN
         '<div class="l-txt" style="' + (isRawHtml ? 'white-space:normal;' : '') + '" contenteditable="true">' + renderedBody + '</div>' +
         utmTableHtml +
       '</div>' +
-      '<div class="sign-area">' +
-        '<div class="sign-box">' +
-          '<div>با تشکر</div>' +
-          '<div>' + safeManagerTitle + '</div>' +
-          '<div>' + safeManagerName + '</div>' +
-          customStampHtml +
-        '</div>' +
-      '</div>' +
+      officeSignatureHtml +
     '</div>' +
     '<div class="lh-foot" style="background:' + safeHeaderColor + ';">' +
-      '<div class="f-warn">این سربرگ صرفاً با اصل مهر و امضاء معتبر خواهد بود' + (sheetTag ? (' (' + safeSheetTag + ')') : '') + '</div>' +
+      '<div class="f-warn">' + footerValidityText + (sheetTag ? (' (' + safeSheetTag + ')') : '') + '</div>' +
       '<div class="f-info">' +
         '<div>آدرس: ' + safeAddress + '<br>کدپستی: ' + safePostal + '</div>' +
         '<div style="text-align:left;direction:ltr;">تلفن: ' + safePhone + '<br>' + safeEmail + '</div>' +
@@ -2590,6 +2599,36 @@ function issueDeficiencyLetterForActiveCase() {
   });
 }
 
+/* بلوک استاندارد تکمیل مشخصات، امضا و اثر انگشت متقاضی برای فرم‌های قابل امضا */
+function buildApplicantSignaturePanelHtml(data, options) {
+  var d = data || {};
+  var opts = options || {};
+  var isA5 = currentPaperSize === "A5";
+  var name = safeHtmlText(String(d.name || ""));
+  var nid = safeHtmlText(String(d.nid || ""));
+  var title = safeHtmlText(opts.title || "تأیید و امضای متقاضی / بهره‌بردار");
+  var fontSize = isA5 ? "7.2pt" : "9.2pt";
+  var fingerprintSize = isA5 ? "15mm" : "20mm";
+  var signatureHeight = isA5 ? "12mm" : "17mm";
+  var inspectorHtml = opts.includeInspector
+    ? '<div style="margin-top:2mm;padding-top:1.5mm;border-top:1px dotted #999;font-size:' + fontSize + ';font-weight:700;">نام و سمت بازرس/کارشناس: .................................................... &nbsp;&nbsp; امضا: ............................</div>'
+    : '';
+  return '<section class="applicant-signature-panel" style="direction:rtl;margin-top:' + (isA5 ? '2mm' : '5mm') + ';padding:' + (isA5 ? '2mm' : '3.5mm') + ';border:1px solid #475569;border-right:3px solid #2e8054;border-radius:4px;background:#fff;page-break-inside:avoid;font-size:' + fontSize + ';line-height:1.7;">' +
+    '<div style="font-weight:900;text-align:center;color:#174b35;margin-bottom:1mm;">' + title + '</div>' +
+    '<div style="margin-bottom:1.5mm;">اینجانب صحت مشخصات و اطلاعات درج‌شده در این فرم را مطالعه و تأیید می‌کنم.</div>' +
+    '<div style="display:grid;grid-template-columns:minmax(0,1fr) ' + fingerprintSize + ';gap:2mm;align-items:stretch;">' +
+      '<div style="display:flex;flex-direction:column;justify-content:space-between;gap:1mm;">' +
+        '<div><b>نام و نام خانوادگی متقاضی:</b> ' + (name || '........................................') + '</div>' +
+        '<div><b>کد ملی / شناسه:</b> ' + (nid || '................................') + '</div>' +
+        '<div style="height:' + signatureHeight + ';border:1px dashed #64748b;border-radius:3px;padding:1mm;"><b>محل امضای متقاضی:</b></div>' +
+        '<div><b>تاریخ:</b> ................................</div>' +
+      '</div>' +
+      '<div style="min-height:' + fingerprintSize + ';border:1px dashed #64748b;border-radius:3px;display:flex;align-items:center;justify-content:center;text-align:center;padding:1mm;font-weight:800;">محل اثر انگشت متقاضی</div>' +
+    '</div>' +
+    inspectorHtml +
+  '</section>';
+}
+
 function printOfficialForm(formType) {
   var c = getActiveCase();
   if (!c) {
@@ -2661,7 +2700,7 @@ function printOfficialForm(formType) {
     innerHtml =
       '<div style="text-align:center;font-size:13pt;font-weight:900;margin-bottom:3mm;">تعهدنامه رسمی بهره‌بردار و الزامات مسئول فنی</div>' +
       '<div style="border:1.5px solid #000;padding:5mm;font-size:10.5pt;line-height:2.2;text-align:justify;">' +
-        'اینجانب <b>' + safeHtmlText(d.name) + '</b> به کد ملی/شناسه <b>' + safeHtmlText(d.nid) + '</b> متقاضی طرح «<b>' + safeHtmlText(d.project) + '</b>» با ظرفیت <b>' + safeHtmlText(d.cap) + '</b> در زمینی به مساحت <b>' + safeHtmlText(d.land) + '</b> مترمربع واقع در <b>' + safeHtmlText(d.loc) + '</b> متعهد می‌گردم کلیه ضوابط فنی، بهداشتی و زیست‌محیطی وزارت جهاد کشاورزی و سازمان نظام مهندسی کشاورزی و منابع طبیعی را رعایت نموده، از خدمات مسئول فنی واجد صلاحیت در سامانه سانکا استفاده نمایم و از هرگونه تغییر کاربری غیرمجاز خودداری کنم.<br><br>امضا و اثر انگشت متقاضی:' +
+        'اینجانب <b>' + safeHtmlText(d.name) + '</b> به کد ملی/شناسه <b>' + safeHtmlText(d.nid) + '</b> متقاضی طرح «<b>' + safeHtmlText(d.project) + '</b>» با ظرفیت <b>' + safeHtmlText(d.cap) + '</b> در زمینی به مساحت <b>' + safeHtmlText(d.land) + '</b> مترمربع واقع در <b>' + safeHtmlText(d.loc) + '</b> متعهد می‌گردم کلیه ضوابط فنی، بهداشتی و زیست‌محیطی وزارت جهاد کشاورزی و سازمان نظام مهندسی کشاورزی و منابع طبیعی را رعایت نموده، از خدمات مسئول فنی واجد صلاحیت در سامانه سانکا استفاده نمایم و از هرگونه تغییر کاربری غیرمجاز خودداری کنم.' +
       '</div>';
   } else if (formType === "BINDER_LABEL") {
     var stage = document.getElementById("a4-preview-stage");
@@ -2696,7 +2735,15 @@ function printOfficialForm(formType) {
     showToastMsg("محل پیش‌نمایش چاپ در صفحه پیدا نشد؛ صفحه را تازه‌سازی کنید.", true);
     return false;
   }
-  stageEl.innerHTML = buildSingleA4HTML("", innerHtml, d.num, d.date, "دارد", "", false, true, currentPaperSize, false);
+  var applicantSignatureFormTypes = ["FOLDER_COVER", "PHARMACY_INSPECTION", "GREENHOUSE_CHECKLIST", "PLEDGE_CONTRACT"];
+  if (applicantSignatureFormTypes.indexOf(formType) !== -1) {
+    var signatureOptions = {
+      title: formType === "PLEDGE_CONTRACT" ? "تأیید تعهدات و امضای بهره‌بردار" : "تأیید و امضای متقاضی / بهره‌بردار",
+      includeInspector: formType === "PHARMACY_INSPECTION" || formType === "GREENHOUSE_CHECKLIST"
+    };
+    innerHtml += buildApplicantSignaturePanelHtml(d, signatureOptions);
+  }
+  stageEl.innerHTML = buildSingleA4HTML("", innerHtml, d.num, d.date, "دارد", "", false, true, currentPaperSize, false, "", undefined, "APPLICANT");
   var formPage = stageEl.querySelector(".a4-page");
   if (formPage) {
     formPage.setAttribute("data-page-kind", "official-form-" + String(formType || "unknown").toLowerCase());
@@ -4986,10 +5033,14 @@ function printUtmSketchSheet() {
       '<div style="font-weight:900;color:#7c2d12;text-align:center;font-size:' + (isA5Sheet ? '6.3pt' : '7.2pt') + ';margin-bottom:.5mm;">اقرار و تأیید متقاضی درباره محدوده و نقاط نقشه</div>' +
       'اینجانب متقاضی/نماینده قانونی، تأیید می‌کنم محل زمین، حدود مورد درخواست، محل رئوس و نقاط و مختصات درج‌شده در این کروکی را در محل معرفی، بازبینی و تأیید کرده‌ام و نقشه بر مبنای اطلاعات و مستندات ارائه‌شده و نقاط معرفی یا تأییدشده تهیه شده است. مسئولیت صحت اسناد و اطلاعات ارائه‌شده، معرفی و تأیید محل هر نقطه و تطبیق نقاط با محدوده مورد درخواست، اعلام حقوق اشخاص ثالث، رفع تعارضات و اخذ مجوزها و رضایت‌های قانونی لازم بر عهده اینجانب است. متعهد می‌شوم مغایرت ناشی از اطلاعات یا محل‌های معرفی/تأییدشده از سوی خود را اعلام و اصلاح کنم و خساراتی را که طبق قانون قابل انتساب به اطلاعات نادرست یا کتمان‌شده از سوی اینجانب باشد جبران نمایم.' +
       '<br>این نقشه صرفاً خروجی فنی مبتنی بر داده‌ها و مدارک ارائه‌شده/تأییدشده برای بررسی درخواست است و به‌تنهایی سند مالکیت یا حدنگار، تحدید حدود ثبتی، گواهی عدم تعارض یا مجوز ساخت و بهره‌برداری محسوب نمی‌شود. این اقرار، مسئولیت‌های قانونی و حرفه‌ای اشخاص تهیه‌کننده را در حدود تقصیر، تخلف یا تکالیف آمره قانونی که قابل اسقاط نیست، ساقط یا منتقل نمی‌کند.' +
-      '<div style="display:flex;justify-content:space-between;align-items:center;gap:4mm;border-top:0.5px dotted #a16207;margin-top:.7mm;padding-top:.7mm;font-weight:800;">' +
-        '<span>نام و نام خانوادگی متقاضی: ' + safeHtmlText(c.name || '................................') + '</span>' +
-        '<span>امضاء و اثر انگشت متقاضی: ............................</span>' +
-        '<span>تاریخ: ........................</span>' +
+      '<div style="display:grid;grid-template-columns:minmax(0,1fr) ' + (isA5Sheet ? '14mm' : '17mm') + ';gap:1.2mm;align-items:stretch;border-top:0.5px dotted #a16207;margin-top:.7mm;padding-top:.7mm;font-weight:800;">' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.7mm;align-content:center;">' +
+          '<span>نام و نام خانوادگی متقاضی: ' + safeHtmlText(c.name || '................................') + '</span>' +
+          '<span>کد ملی / شناسه: ' + safeHtmlText(toFa(c.nid || '')) + '</span>' +
+          '<span style="border:0.5px dashed #64748b;padding:.5mm;">محل امضای متقاضی: ....................</span>' +
+          '<span>تاریخ: ........................</span>' +
+        '</div>' +
+        '<div style="min-height:' + (isA5Sheet ? '14mm' : '17mm') + ';border:0.6px dashed #64748b;border-radius:2px;display:flex;align-items:center;justify-content:center;text-align:center;font-size:' + (isA5Sheet ? '5.2pt' : '6pt') + ';font-weight:800;">اثر انگشت متقاضی</div>' +
       '</div>' +
     '</section>';
 
@@ -5054,8 +5105,8 @@ function printUtmSketchSheet() {
       '<b>گواهی فنی کارشناس:</b> صحت انطباق مختصات فوق با اراضی متقاضی و دستورالعمل‌های فنی نظام مهندسی کشاورزی و منابع طبیعی استان فارس مورد تأیید است.' +
     '</div>';
 
-  var page1Html = buildSingleA4HTML("", sheet1Content, d.num + "/۱", d.date, "کروکی (شیت ۱)", "", false, true, currentPaperSize, false, "شیت ۱ از ۲ (نقشه)");
-  var page2Html = buildSingleA4HTML("", sheet2Content, d.num + "/۲", d.date, "جداول UTM (شیت ۲)", "", false, true, currentPaperSize, false, "شیت ۲ از ۲ (جداول)");
+  var page1Html = buildSingleA4HTML("", sheet1Content, d.num + "/۱", d.date, "کروکی (شیت ۱)", "", false, true, currentPaperSize, false, "شیت ۱ از ۲ (نقشه)", undefined, "NONE");
+  var page2Html = buildSingleA4HTML("", sheet2Content, d.num + "/۲", d.date, "جداول UTM (شیت ۲)", "", false, true, currentPaperSize, false, "شیت ۲ از ۲ (جداول)", undefined, "NONE");
 
   document.getElementById("a4-preview-stage").innerHTML = mapModeControls + page1Html + page2Html;
   updatePaperActionButtons();
