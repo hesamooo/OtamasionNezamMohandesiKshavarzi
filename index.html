@@ -5965,6 +5965,484 @@
   }
 }
 </style>
+
+<style id="nezam-ui-polish-v2">
+/* لایه زیباسازی بصری سامانه ۶۳۶ ـ بدون تغییر در منطق برنامه */
+@media screen {
+  :root {
+    --polish-forest: #153d2d;
+    --polish-forest-2: #1d563c;
+    --polish-green: #2e8054;
+    --polish-mint: #eaf4ed;
+    --polish-gold: #d7b76d;
+    --polish-ink: #203229;
+    --polish-muted: #718078;
+    --polish-line: #e2eae4;
+    --polish-shadow: 0 8px 26px rgba(27, 62, 43, .065);
+    --polish-radius: 16px;
+  }
+
+  html { scroll-padding-top: 88px; }
+  body {
+    color: var(--polish-ink) !important;
+    background:
+      radial-gradient(ellipse at 92% 3%, rgba(84, 150, 103, .075), transparent 30rem),
+      radial-gradient(ellipse at 5% 30%, rgba(215, 183, 109, .055), transparent 26rem),
+      #f5f8f5 !important;
+  }
+
+  /* سربرگ رسمی و یکپارچه */
+  .top-hero-bar {
+    position: relative !important;
+    isolation: isolate;
+    overflow: hidden;
+    background: linear-gradient(115deg, #102d21 0%, #174631 54%, #20543a 100%) !important;
+    border-bottom: 3px solid var(--polish-gold) !important;
+    box-shadow: 0 7px 24px rgba(16, 48, 33, .16) !important;
+  }
+  .top-hero-bar::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    width: 330px;
+    height: 330px;
+    left: 8%;
+    top: -245px;
+    border: 1px solid rgba(236, 214, 159, .15);
+    border-radius: 50%;
+    box-shadow: 0 0 0 28px rgba(255,255,255,.018), 0 0 0 58px rgba(255,255,255,.014);
+    pointer-events: none;
+  }
+  .top-hero-bar > div { position: relative; z-index: 1; }
+  #nav-logo-box {
+    border: 2px solid rgba(238, 215, 160, .9) !important;
+    border-radius: 15px !important;
+    background: linear-gradient(145deg, #fff, #edf4ed) !important;
+    box-shadow: 0 0 0 5px rgba(255,255,255,.07), 0 7px 20px rgba(0,0,0,.2) !important;
+  }
+  #ui-hero-org { letter-spacing: .05px; }
+  #ui-hero-office { letter-spacing: -.3px; }
+  .top-hero-bar .px-3.py-1.rounded {
+    border-radius: 12px !important;
+    background: rgba(255,255,255,.09) !important;
+    border-color: rgba(255,255,255,.17) !important;
+  }
+  .nezam-windows-export-btn {
+    border-radius: 11px !important;
+    background: linear-gradient(135deg, #f1dfb2, #d7b76d) !important;
+    border: 1px solid rgba(255,255,255,.32) !important;
+    color: #23392b !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,.13) !important;
+  }
+
+  /* نوار پرونده فعال */
+  .active-applicant-ContextBar {
+    position: relative;
+    background: rgba(255,255,255,.97) !important;
+    border-bottom: 1px solid #dfe9e2 !important;
+    box-shadow: 0 4px 15px rgba(27, 62, 43, .045) !important;
+  }
+  #active-case-status-badge {
+    border: 1px solid #cfe3d4 !important;
+    background: linear-gradient(135deg, #edf7ef, #e2f0e5) !important;
+    color: #246744 !important;
+  }
+  #global-case-selector { background-color: #fbfdfb !important; }
+  .active-applicant-ContextBar .btn { white-space: nowrap; }
+
+  /* منوی کناری: کنتراست بهتر، فاصله‌گذاری منظم و حالت فعال واضح */
+  nav.app-navbar {
+    background:
+      radial-gradient(circle at 5% 0%, rgba(220,190,117,.12), transparent 17rem),
+      linear-gradient(180deg, #123426 0%, #174532 58%, #102e22 100%) !important;
+    border-left: 1px solid rgba(224, 196, 132, .42) !important;
+    box-shadow: -8px 0 24px rgba(16, 49, 33, .11) !important;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(232, 214, 170, .42) transparent;
+  }
+  .nezam-sb-top-brand {
+    display: flex !important;
+    justify-content: space-between;
+    align-items: center;
+    gap: .5rem;
+    padding: .62rem .5rem .85rem !important;
+    margin-bottom: .35rem !important;
+    border-bottom: 1px solid rgba(255,255,255,.12);
+    color: #f0d99e !important;
+    font-size: .86rem !important;
+  }
+  .nezam-sb-collapse-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 34px;
+    width: 34px !important;
+    height: 34px !important;
+    color: #f6f1df !important;
+    border: 1px solid rgba(238,218,170,.25) !important;
+    border-radius: 10px !important;
+    background: rgba(255,255,255,.09) !important;
+    cursor: pointer;
+    transition: background .18s ease, transform .18s ease;
+  }
+  .nezam-sb-collapse-trigger:hover {
+    background: rgba(231,202,133,.2) !important;
+    transform: translateY(-1px);
+  }
+  nav.app-navbar .nav-link {
+    position: relative;
+    min-height: 46px !important;
+    padding: .62rem .78rem !important;
+    border: 1px solid rgba(255,255,255,.075) !important;
+    border-radius: 12px !important;
+    background: rgba(255,255,255,.045) !important;
+    color: #e5eee8 !important;
+    font-weight: 700 !important;
+    letter-spacing: 0 !important;
+  }
+  nav.app-navbar .nav-link::before {
+    right: -1px !important;
+    top: 10px !important;
+    bottom: 10px !important;
+    width: 3px !important;
+    border-radius: 5px !important;
+  }
+  nav.app-navbar .nav-link:hover {
+    background: rgba(255,255,255,.115) !important;
+    border-color: rgba(228,202,144,.34) !important;
+    color: #fff !important;
+    transform: translateX(-2px) !important;
+  }
+  nav.app-navbar .nav-link.active {
+    background: linear-gradient(110deg, #f2dfad, #ddbd77) !important;
+    border-color: rgba(255,255,255,.5) !important;
+    color: #203b2c !important;
+    box-shadow: 0 5px 15px rgba(0,0,0,.16) !important;
+  }
+  nav.app-navbar .nav-link.active::before { background: #fff !important; }
+
+  /* نوار زیرتب‌ها */
+  .nezam-top-subbar {
+    border-bottom: 1px solid #e1e9e3 !important;
+    background: rgba(255,255,255,.96) !important;
+    box-shadow: 0 4px 14px rgba(30,65,46,.045) !important;
+  }
+  .subbar-breadcrumb { color: #245b3d !important; }
+  .subbar-tab-item {
+    border: 1px solid transparent !important;
+    border-radius: 10px !important;
+    background: #f3f7f4 !important;
+    color: #5d7064 !important;
+    transition: background .16s ease, border-color .16s ease, color .16s ease !important;
+  }
+  .subbar-tab-item:hover {
+    background: #eaf3ec !important;
+    border-color: #d5e5d9 !important;
+    color: #225d3d !important;
+    transform: translateY(-1px) !important;
+  }
+  .subbar-tab-item.active {
+    background: #e4f0e7 !important;
+    border-color: #c9dfce !important;
+    color: #1d6540 !important;
+    box-shadow: inset 0 -2px 0 #3f8a5a !important;
+  }
+
+  /* سطح محتوا و کارت‌ها */
+  .nezam-content-column { min-width: 0 !important; }
+  .nezam-content-column > main { padding-top: clamp(1rem, 2vw, 1.8rem) !important; }
+  .sec-pane.active { animation: polishPaneIn .2s ease both !important; }
+  @keyframes polishPaneIn {
+    from { opacity: .68; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .card-clean {
+    border: 1px solid var(--polish-line) !important;
+    border-radius: var(--polish-radius) !important;
+    background: linear-gradient(180deg, #fff 0%, #fdfefd 100%) !important;
+    box-shadow: var(--polish-shadow) !important;
+  }
+  .card-clean:hover {
+    border-color: #cbded0 !important;
+    box-shadow: 0 10px 28px rgba(27, 62, 43, .085) !important;
+  }
+  .card-clean > .border-bottom {
+    border-bottom-color: #e9efea !important;
+  }
+  .card-clean > .border-bottom strong {
+    color: #245c3e !important;
+    font-size: .96rem !important;
+  }
+  .workflow-law-strip {
+    border: 1px solid #dce9df !important;
+    border-right: 4px solid #4d9565 !important;
+    border-radius: 15px !important;
+    background: linear-gradient(110deg, #edf6ef 0%, #fff 88%) !important;
+    box-shadow: 0 4px 14px rgba(35, 91, 55, .035) !important;
+  }
+  .workflow-step-pill {
+    border: 1px solid #dce9df !important;
+    border-radius: 10px !important;
+    background: #fff !important;
+    color: #405d49 !important;
+    box-shadow: 0 2px 5px rgba(30,70,43,.025) !important;
+  }
+  .workflow-step-pill:hover {
+    border-color: #b9d5c1 !important;
+    background: #f4faf5 !important;
+  }
+
+  /* شاخص‌های آماری و کاشی‌های میانبر */
+  .kpi-macro-card {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid #e4ece6 !important;
+    border-radius: 14px !important;
+    background: linear-gradient(145deg, #fff 0%, #f8fbf8 100%) !important;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease !important;
+  }
+  .kpi-macro-card:hover {
+    transform: translateY(-2px) !important;
+    border-color: #c9dfce !important;
+    box-shadow: 0 7px 18px rgba(34, 86, 51, .07) !important;
+  }
+  .kpi-mini-bars { opacity: .72; }
+  .cmd-tile-grid { gap: .72rem !important; }
+  .cmd-tile {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid #e1eae3 !important;
+    border-radius: 15px !important;
+    background: linear-gradient(145deg, #fff 0%, #fbfdfb 100%) !important;
+    box-shadow: 0 3px 9px rgba(29,70,44,.025) !important;
+  }
+  .cmd-tile:hover {
+    transform: translateY(-3px) !important;
+    border-color: #bcd8c3 !important;
+    background: #fff !important;
+    box-shadow: 0 10px 22px rgba(29,80,47,.09) !important;
+  }
+  .cmd-tile-icon {
+    border: 1px solid #dbe9df !important;
+    border-radius: 14px !important;
+    background: #edf5ef !important;
+  }
+  .tri-group-card {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid #e3ebe5 !important;
+    border-radius: 16px !important;
+    background: linear-gradient(150deg, #fff, #fbfdfb) !important;
+    box-shadow: 0 5px 17px rgba(28,66,42,.045) !important;
+  }
+  .tri-group-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 4px;
+    background: #77a987;
+    pointer-events: none;
+  }
+  .tri-group-g2::before { background: #b59a62; }
+  .tri-group-g3::before { background: #7395a9; }
+  .tri-group-card:hover {
+    transform: translateY(-3px) !important;
+    border-color: #c9ddcf !important;
+    box-shadow: 0 11px 25px rgba(28,66,42,.085) !important;
+  }
+
+  /* دکمه‌ها: سلسله‌مراتب رنگی، اندازه و بازخورد یکسان */
+  .btn {
+    min-height: 39px !important;
+    padding: .48rem .9rem !important;
+    border-radius: 11px !important;
+    font-weight: 750 !important;
+    letter-spacing: 0 !important;
+    box-shadow: 0 2px 5px rgba(30,63,42,.035) !important;
+    transition: transform .16s ease, box-shadow .16s ease, background .16s ease, border-color .16s ease !important;
+  }
+  .btn:hover {
+    transform: translateY(-1.5px) !important;
+    box-shadow: 0 5px 12px rgba(30,63,42,.09) !important;
+    filter: none !important;
+  }
+  .btn:active {
+    transform: translateY(0) scale(.985) !important;
+    box-shadow: none !important;
+  }
+  .btn:focus-visible, .nav-link:focus-visible, .subbar-tab-item:focus-visible {
+    outline: 3px solid rgba(64, 139, 88, .3) !important;
+    outline-offset: 2px !important;
+  }
+  .btn-success {
+    background: linear-gradient(135deg, #2e8054, #236a46) !important;
+    border-color: #256d49 !important;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, #4d7895, #3c6682) !important;
+    border-color: #3d6784 !important;
+  }
+  .btn-danger {
+    background: linear-gradient(135deg, #c36e5c, #ae594a) !important;
+    border-color: #a95345 !important;
+  }
+  .btn-dark {
+    background: linear-gradient(135deg, #385244, #263d31) !important;
+    border-color: #2b4435 !important;
+  }
+  .btn-warning {
+    background: linear-gradient(135deg, #f0d99f, #dfc17a) !important;
+    border-color: #d1b36d !important;
+    color: #293a2e !important;
+  }
+  .btn-light, .btn-outline-success, .btn-outline-primary,
+  .btn-outline-danger, .btn-outline-dark, .btn-outline-secondary {
+    background: #fff !important;
+    border: 1px solid #dce7df !important;
+  }
+  .btn-outline-success { color: #286b47 !important; }
+  .btn-outline-primary { color: #456f89 !important; }
+  .btn-outline-danger { color: #a95045 !important; border-color: #ead9d6 !important; }
+  .btn-sm {
+    min-height: 34px !important;
+    padding: .34rem .68rem !important;
+    border-radius: 9px !important;
+  }
+
+  /* فرم‌ها و ورودی‌ها */
+  label {
+    color: #496052 !important;
+    font-weight: 750 !important;
+  }
+  .form-control, .form-select {
+    min-height: 42px !important;
+    border: 1px solid #d8e4db !important;
+    border-radius: 11px !important;
+    background: #fff !important;
+    color: #263a2e !important;
+    box-shadow: 0 1px 3px rgba(26,65,39,.025) !important;
+    transition: border-color .16s ease, box-shadow .16s ease, background .16s ease !important;
+  }
+  .form-control:hover, .form-select:hover {
+    border-color: #b8d0bf !important;
+    background: #fdfefd !important;
+  }
+  .form-control:focus, .form-select:focus {
+    border-color: #58956b !important;
+    box-shadow: 0 0 0 3px rgba(62,133,81,.13) !important;
+    background: #fff !important;
+  }
+  .form-control::placeholder { color: #9aa79e !important; opacity: 1; }
+  textarea.form-control { line-height: 1.85 !important; }
+  input[type="checkbox"], input[type="radio"] { accent-color: #2e8054; }
+  input[type="file"] {
+    padding: .48rem !important;
+    border: 1px dashed #bbd2c1 !important;
+    border-radius: 11px !important;
+    background: #f8fbf8 !important;
+  }
+  .input-group-text {
+    border-color: #d8e4db !important;
+    border-radius: 10px !important;
+    background: #edf5ef !important;
+    color: #42644c !important;
+  }
+
+  /* جداول و فهرست‌ها */
+  .table-responsive {
+    border: 1px solid #e2eae4 !important;
+    border-radius: 13px !important;
+    background: #fff !important;
+    box-shadow: 0 3px 10px rgba(28,65,41,.025) !important;
+  }
+  .table { border-collapse: separate !important; border-spacing: 0 !important; }
+  .table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #edf5ef !important;
+    color: #2b6242 !important;
+    border-bottom: 1px solid #d8e6dc !important;
+    font-weight: 800 !important;
+    white-space: nowrap;
+  }
+  .table tbody tr:nth-child(even) { background: #fbfdfb !important; }
+  .table tbody tr:hover { background: #f0f7f1 !important; }
+  .table td { border-bottom-color: #edf2ee !important; vertical-align: middle; }
+
+  /* پنجره‌ها، اعلان‌ها و دستیار */
+  .alert {
+    border-radius: 13px !important;
+    border: 1px solid rgba(105,135,112,.18) !important;
+  }
+  .guard-modal-overlay {
+    background: rgba(11, 33, 22, .62) !important;
+    backdrop-filter: blur(7px);
+  }
+  .guard-modal-card {
+    border: 1px solid #e1eae3 !important;
+    border-radius: 19px !important;
+    box-shadow: 0 24px 70px rgba(5,25,14,.25) !important;
+  }
+  .toast-msg {
+    border: 1px solid rgba(255,255,255,.22) !important;
+    border-radius: 13px !important;
+    box-shadow: 0 10px 28px rgba(0,0,0,.16) !important;
+  }
+  #ai-chat-history {
+    border: 1px solid #dfe9e2 !important;
+    border-radius: 15px !important;
+    background: #f5f9f6 !important;
+  }
+
+  /* موبایل و تبلت */
+  @media (max-width: 991px) {
+    nav.app-navbar {
+      background: linear-gradient(100deg, #123426, #1d563c) !important;
+      border-bottom: 2px solid var(--polish-gold) !important;
+      box-shadow: 0 5px 16px rgba(16,49,33,.14) !important;
+      scrollbar-width: thin;
+    }
+    nav.app-navbar .nav-link {
+      min-height: 40px !important;
+      border: 1px solid rgba(255,255,255,.12) !important;
+      border-radius: 10px !important;
+      background: rgba(255,255,255,.07) !important;
+      color: #edf4ef !important;
+    }
+    nav.app-navbar .nav-link.active {
+      background: linear-gradient(120deg, #f2dfad, #ddbd77) !important;
+      color: #203b2c !important;
+      border-color: rgba(255,255,255,.5) !important;
+    }
+    .nezam-sb-top-brand { display: none !important; }
+    .nezam-top-subbar { backdrop-filter: blur(12px); }
+  }
+  @media (max-width: 620px) {
+    .top-hero-bar { padding: .72rem .8rem !important; }
+    .top-hero-bar > div { gap: .7rem !important; }
+    #ui-hero-office { max-width: 70vw; }
+    .active-applicant-ContextBar { padding: .68rem .72rem !important; }
+    .card-clean, .tri-group-card { border-radius: 13px !important; }
+    .cmd-tile-grid { gap: .48rem !important; }
+    .cmd-tile { border-radius: 12px !important; }
+    .btn { white-space: normal; }
+    .btn-sm { white-space: nowrap; }
+    .table-responsive { border-radius: 10px !important; }
+  }
+
+  /* احترام به تنظیمات کاهش حرکت */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: .01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: .01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+</style>
+
 <!-- استودیو نقشه‌کشی اضافی بنا به درخواست کاربر حذف شد؛ ابزار اصلی کروکی UTM حفظ شده است. -->
 </body>
 </html>
